@@ -42,7 +42,7 @@ export const THEMES = {
 		bodyMid: '#fff0a8',
 		bodyDark: '#ffcf7a',
 		visor: '#2a2210',
-		eye: '#fffbe6',
+		eye: '#ffd76a',
 		cheek: '#ff9e7a',
 		accent: '#facc15'
 	},
@@ -54,6 +54,33 @@ export const THEMES = {
 		eye: '#ffd76e',
 		cheek: '#ff6fa5',
 		accent: '#f0abfc'
+	},
+	holo: {
+		bodyLight: '#ffffff',
+		bodyMid: '#d9f4ff',
+		bodyDark: '#c2b6ff',
+		visor: '#0f1533',
+		eye: '#9dfcff',
+		cheek: '#ff9ad5',
+		accent: '#6ee7f9'
+	},
+	lavender: {
+		bodyLight: '#fdfaff',
+		bodyMid: '#eadfff',
+		bodyDark: '#c4a9f4',
+		visor: '#231638',
+		eye: '#ead2ff',
+		cheek: '#ff9cc9',
+		accent: '#a78bfa'
+	},
+	noir: {
+		bodyLight: '#6a6d80',
+		bodyMid: '#2e3040',
+		bodyDark: '#16171f',
+		visor: '#050508',
+		eye: '#7dffd4',
+		cheek: '#ff6b9a',
+		accent: '#8b7bff'
 	}
 } satisfies Record<string, ThemeColors>;
 

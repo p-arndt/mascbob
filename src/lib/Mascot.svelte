@@ -1,8 +1,8 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
+	import { untrack, type Snippet } from 'svelte';
 	import { Spring, Tween } from 'svelte/motion';
 	import { MediaQuery } from 'svelte/reactivity';
-	import { cubicOut } from 'svelte/easing';
+	import { cubicIn, cubicOut } from 'svelte/easing';
 	import { setMascot, svgRef } from './context.js';
 	import { SHAPE_DEFS, clamp } from './geometry.js';
 	import Accessories from './parts/Accessories.svelte';
@@ -92,9 +92,102 @@
 	const blink = new Tween(0, { duration: 70 });
 	const gaze = new Spring({ x: 0, y: 0 }, { stiffness: 0.07, damping: 0.45 });
 	const squish = new Spring({ x: 1, y: 1 }, { stiffness: 0.16, damping: 0.18 });
+	/** Degrees; leaning toward a hovering pointer. */
+	const lean = new Spring(0, { stiffness: 0.06, damping: 0.4 });
+	/** Degrees; a loose spring so kicks ring out as a wobble. */
+	const wobble = new Spring(0, { stiffness: 0.12, damping: 0.14 });
+	/** ViewBox units, negative is up. */
+	const hop = new Tween(0);
 
 	let root = $state<HTMLElement>();
 	let talk = $state(0);
+	let pointerX = $state(0);
+	let entered = $state(false);
+
+	// Matches the CSS pop-in, so parts can hold back their own flourishes until it is done.
+	$effect(() => {
+		if (reduced) {
+			entered = true;
+			return;
+		}
+		const timer = setTimeout(() => (entered = true), 650);
+		return () => clearTimeout(timer);
+	});
+
+	const restSquish = () =>
+		pressed ? { x: 1.1, y: 0.88 } : hovered ? { x: 0.985, y: 1.03 } : { x: 1, y: 1 };
+
+	// Pressing squashes and holds (well damped, so it doesn't jiggle while held); releasing
+	// springs back loosely, which overshoots into a jelly bounce.
+	$effect(() => {
+		if (reduced) {
+			squish.set({ x: 1, y: 1 }, { instant: true });
+			return;
+		}
+		squish.damping = pressed ? 0.6 : 0.18;
+		squish.stiffness = pressed ? 0.25 : 0.16;
+		squish.target = restSquish();
+	});
+
+	$effect(() => {
+		lean.target = reduced || !hovered ? 0 : pointerX * 6;
+	});
+
+	let hopId = 0;
+	/** Jump up by `height` viewBox units and land with a little squash. */
+	async function jump(height: number, up = 150) {
+		if (instant) return;
+		const id = ++hopId;
+		await hop.set(-height, { duration: up, easing: cubicOut });
+		if (id !== hopId) return;
+		await hop.set(0, { duration: up * 1.1, easing: cubicIn });
+		if (id !== hopId) return;
+		const impact = Math.min(height / 90, 0.14);
+		squish.set({ x: 1 + impact, y: 1 - impact }, { instant: true });
+		squish.target = restSquish();
+	}
+
+	let wobbleTimer: ReturnType<typeof setTimeout> | undefined;
+	function kickWobble(deg: number) {
+		if (instant) return;
+		wobble.target = deg;
+		clearTimeout(wobbleTimer);
+		wobbleTimer = setTimeout(() => (wobble.target = 0), 110);
+	}
+	$effect(() => () => clearTimeout(wobbleTimer));
+
+	// Mood changes get a small anticipation hop and a wobble; the boop's own `happy` doesn't count.
+	let lastMood: Mood | undefined;
+	$effect(() => {
+		const next = mood;
+		if (lastMood !== undefined && lastMood !== next) {
+			untrack(() => {
+				jump(6, 130);
+				kickWobble(Math.random() < 0.5 ? -4 : 4);
+			});
+		}
+		lastMood = next;
+	});
+
+	// Rare idle fidgets keep it alive without being busy.
+	$effect(() => {
+		if (reduced) return;
+		let timer: ReturnType<typeof setTimeout>;
+		const schedule = () => {
+			timer = setTimeout(
+				() => {
+					if (!hovered && !pressed && !booping) {
+						if (Math.random() < 0.5) kickWobble(Math.random() < 0.5 ? -3 : 3);
+						else jump(4, 140);
+					}
+					schedule();
+				},
+				7000 + Math.random() * 9000
+			);
+		};
+		schedule();
+		return () => clearTimeout(timer);
+	});
 
 	// Blinking, with the occasional double blink; sleepy eyes are already closed.
 	$effect(() => {
@@ -144,7 +237,22 @@
 			glance();
 			return () => clearTimeout(timer);
 		}
+		// After a while without pointer movement it glances around on its own.
+		let idleTimer: ReturnType<typeof setTimeout>;
+		const glanceAround = () => {
+			gaze.target =
+				Math.random() < 0.3
+					? { x: 0, y: 0 }
+					: { x: Math.random() * 1.6 - 0.8, y: Math.random() * 1 - 0.5 };
+			idleTimer = setTimeout(glanceAround, 1400 + Math.random() * 2200);
+		};
+		const armIdle = () => {
+			clearTimeout(idleTimer);
+			idleTimer = setTimeout(glanceAround, 4000);
+		};
+		armIdle();
 		const move = (e: PointerEvent) => {
+			armIdle();
 			if (!root) return;
 			const rect = root.getBoundingClientRect();
 			// Normalize by a reach larger than the mascot so the eyes keep following far-away pointers.
@@ -158,6 +266,7 @@
 		window.addEventListener('pointermove', move);
 		document.documentElement.addEventListener('pointerleave', reset);
 		return () => {
+			clearTimeout(idleTimer);
 			window.removeEventListener('pointermove', move);
 			document.documentElement.removeEventListener('pointerleave', reset);
 		};
@@ -189,8 +298,11 @@
 
 	function boop() {
 		if (!reduced) {
-			squish.set({ x: 1.14, y: 0.84 }, { instant: true });
-			squish.target = { x: 1, y: 1 };
+			// Stretch on take-off; `jump` squashes again on landing.
+			squish.set({ x: 0.86, y: 1.16 }, { instant: true });
+			squish.target = restSquish();
+			jump(11);
+			kickWobble(pointerX < 0 ? -3 : 3);
 		}
 		booping = true;
 		boops++;
@@ -214,6 +326,26 @@
 	const groundY = $derived(body ? BODY_GROUND_Y : head.bottom + 14);
 	// With a body, the whole figure leans around its hips instead of the head's center.
 	const tiltPivot = $derived(body ? '100 230' : '100 110');
+	// Lean and wobble rock from the base (hips with a body), like something standing.
+	const rockPivot = $derived(body ? '100 250' : `100 ${head.bottom}`);
+	const rock = $derived(lean.current + wobble.current);
+	// The ground reacts to the hop and the squash: smaller and fainter while airborne.
+	const air = $derived(clamp(-hop.current / 24, 0, 1));
+	const groundScale = $derived((1 - air * 0.35) * (1 + (squish.current.x - 1) * 0.8));
+	// With a body the neck pivot gets a bit less, since the whole figure squashes too.
+	const headSx = $derived(body ? 1 + (sx - 1) * 0.7 : sx);
+	const headSy = $derived(body ? 1 + (sy - 1) * 0.7 : sy);
+	// In full-body mode the hover pod takes some of the squash so the head doesn't sink into the torso.
+	const figureSquash = $derived(
+		body
+			? `translate(100 ${BODY_GROUND_Y}) scale(${1 + (sx - 1) * 0.35} ${1 + (sy - 1) * 0.35}) translate(-100 ${-BODY_GROUND_Y})`
+			: ''
+	);
+
+	function trackPointer(e: PointerEvent) {
+		const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+		pointerX = clamp((e.clientX - (rect.left + rect.width / 2)) / (rect.width / 2), -1, 1);
+	}
 
 	setMascot({
 		uid,
@@ -264,6 +396,21 @@
 		},
 		get outfit() {
 			return outfit;
+		},
+		get lean() {
+			return rock;
+		},
+		get hop() {
+			return hop.current;
+		},
+		get squashX() {
+			return headSx;
+		},
+		get squashY() {
+			return headSy;
+		},
+		get entered() {
+			return entered;
 		}
 	});
 </script>
@@ -287,33 +434,54 @@
 					<feMergeNode in="SourceGraphic" />
 				</feMerge>
 			</filter>
+			<radialGradient id="{uid}-ground-glow">
+				<stop offset="0" class="stop-accent" stop-opacity="0.38" />
+				<stop offset="0.55" class="stop-accent" stop-opacity="0.12" />
+				<stop offset="1" class="stop-accent" stop-opacity="0" />
+			</radialGradient>
+			<radialGradient id="{uid}-ground-shadow">
+				<stop offset="0" class="stop-visor" stop-opacity="0.34" />
+				<stop offset="0.6" class="stop-visor" stop-opacity="0.14" />
+				<stop offset="1" class="stop-visor" stop-opacity="0" />
+			</radialGradient>
 			<filter id="{uid}-soft" x="-50%" y="-50%" width="200%" height="200%">
 				<feGaussianBlur stdDeviation="2.4" />
 			</filter>
 		</defs>
 
-		<ellipse class="shadow" cx="100" cy={groundY} rx={hw * 0.7} ry="6" filter={ref('soft')} />
+		<g transform="translate(100 {groundY}) scale({groundScale} 1)" opacity={1 - air * 0.5}>
+			<ellipse class="ground-glow" rx={hw * 1.15} ry="14" fill={ref('ground-glow')} />
+			<ellipse class="shadow" rx={hw * 0.72} ry="6.5" fill={ref('ground-shadow')} />
+			<ellipse class="contact" rx={hw * 0.36} ry="2.6" fill={ref('ground-shadow')} />
+		</g>
 
-		<g class="float">
-			<g transform="rotate({f.tilt} {tiltPivot})">
-				{#if body}
-					<Body layer="back" />
-				{/if}
-				<g transform="translate(100 {head.bottom}) scale({sx} {sy}) translate(-100 {-head.bottom})">
-					<g class="breathe">
-						<Accessories layer="back" />
-						<Shell />
-						<Face />
-						<Accessories layer="front" />
-						{@render accessory?.({ top: t, halfWidth: hw })}
+		<g class="pop">
+			<g class="float">
+				<g transform="translate(0 {hop.current}) rotate({rock} {rockPivot})">
+					<g transform="{figureSquash} rotate({f.tilt} {tiltPivot})">
+						{#if body}
+							<Body layer="back" />
+						{/if}
+						<g
+							class="head"
+							transform="translate(100 {head.bottom}) scale({headSx} {headSy}) translate(-100 {-head.bottom})"
+						>
+							<g class="breathe">
+								<Accessories layer="back" />
+								<Shell />
+								<Face />
+								<Accessories layer="front" />
+								{@render accessory?.({ top: t, halfWidth: hw })}
+							</g>
+						</g>
+						{#if body}
+							<Body layer="front" />
+						{:else if hands}
+							<Hands />
+						{/if}
+						<Effects />
 					</g>
 				</g>
-				{#if body}
-					<Body layer="front" />
-				{:else if hands}
-					<Hands />
-				{/if}
-				<Effects />
 			</g>
 		</g>
 	</svg>
@@ -332,8 +500,15 @@
 		style:width={cssSize}
 		style:aspect-ratio="200 / {viewH}"
 		onclick={boop}
-		onpointerenter={() => (hovered = true)}
-		onpointerleave={() => (hovered = pressed = false)}
+		onpointerenter={(e) => {
+			hovered = true;
+			trackPointer(e);
+		}}
+		onpointermove={trackPointer}
+		onpointerleave={() => {
+			hovered = pressed = false;
+			pointerX = 0;
+		}}
 		onpointerdown={() => (pressed = true)}
 		onpointerup={() => (pressed = false)}
 		onpointercancel={() => (pressed = false)}
@@ -399,30 +574,44 @@
 		stop-color: var(--c-body-dark);
 	}
 
-	.shadow {
-		fill: var(--c-visor);
-		opacity: 0.2;
+	.stop-accent {
+		stop-color: var(--c-accent);
+	}
+	.stop-visor {
+		stop-color: var(--c-visor);
 	}
 
 	/* Transform-origin in SVG only means something relative to the element's own box. */
 	.float,
 	.breathe,
-	.shadow {
+	.shadow,
+	.contact,
+	.ground-glow,
+	.pop {
 		transform-box: fill-box;
 		transform-origin: center;
+	}
+	.pop {
+		transform-origin: 50% 100%;
+		animation: pop-in 0.62s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 	}
 	.float {
 		animation: float var(--float-speed) ease-in-out infinite alternate;
 	}
-	.shadow {
+	.shadow,
+	.contact,
+	.ground-glow {
 		animation: shadow var(--float-speed) ease-in-out infinite alternate;
 	}
+	/* A slightly off-beat, uneven cycle so breathing never syncs with the float and feels organic. */
 	.breathe {
 		transform-origin: 50% 100%;
-		animation: breathe calc(var(--float-speed) * 1.3) ease-in-out infinite alternate;
+		animation: breathe calc(var(--float-speed) * 1.37) ease-in-out infinite;
 	}
 	.no-float .float,
-	.no-float .shadow {
+	.no-float .shadow,
+	.no-float .contact,
+	.no-float .ground-glow {
 		animation: none;
 	}
 	.still :global(*),
@@ -430,6 +619,15 @@
 		animation: none !important;
 	}
 
+	@keyframes pop-in {
+		from {
+			transform: scale(0.6);
+			opacity: 0;
+		}
+		40% {
+			opacity: 1;
+		}
+	}
 	@keyframes float {
 		to {
 			transform: translateY(-7px);
@@ -437,13 +635,23 @@
 	}
 	@keyframes shadow {
 		to {
-			transform: scaleX(0.8);
-			opacity: 0.1;
+			transform: scaleX(0.82);
+			opacity: 0.55;
 		}
 	}
 	@keyframes breathe {
-		to {
-			transform: scale(1.012, 0.985);
+		0%,
+		100% {
+			transform: scale(1, 1);
+		}
+		38% {
+			transform: scale(1.008, 0.99);
+		}
+		52% {
+			transform: scale(1.009, 0.988);
+		}
+		78% {
+			transform: scale(0.998, 1.003);
 		}
 	}
 </style>

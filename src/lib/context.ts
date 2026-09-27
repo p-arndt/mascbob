@@ -34,6 +34,19 @@ export interface MascotContext {
 	/** Full-body mode. */
 	readonly body: boolean;
 	readonly outfit: Outfit;
+	/**
+	 * Degrees the whole figure currently rocks around its base (hover lean toward the
+	 * pointer plus wobbles from boops, mood changes and fidgets). Positive leans right.
+	 * Useful for secondary motion, e.g. antennas or ears that lag the other way.
+	 */
+	readonly lean: number;
+	/** Vertical hop offset in viewBox units, negative while airborne (boop, mood change, fidget). */
+	readonly hop: number;
+	/** Current head scale around its bottom: > 1 on x and < 1 on y while squashed (press, landing). */
+	readonly squashX: number;
+	readonly squashY: number;
+	/** False while the mount pop-in plays (~650 ms); true immediately under reduced motion. */
+	readonly entered: boolean;
 }
 
 const KEY = Symbol('mascott');
