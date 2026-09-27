@@ -117,8 +117,8 @@
 	const blink = new Tween(0, { duration: 70 });
 	const gaze = new Spring({ x: 0, y: 0 }, { stiffness: 0.07, damping: 0.45 });
 	const squish = new Spring({ x: 1, y: 1 }, { stiffness: 0.16, damping: 0.18 });
-	/** Degrees; leaning toward a hovering pointer. */
-	const lean = new Spring(0, { stiffness: 0.06, damping: 0.4 });
+	/** Degrees; the head tilts toward the pointer on its neck while the body stays planted. */
+	const headTurn = new Spring(0, { stiffness: 0.07, damping: 0.42 });
 	/** Degrees; a loose spring so kicks ring out as a wobble. */
 	const wobble = new Spring(0, { stiffness: 0.12, damping: 0.14 });
 	/** ViewBox units, negative is up. */
@@ -166,7 +166,7 @@
 
 	let reactionLean = $state(0);
 	$effect(() => {
-		lean.target = reduced ? 0 : (hovered ? pointerX * 6 : 0) + reactionLean;
+		headTurn.target = reduced ? 0 : (hovered ? pointerX * 5 : 0) + reactionLean;
 	});
 
 	let hopId = 0;
@@ -410,7 +410,8 @@
 	const tiltPivot = $derived(body ? '100 214' : '100 110');
 	// Lean and wobble rock from the base (the soles with a body), like something standing.
 	const rockPivot = $derived(body ? `100 ${BODY_GROUND_Y}` : `100 ${head.bottom}`);
-	const rock = $derived(lean.current + wobble.current);
+	const rock = $derived(wobble.current);
+	const neckY = $derived(head.bottom - 6);
 	// The ground reacts to the hop and the squash: smaller and fainter while airborne.
 	const air = $derived(clamp(-hop.current / 24, 0, 1));
 	const groundScale = $derived((1 - air * 0.35) * (1 + (squish.current.x - 1) * 0.8));
@@ -483,7 +484,7 @@
 			return shoes;
 		},
 		get lean() {
-			return rock;
+			return rock + headTurn.current;
 		},
 		get hop() {
 			return hop.current;
@@ -559,16 +560,18 @@
 							{#if body}
 								<Body layer="back" />
 							{/if}
-							<g
-								class="head"
-								transform="translate(100 {head.bottom}) scale({headSx} {headSy}) translate(-100 {-head.bottom})"
-							>
-								<g class="breathe">
-									<Accessories layer="back" />
-									<Shell />
-									<Face />
-									<Accessories layer="front" />
-									{@render accessory?.({ top: t, halfWidth: hw })}
+							<g transform="rotate({headTurn.current} 100 {neckY})">
+								<g
+									class="head"
+									transform="translate(100 {head.bottom}) scale({headSx} {headSy}) translate(-100 {-head.bottom})"
+								>
+									<g class="breathe">
+										<Accessories layer="back" />
+										<Shell />
+										<Face />
+										<Accessories layer="front" />
+										{@render accessory?.({ top: t, halfWidth: hw })}
+									</g>
 								</g>
 							</g>
 							{#if body}

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	CircleDetector,
 	DEFAULT_REACTIONS,
+	FOLLOW_TILT,
 	FlickDetector,
 	PetDetector,
 	REACTIONS,
@@ -286,12 +287,13 @@ describe('ReactionController', () => {
 	});
 
 	it('leans away when shy and toward the pointer otherwise', () => {
-		const { host, events, at } = setup({ shy: true });
+		const { host, events, at, shown } = setup({ shy: true });
 		at(400, 150);
-		expect(host.lean).toHaveBeenLastCalledWith(expect.closeTo(3 * (300 / 450), 1));
+		expect(host.lean).toHaveBeenLastCalledWith(expect.closeTo(FOLLOW_TILT * (300 / 450), 1));
 		at(110, 100);
 		expect(events).toContainEqual({ type: 'shy' });
 		expect(host.lean).toHaveBeenLastCalledWith(-7);
+		expect(shown.at(-1)).toEqual({ name: 'shy', mood: 'shy' });
 	});
 
 	it('giggles and then sulks under rapid boops', () => {

@@ -3,7 +3,7 @@ import type { Mood } from './types.js';
 /**
  * Pointer reactions, each individually switchable through the `reactions` prop:
  *
- * - `follow`: the whole figure leans slightly toward the pointer, wherever it is.
+ * - `follow`: the head tilts toward the pointer, wherever it is on the page.
  * - `pet`: stroking back and forth over the head makes it content; enough strokes earn hearts.
  * - `startle`: a very fast flick of the pointer close by makes it jump in surprise.
  * - `dizzy`: circling the pointer around it twice makes its eyes roll and it wobble.
@@ -12,6 +12,9 @@ import type { Mood } from './types.js';
  * - `bored`: with the pointer resting for a long while it dozes off (only while `mood` is `idle`)
  *   and wakes up when the pointer moves again.
  */
+/** Degrees the head tilts toward a far-away pointer with `follow`. */
+export const FOLLOW_TILT = 9;
+
 export const REACTIONS = ['follow', 'pet', 'startle', 'dizzy', 'shy', 'tickle', 'bored'] as const;
 export type Reaction = (typeof REACTIONS)[number];
 
@@ -263,7 +266,7 @@ export interface ReactionState {
 /** Hooks into the component; all motion helpers are expected to no-op under reduced motion. */
 export interface ReactionHost {
 	show(state: ReactionState | null): void;
-	/** Extra lean in degrees, positive to the right. */
+	/** Extra head tilt in degrees, positive to the right. */
 	lean(deg: number): void;
 	/** Gaze target, -1..1 on both axes. */
 	look(x: number, y: number): void;
@@ -421,7 +424,7 @@ export class ReactionController {
 
 		if (f.follow && !this.shy) {
 			const reach = Math.max(viewHeight, 200) * 1.5;
-			this.setLean(Math.max(-1, Math.min(1, dx / reach)) * 3);
+			this.setLean(Math.max(-1, Math.min(1, dx / reach)) * FOLLOW_TILT);
 		}
 		this.refresh();
 	}
@@ -587,5 +590,5 @@ export class ReactionController {
 }
 
 const PETTING: ReactionState = { name: 'pet', mood: 'happy' };
-const SHY: ReactionState = { name: 'shy', mood: 'wink' };
+const SHY: ReactionState = { name: 'shy', mood: 'shy' };
 const BORED: ReactionState = { name: 'bored', mood: 'sleepy' };

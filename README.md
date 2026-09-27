@@ -21,7 +21,7 @@ pnpm add mascott
 <Mascot {mood} theme="og" accessories={['ring']} onboop={() => (mood = 'love')} />
 ```
 
-It reacts to the pointer: stroke over its head to pet it, circle around it to make it dizzy,
+It reacts to the pointer: its head tilts toward the cursor, stroke over its head to pet it, circle around it to make it dizzy,
 boop it over and over to tickle it, or leave it alone until it gets bored. `follow`, `pet`,
 `dizzy`, `tickle` and `bored` are on by default; `startle` and `shy` are opt-in:
 
