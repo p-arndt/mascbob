@@ -106,21 +106,16 @@
 {/snippet}
 
 <!--
-	Shoes share one construction: the dark back rim of the collar, then the ankle (in leg
-	color, so it reads as the leg going in), then the upper whose top edge is the front lip.
+	Shoes are drawn in two passes around the fixed leg: the dark back rim of the collar
+	behind it, then the upper, whose top edge is the front lip. The leg itself reaches into
+	the shoe, so a toe tap can never pull a seam open between them.
 -->
-{#snippet collar(y: number, rx: number)}
-	<ellipse class="opening" cx="0" cy={-y} {rx} ry="3" />
-	<!-- Slightly wider and taller than the leg, so the toe tap never opens a notch. -->
-	<rect class="ankle-stub" x="-7.4" y={-y - 10} width="14.8" height="15" rx="3.5" />
-{/snippet}
 
 {#snippet sneaker(high: boolean, side: number)}
 	{@const c = high ? FOOT_COLLAR.hightops : FOOT_COLLAR.sneakers}
 	<!-- Short, round toe box: toy sneakers read cute; long ones read as flippers from the front. -->
 	{@const upper = `M-11 -9C-13 ${-c * 0.6} -12.5 ${-c} -8.6 ${-c}Q0 ${-c + 3.8} 8.6 ${-c}C${high ? 9.5 : 10} ${-c * 0.6} 11 -19 16 -17.5C21.5 -16 23 -12 22.5 -9Z`}
 	<g class={high ? 'shoe-hightops' : 'shoe-sneakers'}>
-		{@render collar(c, 8.6)}
 		<path class="upper" d={upper} fill={ref('shoe')} />
 		<path d={upper} fill={ref('shoe-ao')} />
 		{#if high}
@@ -155,7 +150,6 @@
 	{@const upper = `M-13 -11C-14.5 ${-c * 0.6} -13.5 ${-c} -9 ${-c}Q0 ${-c + 3.6} 9 ${-c}C10 ${-c * 0.6} 13 -21 20 -19.5C28 -18 31.5 -15 31 -11Z`}
 	<g class="shoe-boots">
 		<rect class="pull-tab" x="-12.5" y={-c - 6} width="5" height="9" rx="2.2" />
-		{@render collar(c, 9)}
 		<path class="boot-upper" d={upper} />
 		<path d={upper} fill={ref('shoe-ao')} />
 		<path class="cuff" d="M-9.5 {-c}Q0 {-c + 4.2} 9.5 {-c}" />
@@ -185,6 +179,40 @@
 		</linearGradient>
 	</defs>
 
+	{#snippet foot(side: number, rim: boolean)}
+		{@const x = 100 + side * LEG_X}
+		<!-- Both passes run the same animation from mount, so they stay in lockstep. -->
+		<g
+			class="foot"
+			class:tap={side === 1 && tapping}
+			style:transform-origin="{x}px {BODY_GROUND_Y - (FOOT_COLLAR[shoes] ?? 0) * FOOT_SCALE}px"
+		>
+			<g transform="translate({x} {BODY_GROUND_Y}) scale({side * FOOT_SCALE} {FOOT_SCALE})">
+				{#if rim}
+					{#if shoes !== 'none'}
+						<ellipse
+							class="opening"
+							cx="0"
+							cy={-FOOT_COLLAR[shoes]}
+							rx={shoes === 'boots' ? 9 : 8.6}
+							ry="3"
+						/>
+					{/if}
+				{:else if shoes === 'sneakers' || shoes === 'hightops'}
+					{@render sneaker(shoes === 'hightops', side)}
+				{:else if shoes === 'boots'}
+					{@render boot()}
+				{:else}
+					{@render plainFoot()}
+				{/if}
+			</g>
+		</g>
+	{/snippet}
+
+	{#each [-1, 1] as side (side)}
+		{@render foot(side, true)}
+	{/each}
+
 	{#each [-1, 1] as side (side)}
 		<g transform="translate({100 + side * LEG_X} 0)">
 			<rect class="leg" x="-8.5" y={legTop} width="17" height={legBottom - legTop} rx="8.5" />
@@ -194,22 +222,7 @@
 
 	<!-- Each foot is centered on its leg: the leg steps into the collar instead of standing on the shoe. -->
 	{#each [-1, 1] as side (side)}
-		{@const x = 100 + side * LEG_X}
-		<g
-			class="foot"
-			class:tap={side === 1 && tapping}
-			style:transform-origin="{x - side * 6 * FOOT_SCALE}px {BODY_GROUND_Y}px"
-		>
-			<g transform="translate({x} {BODY_GROUND_Y}) scale({side * FOOT_SCALE} {FOOT_SCALE})">
-				{#if shoes === 'sneakers' || shoes === 'hightops'}
-					{@render sneaker(shoes === 'hightops', side)}
-				{:else if shoes === 'boots'}
-					{@render boot()}
-				{:else}
-					{@render plainFoot()}
-				{/if}
-			</g>
-		</g>
+		{@render foot(side, false)}
 	{/each}
 {:else if layer === 'back'}
 	<defs>
@@ -392,9 +405,6 @@
 		fill: var(--c-visor);
 		opacity: 0.7;
 	}
-	.ankle-stub {
-		fill: var(--c-body-dark);
-	}
 	.upper {
 		stroke: var(--c-visor);
 		stroke-width: 0.8;
@@ -448,7 +458,10 @@
 		stroke-width: 2.2;
 		opacity: 0.35;
 	}
-	/* The foot pivots just behind the ankle, so a tap lifts the toe without pulling the shoe off the leg. */
+	/*
+	 * The foot pivots on the ankle, where the leg enters it: the joint stays closed while the
+	 * toe lifts. The small lift keeps the heel from sinking into the ground.
+	 */
 	.foot {
 		transform-box: view-box;
 	}
@@ -617,13 +630,13 @@
 			transform: rotate(0);
 		}
 		81% {
-			transform: rotate(-7deg);
+			transform: translateY(-2.5px) rotate(-8deg);
 		}
 		86% {
 			transform: rotate(0);
 		}
 		91% {
-			transform: rotate(-5deg);
+			transform: translateY(-1.6px) rotate(-5deg);
 		}
 		96% {
 			transform: rotate(0);

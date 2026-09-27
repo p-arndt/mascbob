@@ -56,7 +56,8 @@ describe('Body', () => {
 		expect(render(Mascot, { mood: 'sad' }).container.querySelector('.foot.tap')).toBeNull();
 		for (const shoes of ['none', 'boots'] as const) {
 			const { container } = render(Mascot, { mood: 'idle', shoes });
-			expect(container.querySelectorAll('.foot.tap')).toHaveLength(1);
+			// The tapping foot is drawn in two passes (collar rim, then shoe) that move together.
+			expect(container.querySelectorAll('.foot.tap')).toHaveLength(2);
 		}
 	});
 });

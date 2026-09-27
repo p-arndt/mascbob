@@ -39,9 +39,9 @@ export const FOOT_COLLAR: Record<Shoes, number> = {
 	boots: 33
 };
 
-/** Where the fixed part of the leg ends: at the collar, where the foot's ankle stub takes over. */
+/** Where the leg ends: a little below the collar, hidden inside the shoe or foot. */
 export function legBottomY(shoes: Shoes): number {
-	return BODY_GROUND_Y - (FOOT_COLLAR[shoes] ?? FOOT_COLLAR.none) * FOOT_SCALE;
+	return BODY_GROUND_Y - ((FOOT_COLLAR[shoes] ?? FOOT_COLLAR.none) - 6) * FOOT_SCALE;
 }
 
 /** The torso stays compact under wide heads, otherwise it'd read as a barrel. */
