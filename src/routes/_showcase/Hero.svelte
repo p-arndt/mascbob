@@ -1,241 +1,226 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { fly, scale } from 'svelte/transition';
-	import { backOut } from 'svelte/easing';
+	import { backOut, cubicOut } from 'svelte/easing';
 	import { MediaQuery } from 'svelte/reactivity';
 	import {
 		MOODS,
 		Mascot,
-		type Accessory,
-		type EyeStyle,
+		OUTFITS,
+		SHAPES,
+		THEMES,
 		type Mood,
 		type Outfit,
 		type Shape,
-		type Shoes,
 		type ThemeName
 	} from '$lib/index.js';
 	import { copyText, pick } from './interactions.js';
 
 	const reduced = new MediaQuery('(prefers-reduced-motion: reduce)');
+	const themeNames = Object.keys(THEMES) as ThemeName[];
 
-	type Member = {
-		theme: ThemeName;
-		shape: Shape;
-		mood: Mood;
-		eyes?: EyeStyle;
-		accessories?: Accessory[];
-		outfit?: Outfit;
-		shoes?: Shoes;
-		/** Hidden on narrow screens, where only the middle of the line-up fits. */
-		edge?: boolean;
+	/** The headline is the mascot's current mood, said the way a person would say it. */
+	const WORDS: Record<Mood, string> = {
+		idle: 'chill',
+		happy: 'happy',
+		listening: 'curious',
+		thinking: 'hmm',
+		talking: 'chatty',
+		surprised: 'whoa',
+		sleepy: 'sleepy',
+		sad: 'blue',
+		love: 'smitten',
+		wink: 'cheeky',
+		grumpy: 'grumpy',
+		shy: 'shy',
+		waving: 'hiya'
 	};
 
-	// A group photo: everyone full body on one floor line, the default mascot in the middle.
-	const CAST: Member[] = [
-		{
-			theme: 'volt',
-			shape: 'pebble',
-			mood: 'wink',
-			eyes: 'dot',
-			accessories: ['antenna'],
-			edge: true
-		},
-		{ theme: 'lilac', shape: 'ghost', mood: 'love', accessories: ['halo'], outfit: 'bowtie' },
-		{ theme: 'og', shape: 'capsule', mood: 'happy', outfit: 'puffer', shoes: 'sneakers' },
-		{
-			theme: 'ice',
-			shape: 'bean',
-			mood: 'idle',
-			eyes: 'pill',
-			outfit: 'hoodie',
-			shoes: 'hightops'
-		},
-		{
-			theme: 'noir',
-			shape: 'squircle',
-			mood: 'thinking',
-			eyes: 'wide',
-			accessories: ['headphones'],
-			shoes: 'boots',
-			edge: true
-		}
-	];
-
-	type Reaction = { mood: Mood; label: string; ms: number; say?: string };
-	const REACTIONS = (
+	// Autoplay walks through hand-picked pairs so every step changes both the face and the colorway.
+	const TOUR: [Mood, ThemeName][] = (
 		[
-			{ mood: 'waving', label: 'Say hi', ms: 2200, say: 'Hey there!' },
-			{ mood: 'love', label: 'Love', ms: 2200, say: 'Aww.' },
-			{ mood: 'surprised', label: 'Surprise', ms: 1600, say: 'Whoa!' },
-			{ mood: 'thinking', label: 'Think', ms: 2600, say: 'Hmm…' },
-			{ mood: 'talking', label: 'Talk', ms: 5400, say: 'Blah blah blah…' },
-			{ mood: 'sleepy', label: 'Nap', ms: 3600 },
-			{ mood: 'grumpy', label: 'Grumpy', ms: 1800, say: 'Hmph.' }
-		] satisfies Reaction[]
-	).filter((r) => (MOODS as readonly string[]).includes(r.mood));
-	const BOOP_LINES = ['Hehe!', 'Boop received.', 'Again!', 'That tickles.', '*happy beeps*'];
+			['happy', 'og'],
+			['love', 'lilac'],
+			['surprised', 'ice'],
+			['thinking', 'noir'],
+			['wink', 'volt'],
+			['sleepy', 'mocha'],
+			['grumpy', 'bred'],
+			['waving', 'og']
+		] satisfies [Mood, ThemeName][]
+	).filter(([m, t]) => MOODS.includes(m) && themeNames.includes(t));
 
-	let moods = $state<Mood[]>(CAST.map((m) => m.mood));
-	let active = $state<Mood | null>(null);
-	let bubble = $state<{ at: number; text: string } | null>(null);
+	let mood = $state<Mood>('happy');
+	let theme = $state<ThemeName>('og');
+	let shape = $state<Shape>('capsule');
+	let outfit = $state<Outfit>('puffer');
 	let copied = $state(false);
+	let bubble = $state<string | null>(null);
 
-	let timers: ReturnType<typeof setTimeout>[] = [];
-	function clearTimers() {
-		timers.forEach(clearTimeout);
-		timers = [];
-	}
-	function later(ms: number, fn: () => void) {
-		timers.push(setTimeout(fn, ms));
-	}
+	const accent = $derived(THEMES[theme].accent);
+	const word = $derived(WORDS[mood]);
 
-	function react(r: Reaction) {
-		clearTimers();
-		active = r.mood;
-		bubble = r.say ? { at: 2, text: r.say } : null;
-		// A short ripple across the cast reads as a crowd reacting, not a single switch flipping.
-		CAST.forEach((_, i) => later(d(i * 70), () => (moods[i] = r.mood)));
-		later(r.ms, () => {
-			active = null;
-			bubble = null;
-			CAST.forEach((m, i) => (moods[i] = m.mood));
-		});
-	}
+	type Prop = 'mood' | 'theme' | 'shape' | 'outfit';
+	const OPTIONS: Record<Prop, readonly string[]> = {
+		mood: MOODS,
+		theme: themeNames,
+		shape: SHAPES,
+		outfit: OUTFITS
+	};
+	const PROPS = Object.keys(OPTIONS) as Prop[];
+	const values = $derived<Record<Prop, string>>({ mood, theme, shape, outfit });
+	const code = $derived(
+		`<Mascot mood="${mood}" theme="${theme}" shape="${shape}" outfit="${outfit}" />`
+	);
 
-	function boop(i: number) {
-		if (active) return;
-		clearTimers();
-		bubble = { at: i, text: pick(BOOP_LINES) };
-		later(1600, () => (bubble = null));
+	let touchedAt = 0;
+	function touch() {
+		touchedAt = Date.now();
 	}
 
-	// Number keys fire the reactions in button order.
-	function onkeydown(e: KeyboardEvent) {
-		if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
-		const target = e.target as HTMLElement | null;
-		if (target?.closest('input, textarea, select, [contenteditable]')) return;
-		const r = REACTIONS[Number(e.key) - 1];
-		if (r && scrollY < innerHeight) react(r);
+	function cycle(prop: Prop) {
+		touch();
+		const list = OPTIONS[prop];
+		const next = list[(list.indexOf(values[prop]) + 1) % list.length];
+		if (prop === 'mood') mood = next as Mood;
+		else if (prop === 'theme') theme = next as ThemeName;
+		else if (prop === 'shape') shape = next as Shape;
+		else outfit = next as Outfit;
+	}
+
+	const BOOP_LINES = ['Hehe!', 'Boop!', 'Again!', 'That tickles.', '*beep*'];
+	let bubbleTimer: ReturnType<typeof setTimeout> | undefined;
+	function boop() {
+		touch();
+		mood = pick(MOODS.filter((m) => m !== mood && m !== 'talking'));
+		bubble = pick(BOOP_LINES);
+		clearTimeout(bubbleTimer);
+		bubbleTimer = setTimeout(() => (bubble = null), 1400);
 	}
 
 	onMount(() => {
-		later(600, () => (bubble = { at: 2, text: 'Oh, hi!' }));
-		later(2600, () => (bubble = null));
-		return clearTimers;
+		if (reduced.current) return;
+		let step = 0;
+		const id = setInterval(() => {
+			// Whoever is playing with it keeps control; autoplay resumes only after a quiet spell.
+			if (Date.now() - touchedAt < 9000) return;
+			step = (step + 1) % TOUR.length;
+			[mood, theme] = TOUR[step];
+		}, 2600);
+		return () => {
+			clearInterval(id);
+			clearTimeout(bubbleTimer);
+		};
 	});
 
-	async function copyInstall() {
-		copied = await copyText('pnpm add mascott');
+	async function copyCode() {
+		touch();
+		copied = await copyText(code);
 		setTimeout(() => (copied = false), 1400);
+	}
+
+	let installCopied = $state(false);
+	async function copyInstall() {
+		installCopied = await copyText('pnpm add mascott');
+		setTimeout(() => (installCopied = false), 1400);
 	}
 
 	const d = (ms: number) => (reduced.current ? 0 : ms);
 </script>
 
-<svelte:window {onkeydown} />
-
-<header class="hero">
+<header class="hero" style:--accent={accent}>
 	<div class="copy">
-		<h1>Give your app<br />a little friend.</h1>
+		<p class="word" aria-hidden="true">
+			{#key word}
+				<span class="letters">
+					{#each word as letter, i (i)}
+						<span in:fly={{ y: 40, duration: d(420), delay: d(i * 28), easing: cubicOut }}
+							>{letter}</span
+						>
+					{/each}<span class="dot">.</span>
+				</span>
+			{/key}
+		</p>
+		<h1>Give your app a little friend.</h1>
 		<p class="lead">
-			mascott is an animated SVG character for Svelte 5. It blinks, follows your cursor, reacts to
-			boops and lip-syncs to your voice.
+			An animated SVG character for Svelte 5. It blinks, follows your cursor, reacts to boops and
+			lip-syncs to your voice.
 		</p>
 		<div class="actions">
 			<a class="btn-primary" href="#playground">Open the studio</a>
 			<button class="install" onclick={copyInstall} aria-label="Copy install command">
 				<code>pnpm add mascott</code>
-				<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-					{#if copied}
-						<path
-							d="M5 12.5l4.5 4.5L19 7.5"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-						/>
-					{:else}
-						<rect
-							x="8"
-							y="8"
-							width="12"
-							height="12"
-							rx="3"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="1.8"
-						/>
-						<path
-							d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="1.8"
-						/>
-					{/if}
-				</svg>
+				<span>{installCopied ? 'Copied' : 'Copy'}</span>
 			</button>
 		</div>
 	</div>
 
-	<div class="cast">
-		{#each CAST as m, i (i)}
-			<div class="member" class:edge={m.edge} style:--i={i}>
-				{#if bubble?.at === i}
-					<div
-						class="bubble"
-						role="status"
-						in:scale={{ duration: d(320), start: 0.6, easing: backOut }}
-						out:fly={{ duration: d(160), y: -6 }}
-					>
-						{bubble.text}
-					</div>
-				{/if}
-				<Mascot
-					mood={moods[i]}
-					theme={m.theme}
-					shape={m.shape}
-					eyes={m.eyes}
-					accessories={m.accessories}
-					body
-					outfit={m.outfit}
-					shoes={m.shoes}
-					size="clamp(72px, 8vw, 104px)"
-					label="{m.theme} mascot, boop me"
-					onboop={() => boop(i)}
-				/>
-			</div>
-		{/each}
-	</div>
+	<div class="stage">
+		<div class="disc" aria-hidden="true"></div>
+		<div class="figure">
+			{#if bubble}
+				<div
+					class="bubble"
+					role="status"
+					in:scale={{ duration: d(300), start: 0.6, easing: backOut }}
+					out:fly={{ duration: d(160), y: -6 }}
+				>
+					{bubble}
+				</div>
+			{/if}
+			<Mascot
+				{mood}
+				{theme}
+				{shape}
+				{outfit}
+				body
+				shoes="sneakers"
+				size="clamp(200px, 22vw, 320px)"
+				label="mascott, boop me"
+				onboop={boop}
+			/>
+		</div>
 
-	<div class="reactions" role="group" aria-label="Make them react">
-		{#each REACTIONS as r, i (r.label)}
-			<button
-				class="chip"
-				class:active={active === r.mood}
-				aria-keyshortcuts={String(i + 1)}
-				title="Press {i + 1}"
-				onclick={() => react(r)}
-			>
-				{r.label}
-			</button>
-		{/each}
+		<!-- The hang tag doubles as the API: every value is a button that cycles that prop. -->
+		<div class="tag" role="group" aria-label="Try the props">
+			<code>
+				<span><span class="t-p">&lt;</span><span class="t-tag">Mascot</span></span>
+				{#each PROPS as prop (prop)}
+					<span
+						><span class="t-attr">{prop}</span><span class="t-p">=</span><button
+							class="val"
+							onclick={() => cycle(prop)}
+							aria-label="{prop}: {values[prop]}, next">"{values[prop]}"</button
+						></span
+					>
+				{/each}
+				<span class="t-p">/&gt;</span>
+			</code>
+			<div class="tag-foot">
+				<span>Click a value to change it</span>
+				<button class="copy-code" class:done={copied} onclick={copyCode}
+					>{copied ? 'Copied' : 'Copy'}</button
+				>
+			</div>
+		</div>
 	</div>
 </header>
 
 <style>
 	.hero {
 		display: grid;
-		justify-items: center;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+		align-items: center;
+		gap: 2rem;
 		max-width: 1200px;
+		min-height: min(calc(100svh - 4rem), 860px);
 		margin: 0 auto;
-		padding: clamp(3rem, 8vw, 6rem) 1.5rem 2rem;
-		text-align: center;
+		padding: 1rem 1.5rem 3rem;
 	}
+
 	.copy {
-		display: grid;
-		justify-items: center;
-		max-width: 40rem;
+		/* Lets the mood word size itself to the column, whatever word it currently is. */
+		container-type: inline-size;
 		animation: rise 0.8s var(--out) both;
 	}
 	@keyframes rise {
@@ -244,23 +229,42 @@
 			transform: translateY(14px);
 		}
 	}
+	.word {
+		display: grid;
+		margin: 0 0 0 -0.04em;
+		font-size: min(28cqi, 12.5rem);
+		font-weight: 800;
+		line-height: 0.95;
+		letter-spacing: -0.065em;
+		white-space: nowrap;
+	}
+	/* Every word shares one grid cell, so a new word replaces the old one without the page jumping. */
+	.letters {
+		grid-area: 1 / 1;
+	}
+	.letters > span {
+		display: inline-block;
+	}
+	.dot {
+		color: var(--accent);
+		transition: color 0.6s;
+	}
 	h1 {
-		margin: 0;
-		font-size: clamp(2.6rem, 6vw, 4.8rem);
-		line-height: 1;
-		letter-spacing: -0.05em;
+		margin: 1.5rem 0 0;
+		font-size: clamp(1.5rem, 2.4vw, 2rem);
+		line-height: 1.15;
+		letter-spacing: -0.035em;
 	}
 	.lead {
-		margin: 1.25rem 0 0;
-		max-width: 29rem;
-		font-size: clamp(1.02rem, 1.4vw, 1.15rem);
+		margin: 0.6rem 0 0;
+		max-width: 28rem;
+		font-size: 1.05rem;
 		line-height: 1.5;
 		color: var(--text-2);
 	}
 	.actions {
 		display: flex;
 		flex-wrap: wrap;
-		justify-content: center;
 		gap: 0.6rem;
 		margin-top: 1.75rem;
 	}
@@ -268,19 +272,14 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 0.7rem;
-		padding: 0.85rem 1.2rem;
+		padding: 0.4rem 0.4rem 0.4rem 1.1rem;
 		border: 0;
 		border-radius: 999px;
 		background: var(--surface);
 		color: var(--text-1);
 		font: inherit;
 		cursor: pointer;
-		transition:
-			background 0.15s,
-			transform 0.2s var(--spring);
-	}
-	.install:hover {
-		background: var(--surface-2);
+		transition: transform 0.2s var(--spring);
 	}
 	.install:active {
 		transform: scale(0.96);
@@ -290,63 +289,143 @@
 		background: none;
 		font-size: 0.9rem;
 	}
-	.install svg {
-		color: var(--text-2);
+	.install span {
+		padding: 0.45rem 0.8rem;
+		border-radius: 999px;
+		background: var(--raised);
+		font-size: 0.8rem;
+		font-weight: 600;
 	}
 
-	/* One shared floor line, so the cast reads as a group photo rather than scattered stickers. */
-	.cast {
-		display: flex;
-		justify-content: center;
-		align-items: flex-end;
-		gap: clamp(0.5rem, 2.5vw, 2rem);
-		margin-top: clamp(3rem, 6vw, 4.5rem);
-		padding-bottom: 0.75rem;
-		border-bottom: 1px solid var(--line);
-		width: min(100%, 44rem);
-	}
-	.member {
+	.stage {
 		position: relative;
-		animation: pop-in 0.8s calc(0.2s + var(--i) * 70ms) var(--spring) both;
+		display: grid;
+		justify-items: center;
+		align-items: end;
+		min-height: 640px;
+		animation: rise 0.9s 0.1s var(--out) both;
 	}
-	@keyframes pop-in {
-		from {
-			opacity: 0;
-			transform: translateY(24px) scale(0.9);
-		}
+	/* A flat disc in the colorway: the mascot's own spotlight, recolored with every theme. */
+	.disc {
+		position: absolute;
+		top: 2%;
+		left: 50%;
+		width: min(540px, 100%);
+		aspect-ratio: 1;
+		translate: -50% 0;
+		border-radius: 50%;
+		background: color-mix(in srgb, var(--accent) 16%, var(--bg));
+		transition: background 0.6s;
+	}
+	.figure {
+		position: relative;
+		z-index: 1;
+		margin-bottom: 7rem;
 	}
 	.bubble {
 		position: absolute;
 		z-index: 2;
-		bottom: 96%;
-		left: 60%;
+		top: 2%;
+		left: 70%;
 		width: max-content;
-		max-width: 11rem;
 		padding: 0.5rem 0.85rem;
 		border-radius: 16px 16px 16px 4px;
 		background: var(--text-1);
 		color: var(--on-ink);
 		font-weight: 600;
-		font-size: 0.88rem;
-		line-height: 1.3;
+		font-size: 0.92rem;
 		transform-origin: 0 100%;
 	}
-	.reactions {
+
+	/* Code sits on a dark slab in both schemes, so its colors are fixed rather than tokens. */
+	.tag {
+		position: absolute;
+		z-index: 2;
+		left: 50%;
+		bottom: 0;
+		translate: -50% 0;
+		width: min(100%, 28rem);
+		padding: 0.9rem 1rem 0.6rem;
+		border-radius: 20px;
+		background: var(--slab);
+		box-shadow:
+			inset 0 0 0 1px var(--slab-line),
+			0 20px 40px -24px rgb(0 0 0 / 0.5);
+		color: #eaeaea;
+	}
+	/* Flex rather than inline text, so attributes wrap as whole units and never split at the "=". */
+	.tag code {
 		display: flex;
 		flex-wrap: wrap;
-		justify-content: center;
-		gap: 0.35rem;
-		margin-top: 1.25rem;
+		column-gap: 0.6em;
+		padding: 0;
+		background: none;
+		color: inherit;
+		font-family: var(--mono);
+		font-size: 0.86rem;
+		line-height: 1.8;
+	}
+	.val {
+		padding: 0.05rem 0.3rem;
+		margin: 0 -0.1rem;
+		border: 0;
+		border-radius: 6px;
+		background: rgb(255 255 255 / 0.08);
+		color: #b9e58c;
+		font: inherit;
+		cursor: pointer;
+		transition:
+			background 0.15s,
+			transform 0.15s var(--spring);
+	}
+	.val:hover {
+		background: rgb(255 255 255 / 0.18);
+	}
+	.val:active {
+		transform: scale(0.94);
+	}
+	.tag-foot {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-top: 0.5rem;
+		padding-top: 0.5rem;
+		border-top: 1px solid rgb(255 255 255 / 0.08);
+		font-size: 0.8rem;
+		color: #a3a19c;
+	}
+	.copy-code {
+		padding: 0.3rem 0.8rem;
+		border: 0;
+		border-radius: 999px;
+		background: rgb(255 255 255 / 0.1);
+		color: #eaeaea;
+		font: inherit;
+		font-size: 0.8rem;
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.copy-code:hover {
+		background: rgb(255 255 255 / 0.18);
+	}
+	.copy-code.done {
+		background: #fff;
+		color: #161616;
 	}
 
-	@media (max-width: 560px) {
-		.member.edge {
-			display: none;
+	@media (max-width: 900px) {
+		.hero {
+			grid-template-columns: 1fr;
+			min-height: 0;
+			padding-top: 2rem;
+		}
+		.stage {
+			min-height: 560px;
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {
 		.copy,
-		.member {
+		.stage {
 			animation: none;
 		}
 	}
