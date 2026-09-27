@@ -34,7 +34,7 @@ describe('Body', () => {
 	});
 
 	it('swings the waving forearm', async () => {
-		const { container } = render(Mascot, { mood: 'wink' });
+		const { container } = render(Mascot, { mood: 'waving' });
 		expect(container.querySelector('.fore.swing.wave')).not.toBeNull();
 	});
 

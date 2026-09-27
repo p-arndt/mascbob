@@ -33,7 +33,7 @@ export const FOOT_SCALE = 1.22;
  * foot units. Plain feet have no collar; the leg simply merges into the foot.
  */
 export const FOOT_COLLAR: Record<Shoes, number> = {
-	none: 12,
+	none: 8,
 	sneakers: 24,
 	hightops: 36,
 	boots: 33
@@ -212,6 +212,7 @@ export function coreBeat(mood: Mood): { period: number; mode: CoreMode } {
 		case 'happy':
 			return { period: 0.72, mode: 'beat' };
 		case 'wink':
+		case 'waving':
 		case 'shy':
 		case 'talking':
 			return { period: 0.9, mode: 'beat' };

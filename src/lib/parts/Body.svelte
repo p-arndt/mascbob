@@ -94,14 +94,14 @@
 {/snippet}
 
 <!-- Feet are drawn for the right side with the toe pointing outward (+x), sole on y = 0 and the heel near x = -16. -->
+<!-- Plain feet are part of the body: a stubby rounded toe in the leg's color, no seam. -->
 {#snippet plainFoot()}
+	{@const d =
+		'M-7 -10.5C-9.8 -10.5 -11 -7.5 -11 -4.5C-11 -1.5 -9.5 0 -6.5 0H10.5C14.5 0 16 -2 16 -4.8C16 -8.2 13 -10.2 8.5 -10.5Z'}
 	<g class="foot-plain">
-		<path
-			class="bare"
-			d="M-14 -5C-16 -13 -11 -18 -3 -18C6 -18 11 -14 18 -12.5C25 -11 28 -7 27 -3.5C26 0 23 0 20 0H-9C-12 0 -13 -2 -14 -5Z"
-		/>
-		<path class="bare-shade" d="M-12 -3.2C-5 -1.6 13 -1.6 25 -3.4" />
-		<path class="bare-light" d="M-9 -14C-5 -15.6 1 -15.4 6 -13.6" />
+		<path class="bare" {d} />
+		<path {d} fill={ref('shoe-ao')} />
+		<ellipse class="bare-light" cx="7" cy="-7.6" rx="4.5" ry="1.4" />
 	</g>
 {/snippet}
 
@@ -362,25 +362,11 @@
 	}
 
 	.bare {
-		fill: var(--c-body-light);
-		stroke: var(--c-visor);
-		stroke-width: 1.2;
-		stroke-opacity: 0.14;
-	}
-	.bare-shade,
-	.bare-light {
-		fill: none;
-		stroke-linecap: round;
-	}
-	.bare-shade {
-		stroke: var(--c-visor);
-		stroke-width: 2.4;
-		opacity: 0.12;
+		fill: var(--c-body-dark);
 	}
 	.bare-light {
-		stroke: #fff;
-		stroke-width: 2;
-		opacity: 0.35;
+		fill: #fff;
+		opacity: 0.3;
 	}
 
 	.heel-tab,
