@@ -3,13 +3,50 @@ import type { EyeStyle } from '../types.js';
 
 export type Side = 'left' | 'right';
 
-/** Base eye size per style; `round` is the superellipse exponent (2 = oval, higher = boxier). */
-export const EYE_SIZES: Record<EyeStyle, { w: number; h: number; round: number }> = {
+export interface EyeStyleConfig {
+	w: number;
+	h: number;
+	/** Superellipse exponent: 2 = oval, higher = boxier. */
+	round: number;
+	/** Resting upper lid at the inner (nose) and outer end, as a fraction of the height. */
+	lidInner?: number;
+	lidOuter?: number;
+	/** Size of the white glint relative to the default. */
+	glint?: number;
+}
+
+/** Base eye per style. Resting lids are part of the style so moods still add their own on top. */
+export const EYE_SIZES: Record<EyeStyle, EyeStyleConfig> = {
 	round: { w: 15, h: 21, round: 2.4 },
 	pill: { w: 10, h: 25, round: 2.2 },
 	wide: { w: 23, h: 14, round: 3 },
-	dot: { w: 10, h: 11, round: 2 }
+	dot: { w: 10, h: 11, round: 2 },
+	square: { w: 16, h: 17, round: 5 },
+	sleepy: { w: 18, h: 18, round: 2.6, lidInner: 0.42, lidOuter: 0.46 },
+	cat: { w: 20, h: 16, round: 2.3, lidInner: 0.32, lidOuter: 0 },
+	puppy: { w: 17, h: 20, round: 2.2, lidInner: 0.04, lidOuter: 0.36 },
+	sparkle: { w: 17, h: 22, round: 2.2, glint: 1.7 }
 };
+
+/**
+ * Stacks a mood's lid on the style's resting lid (the mood covers what is still open).
+ * The resting lid lifts as the eye opens past 1, so a sleepy eye still widens in surprise,
+ * and mostly gives way to a happy crescent, which would otherwise be squashed to a line.
+ */
+export function eyeLids(
+	style: EyeStyleConfig,
+	mood: { open: number; lift: number; lidInner: number; lidOuter: number }
+): { inner: number; outer: number } {
+	const awake = clamp((1.25 - mood.open) / 0.25, 0, 1) * (1 - clamp(mood.lift / 0.8, 0, 1) * 0.7);
+	const stack = (rest: number, lid: number) => {
+		const r = clamp(rest * awake, 0, 1);
+		return r + (1 - r) * clamp(lid, 0, 1);
+	};
+	return {
+		inner: stack(style.lidInner ?? 0, mood.lidInner),
+		outer: stack(style.lidOuter ?? 0, mood.lidOuter)
+	};
+}
 
 /** How far the accent print plate sits off the ink plate at rest, in head units. */
 export const MISPRINT = { x: 1.6, y: 1.2 };

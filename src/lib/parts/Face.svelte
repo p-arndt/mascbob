@@ -7,6 +7,7 @@
 		EYE_SIZES,
 		MISPRINT,
 		catMouthPath,
+		eyeLids,
 		eyeOutline,
 		halftone,
 		mouthPath,
@@ -111,6 +112,7 @@
 		// cut: it made the eyes look flat and sleepy. Both eyes always share one shape.
 		const up = Math.max(0, -m.gazeY);
 		const down = Math.max(0, m.gazeY);
+		const lids = eyeLids(base, p);
 		const shape: EyeShape = {
 			cx,
 			cy: eyeY,
@@ -118,8 +120,8 @@
 			h: fullH * Math.max(0, p.open) * (1 + up * 0.12 - down * 0.16) * (1 - m.blink) * (1 - sq),
 			round: base.round,
 			lift: p.lift,
-			lidLeft: side === 'left' ? p.lidOuter : p.lidInner,
-			lidRight: side === 'left' ? p.lidInner : p.lidOuter
+			lidLeft: side === 'left' ? lids.outer : lids.inner,
+			lidRight: side === 'left' ? lids.inner : lids.outer
 		};
 		const len = clamp(base.w * p.scale * 0.85, 9, 15);
 		// Brows bounce with the voice: talking faces are mostly eyebrows.
@@ -136,6 +138,8 @@
 			shape,
 			d: smoothPath(eyeOutline(shape)),
 			heart: { cx, cy: eyeY, s: heart * base.w * 1.5 * p.scale * grow },
+			lid: (lids.inner + lids.outer) / 2,
+			glint: base.glint ?? 1,
 			shine:
 				clamp((shape.h / base.h - 0.3) * 2.5, 0, 1) *
 				clamp(1.6 - p.lift * 2, 0, 1) *
@@ -265,18 +269,19 @@
 		{#if e.shine > 0.01}
 			<!-- Same glint on both eyes: one light source, like a sticker catching the lamp. -->
 			<g clip-path={ref(`eye-clip-${i}`)} opacity={e.shine}>
+				<!-- Hung below the lid, or a heavy-lidded eye would clip its glint away. -->
 				<ellipse
 					class="shine"
 					cx={e.shape.cx + e.shape.w * (0.2 - m.gazeX * 0.14)}
-					cy={e.shape.cy - e.shape.h * (0.2 + m.gazeY * 0.1)}
-					rx={e.shape.w * 0.17}
-					ry={e.shape.h * 0.14}
+					cy={e.shape.cy - e.shape.h * (0.5 - e.lid - (1 - e.lid) * 0.3 + m.gazeY * 0.1)}
+					rx={e.shape.w * 0.17 * e.glint}
+					ry={e.shape.h * 0.14 * e.glint * (1 - e.lid * 0.5)}
 				/>
 				<circle
 					class="shine"
-					cx={e.shape.cx - e.shape.w * 0.12}
+					cx={e.shape.cx - e.shape.w * 0.12 * e.glint}
 					cy={e.shape.cy + e.shape.h * 0.2}
-					r={e.shape.w * 0.07}
+					r={e.shape.w * 0.07 * e.glint}
 				/>
 			</g>
 		{/if}

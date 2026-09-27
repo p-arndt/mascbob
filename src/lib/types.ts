@@ -29,7 +29,17 @@ export const SHAPES = [
 ] as const;
 export type Shape = (typeof SHAPES)[number];
 
-export const EYE_STYLES = ['round', 'pill', 'wide', 'dot'] as const;
+export const EYE_STYLES = [
+	'round',
+	'pill',
+	'wide',
+	'dot',
+	'square',
+	'sleepy',
+	'cat',
+	'puppy',
+	'sparkle'
+] as const;
 export type EyeStyle = (typeof EYE_STYLES)[number];
 
 export { ACCESSORIES, type Accessory } from './parts/accessories.js';

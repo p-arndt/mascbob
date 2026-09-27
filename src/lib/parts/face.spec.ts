@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { MOOD_CONFIGS } from '../moods.js';
+import { EYE_STYLES } from '../types.js';
 import {
+	EYE_SIZES,
 	catMouthPath,
+	eyeLids,
 	eyeOutline,
 	halftone,
 	mouthPath,
@@ -67,6 +70,81 @@ describe('eyeOutline', () => {
 		const xs = lidded.map((p) => p[0]);
 		const rightX = Math.max(...xs.filter((x) => x < 87));
 		expect(top(rightX)).toBeGreaterThan(top(80));
+	});
+});
+
+describe('eye styles', () => {
+	const mood = { open: 1, lift: 0, lidInner: 0, lidOuter: 0 };
+	const styled = (style: (typeof EYE_STYLES)[number], p: Partial<typeof mood> = {}) => {
+		const base = EYE_SIZES[style];
+		const lids = eyeLids(base, { ...mood, ...p });
+		const h = base.h * Math.min(1, p.open ?? 1);
+		return eyeOutline(
+			eye({
+				w: base.w,
+				h,
+				round: base.round,
+				lift: p.lift ?? 0,
+				lidLeft: lids.outer,
+				lidRight: lids.inner
+			})
+		);
+	};
+
+	it('has a size for every style', () => {
+		for (const style of EYE_STYLES) {
+			const base = EYE_SIZES[style];
+			expect(base.w, style).toBeGreaterThan(0);
+			expect(base.h, style).toBeGreaterThan(0);
+			expect(base.round, style).toBeGreaterThanOrEqual(2);
+		}
+	});
+
+	it('blinks every style shut into a thin stroke', () => {
+		for (const style of EYE_STYLES) {
+			const b = bounds(styled(style, { open: 0 }));
+			expect(b.maxY - b.minY, style).toBeLessThan(4);
+		}
+	});
+
+	it('forms a crescent in every style', () => {
+		for (const style of EYE_STYLES) {
+			const open = styled(style);
+			const happy = styled(style, { lift: 0.8 });
+			expect(column(happy, 80), style).toBeLessThan(column(open, 80));
+			expect(column(happy, 80), style).toBeGreaterThan(2.8);
+		}
+	});
+
+	it('keeps plain styles unlidded', () => {
+		expect(eyeLids(EYE_SIZES.round, mood)).toEqual({ inner: 0, outer: 0 });
+		expect(eyeLids(EYE_SIZES.round, { ...mood, lidOuter: 0.5 }).outer).toBe(0.5);
+	});
+
+	it('rests the sleepy eye half-lidded and stacks mood lids on top', () => {
+		const rest = eyeLids(EYE_SIZES.sleepy, mood);
+		expect(rest.inner).toBeGreaterThan(0.3);
+		expect(rest.outer).toBeGreaterThan(0.3);
+		const sad = eyeLids(EYE_SIZES.sleepy, { ...mood, lidOuter: 0.5 });
+		expect(sad.outer).toBeGreaterThan(rest.outer);
+		expect(sad.outer).toBeLessThan(1);
+		expect(column(styled('sleepy'), 80)).toBeLessThan(EYE_SIZES.sleepy.h * 0.7);
+	});
+
+	it('opens the resting lid in surprise', () => {
+		const surprised = eyeLids(EYE_SIZES.sleepy, { ...mood, open: 1.25 });
+		expect(surprised).toEqual({ inner: 0, outer: 0 });
+	});
+
+	it('slants the cat eye up and the puppy eye down toward the outside', () => {
+		const cat = eyeLids(EYE_SIZES.cat, mood);
+		const puppy = eyeLids(EYE_SIZES.puppy, mood);
+		expect(cat.inner).toBeGreaterThan(cat.outer + 0.2);
+		expect(puppy.outer).toBeGreaterThan(puppy.inner + 0.2);
+	});
+
+	it('gives the sparkle eye a bigger glint', () => {
+		expect(EYE_SIZES.sparkle.glint).toBeGreaterThan(1);
 	});
 });
 
