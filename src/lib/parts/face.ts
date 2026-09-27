@@ -49,6 +49,39 @@ export function mouthPath(
 	return `M${r(x0)} ${r(y)}Q${r(cx)} ${r(top)} ${r(x1)} ${r(y)}Q${r(cx)} ${r(bottom)} ${r(x0)} ${r(y)}Z`;
 }
 
+/** Cat mouth ("ω"): two small bumps meeting in the middle, drawn as an open stroke. */
+export function catMouthPath(cx: number, y: number, width: number, depth: number): string {
+	const x0 = cx - width / 2;
+	const x1 = cx + width / 2;
+	const q = width / 4;
+	const low = y + depth * 2;
+	return `M${r(x0)} ${r(y)}Q${r(x0 + q)} ${r(low)} ${r(cx)} ${r(y)}Q${r(x1 - q)} ${r(low)} ${r(x1)} ${r(y)}`;
+}
+
+/**
+ * A squeezed-shut eye as a chevron: `>` for the left eye and `<` for the right,
+ * both pointing at the nose so the pair reads as "> <".
+ */
+export function chevronPath(cx: number, cy: number, w: number, h: number, side: Side): string {
+	const tip = side === 'left' ? cx + w / 2 : cx - w / 2;
+	const back = side === 'left' ? cx - w / 2 : cx + w / 2;
+	return `M${r(back)} ${r(cy - h / 2)}L${r(tip)} ${r(cy)}L${r(back)} ${r(cy + h / 2)}`;
+}
+
+/**
+ * A brow dash centered on `cx`. `tilt` > 0 raises the end nearest the face's
+ * middle (worried), < 0 lowers it (cross); the result is mirrored per side.
+ */
+export function browPath(cx: number, y: number, len: number, tilt: number, side: Side): string {
+	const inner = side === 'left' ? 1 : -1;
+	const dy = (tilt * len) / 2;
+	const xIn = cx + (inner * len) / 2;
+	const xOut = cx - (inner * len) / 2;
+	return `M${r(xOut)} ${r(y + dy)}L${r(xIn)} ${r(y - dy)}`;
+}
+
+export type Side = 'left' | 'right';
+
 function clamp01(v: number): number {
 	return clamp(v, 0, 1);
 }

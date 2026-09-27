@@ -40,6 +40,12 @@ export interface EyeParams {
 	lidOuter: number;
 	/** Crossfade from the regular eye to a heart. */
 	heart: number;
+	/** Visibility 0..1 of the glowing brow dash above the eye. */
+	brow: number;
+	/** Brow angle: positive raises the inner end (worried), negative lowers it (cross). */
+	browTilt: number;
+	/** Moves the brow up (positive) or down, in head units. */
+	browLift: number;
 }
 
 export interface FaceParams {
@@ -52,7 +58,15 @@ export interface FaceParams {
 	mouthCurve: number;
 	mouthOpen: number;
 	mouthX: number;
+	/** Crossfade from the regular mouth to a cat mouth ("ω"), 0..1. */
+	mouthCat: number;
+	/** Crossfade from the regular mouth to a round "o", 0..1. */
+	mouthRound: number;
+	/** Tongue inside the open mouth, 0..1. */
+	tongue: number;
 	cheeks: number;
+	/** Anime blush hatch marks (///) over the cheeks, 0..1. */
+	blushLines: number;
 	tilt: number;
 	/** Vertical stretch of the body; negative squashes. */
 	stretch: number;
