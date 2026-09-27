@@ -1271,7 +1271,7 @@
 
 	@media (max-width: 900px) {
 		.playground {
-			grid-template-columns: 1fr;
+			grid-template-columns: minmax(0, 1fr);
 			height: auto;
 		}
 		.stage {
@@ -1282,6 +1282,15 @@
 		}
 		.downloads {
 			grid-template-columns: repeat(2, 1fr);
+		}
+	}
+	@media (max-width: 520px) {
+		/* Icon-only dice, so the stage bar fits a phone next to the mode switch. */
+		.pill span {
+			display: none;
+		}
+		.stage-bar .segmented button {
+			padding-inline: 0.75rem;
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {

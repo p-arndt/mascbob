@@ -340,7 +340,7 @@
 
 	@media (max-width: 900px) {
 		.talk {
-			grid-template-columns: 1fr;
+			grid-template-columns: minmax(0, 1fr);
 			border-radius: 32px;
 		}
 		.demo {

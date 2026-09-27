@@ -415,7 +415,7 @@
 
 	@media (max-width: 900px) {
 		.hero {
-			grid-template-columns: 1fr;
+			grid-template-columns: minmax(0, 1fr);
 			min-height: 0;
 			padding-top: 2rem;
 		}
