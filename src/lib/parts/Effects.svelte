@@ -1,172 +1,331 @@
 <script lang="ts">
-	import { getMascot } from '../context.js';
+	import { getMascot, svgRef } from '../context.js';
 	import { HEART_PATH, SPARKLE_PATH } from '../geometry.js';
+	import Burst from './Burst.svelte';
 
-	/** Mood effects around the head: sparkles, hearts, zzz, thought bubble, sound waves. */
+	/** Mood effects around the head (sparkles, hearts, zzz, thought bubble, sound waves) and boop bursts. */
 	const m = getMascot();
+	const ref = (name: string) => svgRef(m.uid, name);
 	const t = $derived(m.shape.top);
 	const hw = $derived(m.shape.halfWidth);
+
+	const sparkles = $derived([
+		{ x: 100 + hw + 6, y: t + 12, s: 7, tone: 'accent' },
+		{ x: 100 - hw - 3, y: t + 26, s: 5, tone: 'eye' },
+		{ x: 100 + hw - 14, y: t - 9, s: 4.2, tone: 'eye' },
+		{ x: 100 - hw + 10, y: t - 6, s: 3, tone: 'accent' }
+	]);
+	const glitter = $derived([
+		[100 + hw + 14, t - 2],
+		[100 - hw - 8, t + 8],
+		[100 + hw - 2, t + 30]
+	]);
+	const hearts = $derived([
+		{ x: 100 + hw - 4, y: t + 6, s: 11 },
+		{ x: 100 - hw + 4, y: t + 14, s: 8 },
+		{ x: 100 + hw + 10, y: t + 32, s: 7 }
+	]);
+	const cloud = $derived({ x: 100 + hw - 2, y: t - 26 });
 </script>
 
 {#if m.config.effect === 'sparkles'}
-	{#each [[100 + hw + 6, t + 12, 7], [100 - hw - 2, t + 28, 5], [100 + hw - 16, t - 8, 4]] as [x, y, s], i (i)}
-		<g transform="translate({x} {y}) scale({s})">
-			<path class="sparkle" d={SPARKLE_PATH} style:animation-delay="{i * 0.35}s" />
+	<g filter={ref('glow')}>
+		{#each sparkles as p, i (i)}
+			<g transform="translate({p.x} {p.y})">
+				<g class="twinkle" style:animation-delay="{-i * 0.45}s">
+					<path class="tone-{p.tone}" d={SPARKLE_PATH} transform="scale({p.s})" />
+					<path class="glint" d={SPARKLE_PATH} transform="scale({p.s * 0.42}) rotate(45)" />
+				</g>
+			</g>
+		{/each}
+	</g>
+	{#each glitter as [x, y], i (i)}
+		<g transform="translate({x} {y})">
+			<circle class="glitter" r="1.3" style:animation-delay="{-i * 0.6 - 0.3}s" />
 		</g>
 	{/each}
 {:else if m.config.effect === 'hearts'}
-	{#each [[100 + hw - 4, t + 6, 11], [100 - hw + 4, t + 14, 8], [100 + hw + 10, t + 34, 7]] as [x, y, s], i (i)}
-		<g transform="translate({x} {y}) scale({s})">
-			<path class="heart" d={HEART_PATH} style:animation-delay="{i * 0.5}s" />
+	{#each hearts as p, i (i)}
+		<g transform="translate({p.x} {p.y})">
+			<g class="heart-rise" style:animation-delay="{-i * 0.8}s">
+				<g class="heart-sway" style:animation-delay="{-i * 0.5}s">
+					<g transform="scale({p.s})">
+						<path class="heart" d={HEART_PATH} />
+						<ellipse
+							class="heart-shine"
+							cx="-0.24"
+							cy="-0.27"
+							rx="0.1"
+							ry="0.07"
+							transform="rotate(-35 -0.24 -0.27)"
+						/>
+					</g>
+				</g>
+			</g>
 		</g>
 	{/each}
 {:else if m.config.effect === 'zzz'}
-	{#each [0, 1, 2] as i (i)}
-		<text class="zzz" x={100 + hw - 12} y={t + 4} style:animation-delay="{i * 0.9}s">z</text>
-	{/each}
+	<g transform="translate({100 + hw - 10} {t + 4})">
+		{#each [0, 1, 2] as i (i)}
+			<g class="zzz" style:animation-delay="{-i * 1}s">
+				<circle class="zzz-bubble" r="7.5" />
+				<path class="zzz-z" d="M-3.2 -3.2H3.2L-3.2 3.2H3.2" />
+			</g>
+		{/each}
+	</g>
 {:else if m.config.effect === 'dots'}
-	<circle class="bubble" cx={100 + hw - 6} cy={t + 2} r="3" />
-	<circle class="bubble" cx={100 + hw + 2} cy={t - 8} r="4.5" />
-	<ellipse class="bubble" cx={100 + hw - 2} cy={t - 26} rx="20" ry="12" />
-	{#each [-8, 0, 8] as dx, i (i)}
-		<circle
-			class="dot"
-			cx={100 + hw - 2 + dx}
-			cy={t - 26}
-			r="2.6"
-			style:animation-delay="{i * 0.18}s"
-		/>
-	{/each}
+	<g class="cloud-float">
+		<g class="pop" style:animation-delay="0s">
+			<circle class="bubble" cx={100 + hw - 8} cy={t + 3} r="2.6" />
+		</g>
+		<g class="pop" style:animation-delay="0.12s">
+			<circle class="bubble" cx={100 + hw - 1} cy={t - 7} r="4" />
+		</g>
+		<g class="pop" style:animation-delay="0.24s">
+			<ellipse
+				class="cloud-shadow"
+				cx={cloud.x + 1}
+				cy={cloud.y + 5}
+				rx="20"
+				ry="11"
+				filter={ref('soft')}
+			/>
+			<g class="bubble">
+				<circle cx={cloud.x - 11} cy={cloud.y + 2} r="8.5" />
+				<circle cx={cloud.x - 1} cy={cloud.y - 4} r="10.5" />
+				<circle cx={cloud.x + 11} cy={cloud.y} r="8.5" />
+				<ellipse cx={cloud.x} cy={cloud.y + 4} rx="17" ry="8" />
+			</g>
+			<path
+				class="cloud-shine"
+				d="M{cloud.x - 16} {cloud.y - 1}Q{cloud.x - 14} {cloud.y - 7} {cloud.x - 8} {cloud.y - 7}"
+			/>
+			{#each [-8, 0, 8] as dx, i (i)}
+				<g transform="translate({cloud.x + dx} {cloud.y + 1})">
+					<circle class="dot" r="2.5" style:animation-delay="{i * 0.16}s" />
+				</g>
+			{/each}
+		</g>
+	</g>
 {:else if m.config.effect === 'waves'}
-	{#each [0, 1, 2] as i (i)}
-		<path
-			class="wave"
-			d="M{100 + hw + 8 + i * 7} {100 - 8 - i * 4}Q{100 + hw + 14 + i * 7} 104 {100 +
-				hw +
-				8 +
-				i * 7} {108 + i * 4}"
-			style:animation-delay="{i * 0.25}s"
-		/>
-		<path
-			class="wave"
-			d="M{100 - hw - 8 - i * 7} {100 - 8 - i * 4}Q{100 - hw - 14 - i * 7} 104 {100 -
-				hw -
-				8 -
-				i * 7} {108 + i * 4}"
-			style:animation-delay="{i * 0.25}s"
-		/>
+	{#each [1, -1] as side (side)}
+		<g transform="translate({100 + side * (hw + 6)} 102) scale({side} 1)">
+			{#each [0, 1, 2] as i (i)}
+				<path class="wave" d="M0 -9Q6 0 0 9" style:animation-delay="{-i * 0.5}s" />
+			{/each}
+			<circle class="wave-dot" cx="1" r="1.6" />
+		</g>
 	{/each}
 {/if}
 
+<Burst />
+
 <style>
-	.sparkle {
+	.tone-accent {
 		fill: var(--c-accent);
 	}
+	.tone-eye {
+		fill: var(--c-eye);
+	}
+	.glint {
+		fill: #fff;
+	}
+	.twinkle {
+		animation: twinkle 1.5s ease-in-out infinite;
+	}
+	.glitter {
+		fill: #fff;
+		animation: glitter 1.8s ease-in-out infinite;
+	}
+
 	.heart {
 		fill: var(--c-cheek);
 	}
-	.zzz {
-		fill: var(--c-accent);
-		font:
-			700 13px system-ui,
-			sans-serif;
-		opacity: 0;
-		animation: drift 2.7s ease-out infinite;
+	.heart-shine {
+		fill: #fff;
+		opacity: 0.8;
 	}
+	.heart-rise {
+		animation: heart-rise 2.4s ease-out infinite;
+	}
+	.heart-sway {
+		animation: heart-sway 1.2s ease-in-out infinite alternate;
+	}
+
+	.zzz {
+		opacity: 0.8;
+		animation: drift 3s ease-out infinite;
+	}
+	.zzz-bubble {
+		fill: var(--c-accent);
+		fill-opacity: 0.16;
+		stroke: #fff;
+		stroke-opacity: 0.35;
+		stroke-width: 0.8;
+	}
+	.zzz-z {
+		fill: none;
+		stroke: var(--c-accent);
+		stroke-width: 1.6;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+	}
+
 	.bubble {
 		fill: #fff;
-		opacity: 0.9;
+	}
+	.cloud-shadow {
+		fill: var(--c-visor);
+		opacity: 0.18;
+	}
+	.cloud-shine {
+		fill: none;
+		stroke: var(--c-accent);
+		stroke-width: 1.2;
+		stroke-linecap: round;
+		opacity: 0.35;
+	}
+	.cloud-float {
+		animation: cloud-float 2.6s ease-in-out infinite alternate;
+	}
+	.pop {
+		transform-box: fill-box;
+		transform-origin: center;
+		animation: pop 0.45s cubic-bezier(0.34, 1.6, 0.5, 1) both;
 	}
 	.dot {
 		fill: var(--c-visor);
-		animation: hop 0.9s ease-in-out infinite;
+		animation: hop 1s cubic-bezier(0.3, 0, 0.3, 1) infinite;
 	}
+
 	.wave {
 		fill: none;
 		stroke: var(--c-accent);
-		stroke-width: 2.5;
+		stroke-width: 2.2;
 		stroke-linecap: round;
-		opacity: 0;
-		animation: ping 1.2s ease-out infinite;
+		opacity: 0.6;
+		animation: ripple 1.5s ease-out infinite;
 	}
-	.sparkle {
-		animation: twinkle 1.4s ease-in-out infinite;
-	}
-	.heart {
-		animation: rise 2.2s ease-out infinite;
-	}
-	.sparkle,
-	.heart,
-	.zzz,
-	.dot,
-	.wave {
-		transform-box: fill-box;
-		transform-origin: center;
-	}
-	/* The root's reduced-motion rule stops animations; keep these visible then. */
-	:global(.still) .zzz,
-	:global(.still) .wave {
-		opacity: 1;
+	.wave-dot {
+		fill: var(--c-accent);
+		animation: beat 0.75s ease-in-out infinite alternate;
 	}
 
 	@keyframes twinkle {
 		0%,
 		100% {
-			transform: scale(0.4) rotate(0deg);
-			opacity: 0.2;
+			transform: scale(0.35) rotate(0deg);
+			opacity: 0.25;
 		}
 		50% {
 			transform: scale(1) rotate(45deg);
 			opacity: 1;
 		}
 	}
-	@keyframes rise {
+	@keyframes glitter {
+		0%,
+		100% {
+			opacity: 0;
+			transform: scale(0.4);
+		}
+		50% {
+			opacity: 0.9;
+			transform: scale(1);
+		}
+	}
+	@keyframes heart-rise {
 		0% {
-			transform: translateY(0.5px) scale(0.6);
+			transform: translateY(4px) scale(0.4);
 			opacity: 0;
 		}
-		30% {
+		20% {
+			transform: translateY(0) scale(1.05);
 			opacity: 1;
 		}
+		30% {
+			transform: translateY(-3px) scale(1);
+		}
+		75% {
+			opacity: 0.9;
+		}
 		100% {
-			transform: translateY(-1.6px) scale(1);
+			transform: translateY(-20px) scale(0.85);
 			opacity: 0;
+		}
+	}
+	@keyframes heart-sway {
+		from {
+			transform: translateX(-2.5px) rotate(-12deg);
+		}
+		to {
+			transform: translateX(2.5px) rotate(10deg);
 		}
 	}
 	@keyframes drift {
 		0% {
-			transform: translate(0, 0) scale(0.6);
+			transform: translate(0, 0) scale(0.45);
 			opacity: 0;
 		}
-		30% {
-			opacity: 1;
+		25% {
+			opacity: 0.9;
+		}
+		60% {
+			transform: translate(10px, -16px) scale(0.95);
 		}
 		100% {
-			transform: translate(14px, -26px) scale(1.2);
+			transform: translate(14px, -30px) scale(1.2);
 			opacity: 0;
+		}
+	}
+	@keyframes cloud-float {
+		to {
+			transform: translateY(-2px);
+		}
+	}
+	@keyframes pop {
+		from {
+			transform: scale(0);
+			opacity: 0;
+		}
+		to {
+			transform: scale(1);
+			opacity: 1;
 		}
 	}
 	@keyframes hop {
 		0%,
-		60%,
+		55%,
 		100% {
-			transform: translateY(0);
+			transform: translateY(0) scale(1);
 		}
-		30% {
-			transform: translateY(-3px);
-		}
-	}
-	@keyframes ping {
-		0% {
-			opacity: 0;
-			transform: scale(0.9);
+		22% {
+			transform: translateY(-3.5px) scale(0.92, 1.1);
 		}
 		40% {
-			opacity: 0.9;
+			transform: translateY(0) scale(1.15, 0.85);
+		}
+	}
+	@keyframes ripple {
+		0% {
+			transform: translateX(0) scale(0.6);
+			opacity: 0;
+		}
+		25% {
+			opacity: 0.85;
 		}
 		100% {
+			transform: translateX(13px) scale(1.35);
 			opacity: 0;
-			transform: scale(1.1);
+		}
+	}
+	@keyframes beat {
+		from {
+			transform: scale(0.6);
+			opacity: 0.4;
+		}
+		to {
+			transform: scale(1);
+			opacity: 0.9;
 		}
 	}
 </style>
