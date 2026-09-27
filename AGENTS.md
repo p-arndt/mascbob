@@ -10,6 +10,9 @@ moods, themes, shapes, eye styles and accessories. The SvelteKit app in
 - `src/lib/Mascot.svelte`: the component. Everything is drawn in a 200×200 viewBox.
   Face values are tweened (`Tween.of`), gaze/hands/squish use `Spring`, and loops
   (blink, float, effects) are CSS animations or timers.
+- `src/lib/parts/Face.svelte` + `face.ts`: the face is an LED matrix. Expressions are
+  modelled as smooth shapes (eyes, brows, mouth, blush), then rasterized: `lightAt`
+  returns how strongly each LED is covered. Keep new face features in that model.
 - `src/lib/moods.ts`: one `MoodConfig` per mood (face parameters, effect, hand pose, float speed).
   Add a mood here and in `MOODS` in `types.ts`.
 - `src/lib/geometry.ts`: body silhouettes, eye/mouth path builders, shared paths.

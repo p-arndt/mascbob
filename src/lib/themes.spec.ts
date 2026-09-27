@@ -20,7 +20,7 @@ describe('resolveTheme', () => {
 describe('themeStyle', () => {
 	it('emits private custom properties for every color', () => {
 		const style = themeStyle(THEMES.aurora);
-		expect(style).toContain('--_mascott-eye: #7cf3ff');
+		expect(style).toContain('--_mascott-eye: #6d5dfc');
 		expect(style.split('; ')).toHaveLength(Object.keys(THEMES.aurora).length);
 	});
 });

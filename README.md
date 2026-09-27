@@ -1,7 +1,7 @@
 # mascott
 
 A friendly, animated and highly customizable SVG mascot for Svelte 5: a floating,
-pearly companion with a glowing face screen that blinks, breathes, follows the
+pearly companion whose face is a matrix of tiny LEDs under its shell. It blinks, breathes, follows the
 cursor, reacts to boops, switches moods and lip-syncs to your voice. Show just the head or the full body.
 
 ## Install
