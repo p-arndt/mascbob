@@ -14,6 +14,14 @@
 	import Shell from './parts/Shell.svelte';
 	import { moodConfig } from './moods.js';
 	import { createBabble } from './speech.js';
+	import {
+		ReactionController,
+		resolveReactions,
+		type PointerSample,
+		type ReactionEvent,
+		type ReactionState,
+		type ReactionsInput
+	} from './interaction.js';
 	import { resolveTheme, themeStyle, type ThemeInput } from './themes.js';
 	import type { Accessory, EyeStyle, LookAt, Mood, Motion, Outfit, Shape, Shoes } from './types.js';
 
@@ -43,6 +51,15 @@
 		interactive?: boolean;
 		label?: string;
 		onboop?: () => void;
+		/**
+		 * Pointer reactions (needs `interactive`): `follow`, `pet`, `dizzy`, `tickle` and `bored`
+		 * are on by default, `startle` and `shy` are opt-in. `true` = defaults, `false` = none,
+		 * a list enables exactly those, an object like `{ shy: true, bored: false }` toggles
+		 * individual ones on top of the defaults. Reactions only override `mood` briefly.
+		 */
+		reactions?: ReactionsInput;
+		/** Fires when a reaction triggers: `pet` (hearts), `startle`, `dizzy`, `shy`, `tickle`, `bored`, `wake`. */
+		onreaction?: (event: ReactionEvent) => void;
 		/** Custom SVG drawn on top of the head, in the head's 200×200 coordinates. */
 		accessory?: Snippet<[{ top: number; halfWidth: number }]>;
 		class?: string;
@@ -66,6 +83,8 @@
 		interactive = true,
 		label = 'Mascott',
 		onboop,
+		reactions = true,
+		onreaction,
 		accessory,
 		class: className = ''
 	}: Props = $props();
@@ -80,7 +99,8 @@
 	let hovered = $state(false);
 	let pressed = $state(false);
 	let boops = $state(0);
-	const activeMood: Mood = $derived(booping ? 'happy' : mood);
+	let reaction = $state<ReactionState | null>(null);
+	const activeMood: Mood = $derived(reaction?.mood ?? (booping ? 'happy' : mood));
 	const config = $derived(moodConfig(activeMood));
 	const head = $derived(SHAPE_DEFS[shape] ?? SHAPE_DEFS.pebble);
 	const style = $derived(themeStyle(resolveTheme(theme)));
@@ -144,8 +164,9 @@
 		squish.target = restSquish();
 	});
 
+	let reactionLean = $state(0);
 	$effect(() => {
-		lean.target = reduced || !hovered ? 0 : pointerX * 6;
+		lean.target = reduced ? 0 : (hovered ? pointerX * 6 : 0) + reactionLean;
 	});
 
 	let hopId = 0;
@@ -269,7 +290,7 @@
 		armIdle();
 		const move = (e: PointerEvent) => {
 			armIdle();
-			if (!root) return;
+			if (!root || reactor.holdsGaze) return;
 			const rect = root.getBoundingClientRect();
 			// Normalize by a reach larger than the mascot so the eyes keep following far-away pointers.
 			const reach = Math.max(rect.width * 2, 240);
@@ -317,10 +338,60 @@
 		}
 		booping = true;
 		boops++;
+		reactor.boop();
 		clearTimeout(boopTimer);
 		boopTimer = setTimeout(() => (booping = false), 900);
 		onboop?.();
 	}
+
+	// Pointer reactions: gestures are detected in interaction.ts, this only feeds it.
+	const reactor = new ReactionController({
+		show: (state) => (reaction = state),
+		lean: (deg) => (reactionLean = deg),
+		look: (x, y) => (gaze.target = { x, y }),
+		jump: (height, up) => jump(height, up),
+		wobble: (deg) => kickWobble(deg),
+		emit: (event) => onreaction?.(event)
+	});
+	const reactionFlags = $derived(resolveReactions(reactions));
+	$effect(() => {
+		reactor.configure(reactionFlags, reduced, mood, {
+			viewHeight: body ? BODY_VIEWBOX_HEIGHT : 200,
+			head
+		});
+	});
+	$effect(() => {
+		const el = root;
+		if (!el || !interactive || !onscreen || !Object.values(reactionFlags).some(Boolean)) return;
+		const viewHeight = body ? BODY_VIEWBOX_HEIGHT : 200;
+		let rect: DOMRect | null = null;
+		const forget = () => (rect = null);
+		const sample: PointerSample = { x: 0, y: 0, scale: 1, t: 0, hovering: false, pressed: false };
+		const move = (e: PointerEvent) => {
+			rect ??= el.getBoundingClientRect();
+			if (!rect.width) return;
+			sample.scale = rect.width / 200;
+			sample.x = (e.clientX - rect.left) / sample.scale;
+			sample.y = ((e.clientY - rect.top) / rect.height) * viewHeight;
+			sample.t = e.timeStamp;
+			sample.hovering = e.pointerType !== 'touch';
+			sample.pressed = pressed;
+			reactor.pointer(sample);
+		};
+		const leave = () => reactor.leave();
+		const opts = { passive: true } as const;
+		window.addEventListener('pointermove', move, opts);
+		window.addEventListener('scroll', forget, { passive: true, capture: true });
+		window.addEventListener('resize', forget, opts);
+		document.documentElement.addEventListener('pointerleave', leave, opts);
+		return () => {
+			window.removeEventListener('pointermove', move);
+			window.removeEventListener('scroll', forget, { capture: true });
+			window.removeEventListener('resize', forget);
+			document.documentElement.removeEventListener('pointerleave', leave);
+			reactor.reset();
+		};
+	});
 
 	const f = $derived(face.current);
 	const gx = $derived(clamp(gaze.current.x + f.gazeX, -1, 1));
@@ -428,6 +499,9 @@
 		},
 		get onscreen() {
 			return onscreen;
+		},
+		get reaction() {
+			return reaction?.name ?? null;
 		}
 	});
 </script>

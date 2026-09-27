@@ -1,5 +1,6 @@
 import { getContext, setContext } from 'svelte';
 import type { ShapeDef } from './geometry.js';
+import type { Reaction } from './interaction.js';
 import type { Accessory, EyeStyle, FaceParams, Mood, MoodConfig, Outfit, Shoes } from './types.js';
 
 /**
@@ -50,6 +51,11 @@ export interface MascotContext {
 	readonly entered: boolean;
 	/** False while scrolled out of view; skip timers and per-frame work then. */
 	readonly onscreen: boolean;
+	/**
+	 * Pointer reaction currently shown, or null. `mood` already reflects it; parts can
+	 * add detail, e.g. spiral eyes while `dizzy` or hands over the eyes while `shy`.
+	 */
+	readonly reaction: Reaction | null;
 }
 
 const KEY = Symbol('mascott');
