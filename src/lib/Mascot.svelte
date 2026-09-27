@@ -7,7 +7,7 @@
 	import { SHAPE_DEFS, clamp } from './geometry.js';
 	import Accessories from './parts/Accessories.svelte';
 	import Body from './parts/Body.svelte';
-	import { BODY_GROUND_Y, BODY_VIEWBOX_HEIGHT, HIP_Y } from './parts/body.js';
+	import { BODY_GROUND_Y, BODY_VIEWBOX_HEIGHT, FOOT_SCALE, HIP_Y, LEG_X } from './parts/body.js';
 	import Effects from './parts/Effects.svelte';
 	import Face from './parts/Face.svelte';
 	import Hands from './parts/Hands.svelte';
@@ -118,7 +118,19 @@
 		duration: () => (instant ? 0 : 380),
 		easing: cubicOut
 	});
-	const blink = new Tween(0, { duration: 70 });
+	const blink = new Tween(0);
+	/** Seconds; the idle loops' CSS duration, matching `--float-speed` in the styles. */
+	const BASE_FLOAT_SPEED = 3.2;
+	/** Toe tip and heel of each sole along x, in body.ts' local foot units (toe points outward). */
+	const SOLES: Record<Shoes, { toe: number; heel: number }> = {
+		none: { toe: 16, heel: -11 },
+		sneakers: { toe: 25.6, heel: -13 },
+		hightops: { toe: 25.6, heel: -13 },
+		boots: { toe: 33.5, heel: -15.4 },
+		slippers: { toe: 24.4, heel: -12.8 },
+		rainboots: { toe: 26.2, heel: -14 },
+		skates: { toe: 26.5, heel: -12.5 }
+	};
 	/** Face center in head coordinates, where the eyes aim from. */
 	const FACE_Y = 100;
 	// Stiff and well damped: eyes snap to a new target and hold it, like real saccades.
@@ -143,6 +155,28 @@
 		});
 		io.observe(root);
 		return () => io.disconnect();
+	});
+	// The idle loops run at a fixed CSS duration and the mood only changes their playback rate:
+	// retiming a running CSS animation jumps its progress, a playback rate keeps the phase.
+	const PACED = ['float', 'stand', 'shadow', 'contact', 'ground-glow', 'breathe', 'bob'];
+	const pacedBy = (a: Animation) => {
+		const target = a.effect instanceof KeyframeEffect ? a.effect.target : null;
+		return !!target && PACED.some((c) => target.classList.contains(c));
+	};
+	$effect(() => {
+		const el = root;
+		if (!el || typeof el.getAnimations !== 'function') return;
+		const rate = BASE_FLOAT_SPEED / config.floatSpeed;
+		const pace = (a: Animation) => {
+			if (pacedBy(a) && a.playbackRate !== rate) a.updatePlaybackRate(rate);
+		};
+		el.getAnimations({ subtree: true }).forEach(pace);
+		// Loops that (re)start later, e.g. after reduced motion or when hands appear, get paced too.
+		const started = (e: AnimationEvent) => {
+			if (e.target instanceof Element) e.target.getAnimations().forEach(pace);
+		};
+		el.addEventListener('animationstart', started);
+		return () => el.removeEventListener('animationstart', started);
 	});
 	let talk = $state(0);
 	let pointerX = $state(0);
@@ -234,30 +268,52 @@
 		return () => clearTimeout(timer);
 	});
 
-	// Blinking, with the occasional double blink; sleepy eyes are already closed.
+	const asleep = $derived(activeMood === 'sleepy');
+	let blinkId = 0;
+	/** Lids snap shut and ease open, like real ones; a newer blink cuts an older one short. */
+	async function blinkEyes(times = 1, depth = 1) {
+		const id = ++blinkId;
+		for (let i = 0; i < times; i++) {
+			await blink.set(depth, { duration: 60, easing: cubicIn });
+			if (id !== blinkId) return;
+			await blink.set(0, { duration: 140, easing: cubicOut });
+			if (id !== blinkId) return;
+		}
+	}
+
+	// Blinking, with the occasional half or double blink; sleepy eyes are already closed.
 	$effect(() => {
-		if (activeMood === 'sleepy' || !onscreen) return;
-		let alive = true;
+		if (asleep || !onscreen) return;
 		let timer: ReturnType<typeof setTimeout>;
 		const schedule = () => {
 			timer = setTimeout(
-				async () => {
-					const times = Math.random() < 0.2 ? 2 : 1;
-					for (let i = 0; i < times && alive; i++) {
-						await blink.set(1);
-						await blink.set(0);
-					}
-					if (alive) schedule();
+				() => {
+					const r = Math.random();
+					if (r < 0.15) blinkEyes(1, 0.55);
+					else blinkEyes(r < 0.32 ? 2 : 1);
+					schedule();
 				},
 				2200 + Math.random() * 3800
 			);
 		};
 		schedule();
 		return () => {
-			alive = false;
 			clearTimeout(timer);
+			blinkId++;
 			blink.set(0, { duration: 0 });
 		};
+	});
+
+	// A blink right as the mood changes hides the face morphing underneath it.
+	let blinkMood: Mood | undefined;
+	$effect(() => {
+		const next = activeMood;
+		if (blinkMood !== undefined && blinkMood !== next) {
+			untrack(() => {
+				if (!reduced && onscreen && next !== 'sleepy') blinkEyes();
+			});
+		}
+		blinkMood = next;
 	});
 
 	$effect(() => {
@@ -311,9 +367,7 @@
 			if (!s.jump) return;
 			fixed = next;
 			gaze.target = next;
-			if (s.blink && !reduced && blink.current === 0 && activeMood !== 'sleepy') {
-				blink.set(1).then(() => blink.set(0));
-			}
+			if (s.blink && !reduced && blink.current === 0 && !asleep) blinkEyes();
 		};
 		const reset = () => {
 			gaze.target = { x: 0, y: 0 };
@@ -434,6 +488,16 @@
 	// The ground reacts to the hop and the squash: smaller and fainter while airborne.
 	const air = $derived(clamp(-hop.current / 24, 0, 1));
 	const groundScale = $derived((1 - air * 0.35) * (1 + (squish.current.x - 1) * 0.8));
+	// Feet point outward, so the shoes reach past the head's shadow; body.ts draws them in local foot units.
+	const sole = $derived(SOLES[shoes] ?? SOLES.none);
+	const footSpan = $derived(LEG_X + sole.toe * FOOT_SCALE);
+	const shadowRx = $derived(body ? Math.max(hw * 0.72, footSpan + 4) : hw * 0.72);
+	const footContact = $derived({
+		x: LEG_X + ((sole.toe + sole.heel) / 2) * FOOT_SCALE,
+		rx: ((sole.toe - sole.heel) / 2) * FOOT_SCALE * 0.85
+	});
+	// Feet squash with the figure (see figureSquash) and lift off entirely on a hop.
+	const footContactScale = $derived(1 + (sx - 1) * 0.35);
 	// With a body the neck pivot gets a bit less, since the whole figure squashes too.
 	const headSx = $derived(body ? 1 + (sx - 1) * 0.7 : sx);
 	const headSy = $derived(body ? 1 + (sy - 1) * 0.7 : sy);
@@ -565,9 +629,27 @@
 
 		<g transform="translate(100 {groundY}) scale({groundScale} 1)" opacity={1 - air * 0.5}>
 			<ellipse class="ground-glow" rx={hw * 1.15} ry="14" fill={ref('ground-glow')} />
-			<ellipse class="shadow" rx={hw * 0.72} ry="6.5" fill={ref('ground-shadow')} />
-			<ellipse class="contact" rx={hw * 0.36} ry="2.6" fill={ref('ground-shadow')} />
+			<ellipse class="shadow" rx={shadowRx} ry="6.5" fill={ref('ground-shadow')} />
+			{#if !body}
+				<ellipse class="contact" rx={hw * 0.36} ry="2.6" fill={ref('ground-shadow')} />
+			{/if}
 		</g>
+		{#if body}
+			<g
+				transform="translate(100 {groundY}) scale({footContactScale} 1)"
+				opacity={clamp(1 - air * 2.5, 0, 1)}
+			>
+				{#each [-1, 1] as side (side)}
+					<ellipse
+						class="foot-contact"
+						cx={side * footContact.x}
+						rx={footContact.rx}
+						ry="2.2"
+						fill={ref('ground-shadow')}
+					/>
+				{/each}
+			</g>
+		{/if}
 
 		<g class="pop">
 			<!-- Standing figures shift their weight instead of floating. -->
@@ -627,7 +709,7 @@
 		class:no-float={!float || body}
 		aria-label={label}
 		data-mood={activeMood}
-		style="{style}; --float-speed: {config.floatSpeed}s"
+		{style}
 		style:width={cssSize}
 		style:aspect-ratio="200 / {viewH}"
 		onclick={boop}
@@ -656,7 +738,7 @@
 		class:no-float={!float || body}
 		aria-label={label}
 		data-mood={activeMood}
-		style="{style}; --float-speed: {config.floatSpeed}s"
+		{style}
 		style:width={cssSize}
 		style:aspect-ratio="200 / {viewH}"
 	>
@@ -674,6 +756,8 @@
 		--c-cheek: var(--mascott-cheek, var(--_mascott-cheek));
 		--c-accent: var(--mascott-accent, var(--_mascott-accent));
 		--c-sprout: var(--mascott-sprout, #6fdc8c);
+
+		--float-speed: 3.2s;
 
 		display: inline-block;
 		padding: 0;

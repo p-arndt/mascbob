@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
 import Mascot from './Mascot.svelte';
+import { moodConfig } from './moods.js';
+import { BODY_GROUND_Y, FOOT_SCALE, LEG_X } from './parts/body.js';
 
 describe('Mascot', () => {
 	it('renders as a labelled button by default', async () => {
@@ -95,5 +97,54 @@ describe('Mascot motion', () => {
 		const pop = container.querySelector('.pop') as SVGGElement;
 		expect(getComputedStyle(pop).animationName).toMatch(/pop-in$/);
 		expect(getComputedStyle(pop).animationIterationCount).toBe('1');
+	});
+
+	it('paces the idle loops by playback rate so a mood change keeps their phase', async () => {
+		const { container, rerender } = render(Mascot, { body: false, motion: 'full' });
+		const float = container.querySelector('.float') as SVGGElement;
+		const duration = getComputedStyle(float).animationDuration;
+		const rate = () => float.getAnimations()[0]?.playbackRate;
+		await expect.poll(rate).toBe(1);
+		await rerender({ mood: 'happy' });
+		await expect.poll(rate).toBeCloseTo(3.2 / moodConfig('happy').floatSpeed);
+		expect(getComputedStyle(float).animationDuration).toBe(duration);
+	});
+
+	it('blinks when the mood changes', async () => {
+		const { container, rerender } = render(Mascot, { body: false, motion: 'full' });
+		const eye = () => container.querySelector('clipPath[id$="-eye-clip-0"] path') as SVGPathElement;
+		await new Promise((r) => setTimeout(r, 700));
+		await rerender({ mood: 'surprised' });
+		let least = Infinity;
+		const until = performance.now() + 200;
+		while (performance.now() < until) {
+			least = Math.min(least, eye().getBBox().height);
+			await new Promise((r) => requestAnimationFrame(r));
+		}
+		await new Promise((r) => setTimeout(r, 600));
+		expect(least).toBeLessThan(eye().getBBox().height * 0.5);
+	});
+});
+
+describe('Mascot ground', () => {
+	it('sizes the shadow to reach past the toes with a body', async () => {
+		const { container } = render(Mascot, { shoes: 'boots' });
+		const shadow = container.querySelector('ellipse.shadow') as SVGEllipseElement;
+		expect(Number(shadow.getAttribute('rx'))).toBeGreaterThan(LEG_X + 33 * FOOT_SCALE);
+		const contacts = [...container.querySelectorAll('ellipse.foot-contact')];
+		expect(contacts).toHaveLength(2);
+		const [l, r] = contacts.map((c) => Number(c.getAttribute('cx')));
+		expect(l).toBeCloseTo(-r);
+		expect(r).toBeGreaterThan(LEG_X);
+		const ground = contacts[0].parentElement!.getAttribute('transform') ?? '';
+		expect(ground).toContain(`translate(100 ${BODY_GROUND_Y + 1})`);
+	});
+
+	it('keeps the head-only shadow and its single contact', async () => {
+		const { container } = render(Mascot, { body: false });
+		expect(container.querySelector('ellipse.foot-contact')).toBeNull();
+		expect(container.querySelector('ellipse.contact')).not.toBeNull();
+		const rx = Number(container.querySelector('ellipse.shadow')!.getAttribute('rx'));
+		expect(rx).toBeLessThan(LEG_X + 25 * FOOT_SCALE);
 	});
 });
