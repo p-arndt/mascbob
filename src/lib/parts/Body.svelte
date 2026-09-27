@@ -111,7 +111,8 @@
 -->
 {#snippet collar(y: number, rx: number)}
 	<ellipse class="opening" cx="0" cy={-y} {rx} ry="3" />
-	<rect class="ankle-stub" x="-7" y={-y - 7} width="14" height="12" rx="3" />
+	<!-- Slightly wider and taller than the leg, so the toe tap never opens a notch. -->
+	<rect class="ankle-stub" x="-7.4" y={-y - 10} width="14.8" height="15" rx="3.5" />
 {/snippet}
 
 {#snippet sneaker(high: boolean)}

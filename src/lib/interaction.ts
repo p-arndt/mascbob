@@ -13,7 +13,7 @@ import type { Mood } from './types.js';
  *   and wakes up when the pointer moves again.
  */
 /** Degrees the head tilts toward a far-away pointer with `follow`. */
-export const FOLLOW_TILT = 9;
+export const FOLLOW_TILT = 7;
 
 export const REACTIONS = ['follow', 'pet', 'startle', 'dizzy', 'shy', 'tickle', 'bored'] as const;
 export type Reaction = (typeof REACTIONS)[number];

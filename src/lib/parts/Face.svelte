@@ -93,35 +93,43 @@
 	const sq = $derived(clamp(squeeze.current, 0, 1));
 	const pop = $derived(1 + Math.max(0, -squeeze.current) * 0.6);
 	const grow = $derived(1 + curious.current * 0.1);
-	const eyeY = $derived(96 + m.gazeY * 9 + saccade.current.y);
+	// More travel upward than downward: looking up is the expressive direction, down has the lids.
+	const eyeY = $derived(96 + m.gazeY * (m.gazeY < 0 ? 12 : 8) + saccade.current.y);
 	// Syllables knock the accent plate around a little, like a speaker cone.
 	const offset = $derived({ x: plate.current.x + talk * 1.6, y: plate.current.y - talk * 1.1 });
 
 	function eye(p: EyeParams, baseX: number, side: Side) {
 		const base = EYE_SIZES[m.eyes] ?? EYE_SIZES.round;
 		const outward = side === 'left' ? -1 : 1;
-		// A close pointer pulls both eyes toward it (vergence); eyes travel furthest of all
+		// A close pointer pulls both eyes in a little (vergence); eyes travel furthest of all
 		// features, which is what makes the flat face read as a turning head.
-		const cx = baseX + m.gazeX * 9 + saccade.current.x - outward * m.focus * 2.6;
+		const cx = baseX + m.gazeX * 9 + saccade.current.x - outward * m.focus * 1.4;
 		const heart = clamp(p.heart, 0, 1);
 		const size = p.scale * grow * pop * (1 - heart) * (1 + m.focus * 0.08);
 		const fullH = base.h * size;
-		// The eye on the side we look toward rolls onto the edge of the head and foreshortens.
-		const turn = 1 - Math.max(0, outward * m.gazeX) * 0.16;
+		// Lids do the vertical acting: looking up opens the eyes wide, looking down lowers
+		// both upper lids. Both eyes always stay the same shape, so neither one bulges.
+		const up = Math.max(0, -m.gazeY);
+		const down = Math.max(0, m.gazeY);
 		const shape: EyeShape = {
 			cx,
 			cy: eyeY,
-			w: base.w * size * turn,
-			h: fullH * Math.max(0, p.open) * (1 - m.blink) * (1 - sq),
+			w: base.w * size,
+			h: fullH * Math.max(0, p.open) * (1 + up * 0.12) * (1 - m.blink) * (1 - sq),
 			round: base.round,
 			lift: p.lift,
-			lidLeft: side === 'left' ? p.lidOuter : p.lidInner,
-			lidRight: side === 'left' ? p.lidInner : p.lidOuter
+			lidLeft: (side === 'left' ? p.lidOuter : p.lidInner) + down * 0.28,
+			lidRight: (side === 'left' ? p.lidInner : p.lidOuter) + down * 0.28
 		};
 		const len = clamp(base.w * p.scale * 0.85, 9, 15);
 		// Brows bounce with the voice: talking faces are mostly eyebrows.
 		const browY =
-			eyeY - (base.h * p.scale * clamp(p.open, 0.5, 1.25)) / 2 - 6 - p.browLift - talk * 2.2;
+			eyeY -
+			(base.h * p.scale * clamp(p.open, 0.5, 1.25)) / 2 -
+			6 -
+			p.browLift -
+			talk * 2.2 -
+			up * 3;
 		// Positive tilt raises the inner end (toward the nose).
 		const rise = p.browTilt * len * 0.45 * (side === 'left' ? 1 : -1);
 		return {

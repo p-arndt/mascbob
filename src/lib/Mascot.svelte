@@ -7,7 +7,7 @@
 	import { SHAPE_DEFS, clamp } from './geometry.js';
 	import Accessories from './parts/Accessories.svelte';
 	import Body from './parts/Body.svelte';
-	import { BODY_GROUND_Y, BODY_VIEWBOX_HEIGHT } from './parts/body.js';
+	import { BODY_GROUND_Y, BODY_VIEWBOX_HEIGHT, HIP_Y } from './parts/body.js';
 	import Effects from './parts/Effects.svelte';
 	import Face from './parts/Face.svelte';
 	import Hands from './parts/Hands.svelte';
@@ -577,7 +577,10 @@
 						{/if}
 						<g transform="rotate({f.tilt} {tiltPivot})">
 							{#if body}
-								<Body layer="back" />
+								<!-- The torso turns a little with the head so no torso corner peeks out behind it. -->
+								<g transform="rotate({headTurn.current * 0.45} 100 {HIP_Y})">
+									<Body layer="back" />
+								</g>
 							{/if}
 							<g transform="rotate({headTurn.current} 100 {neckY})">
 								<g
@@ -594,7 +597,9 @@
 								</g>
 							</g>
 							{#if body}
-								<Body layer="front" />
+								<g transform="rotate({headTurn.current * 0.45} 100 {HIP_Y})">
+									<Body layer="front" />
+								</g>
 							{:else if hands}
 								<Hands />
 							{/if}
