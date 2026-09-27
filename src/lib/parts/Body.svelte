@@ -245,6 +245,10 @@
 			<stop offset="0" class="stop-light" />
 			<stop offset="1" class="stop-dark" />
 		</linearGradient>
+		<linearGradient id={id('leg-ao')} x1="0" y1="0" x2="0" y2="1">
+			<stop offset="0" class="stop-ink" stop-opacity="0.2" />
+			<stop offset="1" class="stop-ink" stop-opacity="0" />
+		</linearGradient>
 	</defs>
 
 	{#snippet foot(side: number, rim: boolean)}
@@ -302,6 +306,16 @@
 					rx="1.75"
 				/>
 			{/if}
+			<!-- The torso's hem shades the top of each leg so the legs tuck in instead of being pinned on. -->
+			<rect
+				class="leg-ao"
+				x="-10"
+				y={legTop}
+				width="20"
+				height="22"
+				rx="8.5"
+				fill={ref('leg-ao')}
+			/>
 		</g>
 	{/each}
 
@@ -320,6 +334,11 @@
 		<clipPath id={id('torso')}>
 			<path d={torsoPath(hw)} />
 		</clipPath>
+		<radialGradient id={id('head-shadow')}>
+			<stop offset="0" class="stop-ink" stop-opacity="0.22" />
+			<stop offset="0.6" class="stop-ink" stop-opacity="0.1" />
+			<stop offset="1" class="stop-ink" stop-opacity="0" />
+		</radialGradient>
 	</defs>
 
 	{#if outfit === 'cape'}
@@ -388,6 +407,18 @@
 		<!-- The number sits under the status light, like a player's number under the crest. -->
 		<path class="jersey-number" d="M93.5 {HIP_Y - 20}H106.5L99 {HIP_Y - 5}" />
 	{/if}
+	<!-- Drawn over the outfit because the head shades whatever the torso wears; the head itself
+	     covers the top half, so only the falloff below the chin shows. Offset right, away from
+	     the top-left light. -->
+	<ellipse
+		class="head-shadow"
+		clip-path={ref('torso')}
+		cx={100 + hw * 0.08}
+		cy={m.shape.bottom}
+		rx={hw * 0.8}
+		ry="8"
+		fill={ref('head-shadow')}
+	/>
 	<path class="edge" d={torsoPath(hw)} />
 
 	<!-- A tiny status light on the chest echoes the LED face; it beats with the mood. -->

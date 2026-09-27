@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import Mascot from '../Mascot.svelte';
-import { BODY_VIEWBOX_HEIGHT } from './body.js';
+import { BODY_VIEWBOX_HEIGHT, OUTFITS } from './body.js';
 
 describe('Body', () => {
 	it('stands on plain feet by default', async () => {
@@ -54,6 +54,22 @@ describe('Body', () => {
 		const jersey = render(Mascot, { outfit: 'jersey' }).container;
 		expect(jersey.querySelector('.arms.short')).not.toBeNull();
 		expect(jersey.querySelectorAll('.sleeve-band')).toHaveLength(2);
+	});
+
+	it.each(OUTFITS)('lets the head shade the torso in %s', async (outfit) => {
+		const { container } = render(Mascot, { outfit });
+		const shadow = container.querySelector('.head-shadow');
+		expect(shadow).not.toBeNull();
+		expect(shadow?.getAttribute('clip-path')).toMatch(/-torso\)$/);
+		// Painted after the outfit fabric but under the torso outline, so it falls on clothes too.
+		expect(shadow?.nextElementSibling?.classList.contains('edge')).toBe(true);
+		expect(container.querySelectorAll('.leg-ao')).toHaveLength(2);
+	});
+
+	it('drops the head shadow without a body', async () => {
+		const { container } = render(Mascot, { body: false });
+		expect(container.querySelector('.head-shadow')).toBeNull();
+		expect(container.querySelector('.leg-ao')).toBeNull();
 	});
 
 	it('uses floating hands and floats without a body', async () => {
