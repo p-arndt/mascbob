@@ -769,6 +769,8 @@
 	.controls {
 		padding: 1.75rem 2rem 2rem;
 		display: grid;
+		/* minmax(0, …): a long line in the code block must scroll, not widen the column and clip the chips. */
+		grid-template-columns: minmax(0, 1fr);
 		gap: 1.25rem;
 		align-content: start;
 		border-left: 1px solid rgb(255 255 255 / 0.07);
@@ -891,6 +893,7 @@
 
 	.code {
 		position: relative;
+		min-width: 0;
 	}
 	.code :global(pre) {
 		min-height: 9.5em;
