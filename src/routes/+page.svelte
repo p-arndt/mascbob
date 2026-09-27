@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
 	import {
 		ACCESSORIES,
@@ -17,9 +18,8 @@
 	import Playground from './_showcase/Playground.svelte';
 	import TalkDemo from './_showcase/TalkDemo.svelte';
 	import { copyText, reveal } from './_showcase/interactions.js';
-	import { pinScheme, pinnedScheme } from './_showcase/scheme.js';
-
-	let scrolled = $state(false);
+	import SiteFooter from './_showcase/SiteFooter.svelte';
+	import SiteNav from './_showcase/SiteNav.svelte';
 
 	const themeNames = Object.keys(THEMES) as ThemeName[];
 	const tint = (theme: ThemeName, amount = 14) =>
@@ -35,23 +35,6 @@
 	});
 
 	let swatch = $state<ThemeName>('lilac');
-
-	// Follows the system until the visitor picks a scheme, then stays pinned.
-	let dark = $state(false);
-	onMount(() => {
-		const system = matchMedia('(prefers-color-scheme: dark)');
-		const pinned = pinnedScheme();
-		dark = pinned ? pinned === 'dark' : system.matches;
-		const follow = (e: MediaQueryListEvent) => {
-			if (!pinnedScheme()) dark = e.matches;
-		};
-		system.addEventListener('change', follow);
-		return () => system.removeEventListener('change', follow);
-	});
-	function toggleScheme() {
-		dark = !dark;
-		pinScheme(dark ? 'dark' : 'light');
-	}
 
 	const more = [
 		{
@@ -146,44 +129,8 @@
 	<meta name="theme-color" content="#111110" media="(prefers-color-scheme: dark)" />
 </svelte:head>
 
-<svelte:window onscroll={() => (scrolled = scrollY > 8)} />
-
 <div class="site">
-	<nav class:scrolled>
-		<a class="brand" href="#top" aria-label="mascott home">
-			<Mascot size={28} hands={false} float={false} interactive={false} label="" />
-			<span>mascott</span>
-		</a>
-		<div class="links">
-			<a href="#features">Features</a>
-			<a href="#talk">Voice</a>
-			<a href="#moods">Moods</a>
-			<a href="#usage">Docs</a>
-		</div>
-		<div class="nav-end">
-			<button
-				class="scheme"
-				onclick={toggleScheme}
-				aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
-				title={dark ? 'Light mode' : 'Dark mode'}
-			>
-				<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-					{#if dark}
-						<circle cx="12" cy="12" r="4.2" fill="currentColor" />
-						<path
-							d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6"
-							stroke="currentColor"
-							stroke-width="1.8"
-							stroke-linecap="round"
-						/>
-					{:else}
-						<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="currentColor" />
-					{/if}
-				</svg>
-			</button>
-			<a class="btn-primary nav-cta" href="#playground">Studio</a>
-		</div>
-	</nav>
+	<SiteNav />
 
 	<div id="top">
 		<Hero />
@@ -306,7 +253,10 @@
 					Install the package, drop in the component and let it react to your app. Types included,
 					nothing to configure.
 				</p>
-				<a class="btn-ghost" href="#playground">Design one in the studio</a>
+				<div class="usage-actions">
+					<a class="btn-primary" href={resolve('/docs')}>Read the docs</a>
+					<a class="btn-ghost" href="#playground">Design one in the studio</a>
+				</div>
 			</div>
 			<div class="window">
 				<div class="window-bar">
@@ -320,101 +270,10 @@
 		</section>
 	</main>
 
-	<footer>
-		<div class="footer-mascot">
-			<Mascot mood="sleepy" size={72} hands={false} interactive={false} label="sleeping mascot" />
-		</div>
-		<p>Made with Svelte 5 and a lot of boops. MIT licensed.</p>
-		<a href="#top">Back to top</a>
-	</footer>
+	<SiteFooter />
 </div>
 
 <style>
-	nav {
-		position: sticky;
-		top: 0;
-		z-index: 50;
-		display: grid;
-		grid-template-columns: 1fr auto 1fr;
-		align-items: center;
-		max-width: 1200px;
-		margin: 0 auto;
-		padding: 0.8rem 1.5rem;
-	}
-	nav::before {
-		content: '';
-		position: absolute;
-		inset: 0 calc(50% - 50vw);
-		z-index: -1;
-		border-bottom: 1px solid transparent;
-		transition:
-			background 0.25s,
-			border-color 0.25s;
-	}
-	nav.scrolled::before {
-		background: var(--nav-bg);
-		backdrop-filter: blur(14px) saturate(180%);
-		-webkit-backdrop-filter: blur(14px) saturate(180%);
-		border-bottom-color: var(--line);
-	}
-	.brand {
-		display: flex;
-		align-items: center;
-		gap: 0.45rem;
-		color: var(--text-1);
-		text-decoration: none;
-		font-weight: 700;
-		font-size: 1.15rem;
-		letter-spacing: -0.03em;
-	}
-	.links {
-		display: flex;
-		gap: 0.15rem;
-	}
-	.links a {
-		padding: 0.45rem 0.85rem;
-		border-radius: 999px;
-		color: var(--text-1);
-		text-decoration: none;
-		font-size: 0.93rem;
-		font-weight: 500;
-		transition: background 0.15s;
-	}
-	.links a:hover {
-		background: var(--surface);
-	}
-	.nav-end {
-		justify-self: end;
-		display: flex;
-		align-items: center;
-		gap: 0.4rem;
-	}
-	.scheme {
-		display: grid;
-		place-items: center;
-		width: 2.4rem;
-		height: 2.4rem;
-		padding: 0;
-		border: 0;
-		border-radius: 50%;
-		background: none;
-		color: var(--text-1);
-		cursor: pointer;
-		transition:
-			background 0.15s,
-			transform 0.3s var(--spring);
-	}
-	.scheme:hover {
-		background: var(--surface);
-	}
-	.scheme:active {
-		transform: rotate(-30deg) scale(0.9);
-	}
-	.nav-cta {
-		padding: 0.55rem 1.1rem;
-		font-size: 0.92rem;
-	}
-
 	main {
 		max-width: 1200px;
 		margin: 0 auto;
@@ -528,6 +387,11 @@
 		font-size: 1.08rem;
 		max-width: 26rem;
 	}
+	.usage-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.6rem;
+	}
 	.window {
 		border-radius: 24px;
 		background: var(--slab);
@@ -575,30 +439,9 @@
 		color: #161616;
 	}
 
-	footer {
-		display: grid;
-		justify-items: center;
-		gap: 0.4rem;
-		padding: 3rem 1.5rem 4rem;
-		border-top: 1px solid var(--line);
-		color: var(--text-2);
-		font-size: 0.92rem;
-	}
-	footer p {
-		margin: 0.5rem 0 0;
-	}
-	footer a {
-		color: var(--text-1);
-		font-weight: 600;
-		text-decoration: none;
-	}
-	footer a:hover {
-		text-decoration: underline;
-	}
-
 	@media (max-width: 960px) {
 		.showcase {
-			grid-template-columns: 1fr;
+			grid-template-columns: minmax(0, 1fr);
 		}
 		.feature {
 			min-height: 0;
@@ -612,20 +455,15 @@
 		.text {
 			padding: 1.5rem 1.5rem 1.5rem 0;
 		}
+		/* minmax(0, …) so a long code line scrolls inside its block instead of widening the page. */
 		.more,
 		.usage {
-			grid-template-columns: 1fr;
+			grid-template-columns: minmax(0, 1fr);
 		}
 	}
 	@media (max-width: 640px) {
-		nav {
-			grid-template-columns: 1fr auto;
-		}
-		.links {
-			display: none;
-		}
 		.feature {
-			grid-template-columns: 1fr;
+			grid-template-columns: minmax(0, 1fr);
 		}
 		.text {
 			padding: 0 1.5rem 1.5rem;
