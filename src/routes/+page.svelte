@@ -1,690 +1,503 @@
 <script lang="ts">
-	import {
-		ACCESSORIES,
-		EYE_STYLES,
-		MOODS,
-		Mascot,
-		SHAPES,
-		THEMES,
-		type Accessory,
-		type EyeStyle,
-		type Mood,
-		type Shape,
-		type ThemeName
-	} from '$lib/index.js';
+	import { ACCESSORIES, MOODS, Mascot, SHAPES, THEMES } from '$lib/index.js';
+	import './_showcase/showcase.css';
+	import Code, { plain, type Token } from './_showcase/Code.svelte';
+	import Galleries from './_showcase/Galleries.svelte';
+	import Hero from './_showcase/Hero.svelte';
+	import Playground from './_showcase/Playground.svelte';
+	import TalkDemo from './_showcase/TalkDemo.svelte';
+	import { copyText, reveal, spotlight } from './_showcase/interactions.js';
 
-	const themeNames = Object.keys(THEMES) as ThemeName[];
-
-	let mood = $state<Mood>('happy');
-	let theme = $state<ThemeName>('aurora');
-	let shape = $state<Shape>('pebble');
-	let eyes = $state<EyeStyle>('round');
-	let accessories = $state<Accessory[]>(['ring']);
-	let hands = $state(true);
-	let float = $state(true);
-	let lookAt = $state<'pointer' | 'wander' | 'none'>('pointer');
-	let size = $state(260);
-	let boops = $state(0);
-
-	let heroMood = $state<Mood>('idle');
-	let heroTimer: ReturnType<typeof setTimeout> | undefined;
-	function react(next: Mood, ms = 1600) {
-		heroMood = next;
-		clearTimeout(heroTimer);
-		heroTimer = setTimeout(() => (heroMood = 'idle'), ms);
-	}
-
-	function toggle(a: Accessory) {
-		accessories = accessories.includes(a)
-			? accessories.filter((x) => x !== a)
-			: [...accessories, a];
-	}
-
-	const code = $derived(
-		[
-			'<Mascot',
-			`  mood="${mood}"`,
-			`  theme="${theme}"`,
-			shape !== 'pebble' && `  shape="${shape}"`,
-			eyes !== 'round' && `  eyes="${eyes}"`,
-			accessories.length && `  accessories={[${accessories.map((a) => `'${a}'`).join(', ')}]}`,
-			!hands && '  hands={false}',
-			!float && '  float={false}',
-			lookAt !== 'pointer' && `  lookAt="${lookAt}"`,
-			size !== 160 && `  size={${size}}`,
-			'/>'
-		]
-			.filter(Boolean)
-			.join('\n')
-	);
-
-	let copied = $state(false);
-	async function copy(text: string) {
-		await navigator.clipboard.writeText(text);
-		copied = true;
-		setTimeout(() => (copied = false), 1200);
-	}
-
-	const usage = [
-		'<' + 'script>',
-		"  import { Mascot } from 'mascott';",
-		"  let mood = $state('idle');",
-		'</' + 'script>',
-		'',
-		'<Mascot {mood} theme="aurora" accessories={[\'ring\']} />',
-		'',
-		'<!-- restyle with plain CSS -->',
-		'<' + 'style>',
-		'  :global(.brand) { --mascott-eye: #00ffc6; --mascott-accent: #ff4fd8; }',
-		'</' + 'style>'
-	].join('\n');
+	let scrolled = $state(false);
 
 	const features = [
-		[
-			'11 moods',
-			'Idle, happy, listening, thinking, talking, surprised, sleepy, sad, love, wink, grumpy, with smooth morphing in between.'
-		],
-		['Alive by default', 'Blinks, breathes, floats, follows the cursor and reacts to boops.'],
-		['Fully themeable', 'Six presets, per-color overrides, or plain CSS variables.'],
-		['Voice ready', 'Feed audio amplitude into `level` and the mouth lip-syncs.'],
-		['Tiny & dependency-free', 'Pure SVG + Svelte 5 motion. No canvas, no runtime.'],
-		['Accessible', 'Real button semantics, labels, and prefers-reduced-motion support.']
+		{
+			title: `${MOODS.length} expressive moods`,
+			text: 'Eyes, lids, mouth, blush and posture are tweened, so every switch is a smooth morph instead of a cut.',
+			icon: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM8.5 14.5s1.3 2 3.5 2 3.5-2 3.5-2M9 9.5h.01M15 9.5h.01',
+			wide: true
+		},
+		{
+			title: 'Alive by default',
+			text: 'Blinks, breathes, floats, follows the cursor and squishes on boop.',
+			icon: 'M3 12h4l2-6 4 12 2-6h6'
+		},
+		{
+			title: 'Themeable to the bone',
+			text: `${Object.keys(THEMES).length} presets, per-color overrides, or plain CSS variables.`,
+			icon: 'M12 3a9 9 0 0 0 0 18c1 0 1.5-.8 1.5-1.5 0-1.2-1-1.5-1-2.5 0-.8.7-1.5 1.5-1.5H16a5 5 0 0 0 5-5c0-4-4-7.5-9-7.5ZM7.5 11h.01M10 7.5h.01M15 7.5h.01'
+		},
+		{
+			title: 'Voice ready',
+			text: 'Pipe audio amplitude into `level` and the mouth lip-syncs in real time.',
+			icon: 'M12 3v18M8 7v10M4 10v4M16 7v10M20 10v4'
+		},
+		{
+			title: 'Head or full body',
+			text: `${SHAPES.length} head shapes, ${ACCESSORIES.length} accessories and an optional body with outfits.`,
+			icon: 'M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM5 21c0-4 3-7 7-7s7 3 7 7'
+		},
+		{
+			title: 'Tiny and accessible',
+			text: 'Pure SVG and Svelte 5 motion, zero dependencies. Real button semantics and reduced-motion support built in.',
+			icon: 'M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3ZM9 12l2 2 4-4',
+			wide: true
+		}
 	];
+
+	const usage: Token[][] = [
+		[
+			['t-p', '<'],
+			['t-tag', 'script'],
+			['t-p', '>']
+		],
+		[
+			['t-attr', '  import'],
+			['', ' { Mascot } '],
+			['t-attr', 'from'],
+			['t-str', " 'mascott'"],
+			['', ';']
+		],
+		[
+			['t-attr', '  let'],
+			['', ' mood = '],
+			['t-expr', '$state'],
+			['', '('],
+			['t-str', "'idle'"],
+			['', ');']
+		],
+		[
+			['t-p', '</'],
+			['t-tag', 'script'],
+			['t-p', '>']
+		],
+		[],
+		[
+			['t-p', '<'],
+			['t-tag', 'Mascot'],
+			['', ' {mood} '],
+			['t-attr', 'body'],
+			['', ' '],
+			['t-attr', 'theme'],
+			['t-p', '='],
+			['t-str', '"aurora"'],
+			['', ' '],
+			['t-attr', 'onboop'],
+			['t-p', '={'],
+			['t-expr', "() => (mood = 'love')"],
+			['t-p', '}'],
+			['t-p', ' />']
+		],
+		[],
+		[['t-c', '<!-- or restyle with plain CSS -->']],
+		[
+			['t-tag', '.brand'],
+			['', ' { '],
+			['t-attr', '--mascott-eye'],
+			['', ': '],
+			['t-str', '#00ffc6'],
+			['', '; '],
+			['t-attr', '--mascott-accent'],
+			['', ': '],
+			['t-str', '#ff4fd8'],
+			['', '; }']
+		]
+	];
+	const usageText = plain(usage);
+
+	let copied = $state(false);
+	async function copyUsage() {
+		copied = await copyText(usageText);
+		setTimeout(() => (copied = false), 1400);
+	}
 </script>
 
 <svelte:head>
-	<title>mascott: a friendly, animated mascot for Svelte</title>
+	<title>mascott · an animated companion for Svelte</title>
 	<meta
 		name="description"
-		content="Animated, highly customizable SVG mascot component for Svelte 5."
+		content="An animated, endlessly customizable SVG mascot for Svelte 5: moods, themes, full body, outfits and voice lip-sync."
 	/>
+	<meta name="theme-color" content="#07071a" />
 </svelte:head>
 
-<div class="aurora" aria-hidden="true"></div>
+<svelte:window onscroll={() => (scrolled = scrollY > 8)} />
 
-<header class="hero">
-	<div class="hero-copy">
-		<span class="badge">Svelte 5 · SVG · zero deps</span>
-		<h1>Meet <span class="grad">mascott</span>.</h1>
-		<p class="lead">
-			A friendly little companion for your app. It blinks, floats, listens, thinks and talks, and
-			you can restyle every part of it.
-		</p>
-		<div class="hero-actions">
-			<button class="install" onclick={() => copy('pnpm add mascott')}>
-				<code>pnpm add mascott</code>
-				<span>{copied ? 'Copied!' : 'Copy'}</span>
-			</button>
-			<a class="ghost" href="#playground">Open playground →</a>
-		</div>
-		<div class="chips small">
-			{#each ['love', 'thinking', 'surprised', 'sleepy', 'wink'] as const as m (m)}
-				<button onclick={() => react(m, m === 'sleepy' ? 3200 : 1800)}>{m}</button>
-			{/each}
-		</div>
+<div class="site">
+	<div class="backdrop" aria-hidden="true">
+		<div class="blob b1"></div>
+		<div class="blob b2"></div>
+		<div class="blob b3"></div>
+		<div class="grain"></div>
 	</div>
-	<div class="hero-stage">
-		<div class="glow"></div>
-		<Mascot
-			mood={heroMood}
-			accessories={['ring']}
-			size="min(420px, 80vw)"
-			label="mascott, boop me"
-		/>
-		<p class="hint">psst, boop it</p>
+
+	<nav class:scrolled>
+		<a class="brand" href="#top" aria-label="mascott home">
+			<Mascot size={30} hands={false} float={false} interactive={false} label="" />
+			<span>mascott</span>
+		</a>
+		<div class="links">
+			<a href="#playground">Playground</a>
+			<a href="#talk">Voice</a>
+			<a href="#moods">Moods</a>
+			<a class="hide-sm" href="#usage">Docs</a>
+		</div>
+	</nav>
+
+	<div id="top">
+		<Hero />
 	</div>
-</header>
 
-<main>
-	<section class="features">
-		{#each features as [title, text] (title)}
-			<article class="card feature">
-				<h3>{title}</h3>
-				<p>{text}</p>
-			</article>
-		{/each}
-	</section>
-
-	<section id="playground" class="playground card">
-		<div class="stage">
-			<Mascot
-				{mood}
-				{theme}
-				{shape}
-				{eyes}
-				{accessories}
-				{hands}
-				{float}
-				{lookAt}
-				{size}
-				onboop={() => boops++}
-			/>
-			<span class="boops">{boops} {boops === 1 ? 'boop' : 'boops'}</span>
-		</div>
-
-		<div class="controls">
-			<h2>Playground</h2>
-
-			<fieldset>
-				<legend>Mood</legend>
-				<div class="chips">
-					{#each MOODS as m (m)}
-						<button class:active={mood === m} onclick={() => (mood = m)}>{m}</button>
-					{/each}
-				</div>
-			</fieldset>
-
-			<fieldset>
-				<legend>Theme</legend>
-				<div class="swatches">
-					{#each themeNames as name (name)}
-						<button
-							class="swatch"
-							class:active={theme === name}
-							title={name}
-							aria-label="{name} theme"
-							style="--a: {THEMES[name].bodyMid}; --b: {THEMES[name].bodyDark}; --c: {THEMES[name]
-								.eye}"
-							onclick={() => (theme = name)}
-						></button>
-					{/each}
-				</div>
-			</fieldset>
-
-			<div class="row">
-				<fieldset>
-					<legend>Shape</legend>
-					<div class="chips">
-						{#each SHAPES as s (s)}
-							<button class:active={shape === s} onclick={() => (shape = s)}>{s}</button>
-						{/each}
-					</div>
-				</fieldset>
-				<fieldset>
-					<legend>Eyes</legend>
-					<div class="chips">
-						{#each EYE_STYLES as e (e)}
-							<button class:active={eyes === e} onclick={() => (eyes = e)}>{e}</button>
-						{/each}
-					</div>
-				</fieldset>
-			</div>
-
-			<fieldset>
-				<legend>Accessories</legend>
-				<div class="chips">
-					{#each ACCESSORIES as a (a)}
-						<button class:active={accessories.includes(a)} onclick={() => toggle(a)}>{a}</button>
-					{/each}
-				</div>
-			</fieldset>
-
-			<div class="row">
-				<fieldset>
-					<legend>Gaze</legend>
-					<div class="chips">
-						{#each ['pointer', 'wander', 'none'] as const as l (l)}
-							<button class:active={lookAt === l} onclick={() => (lookAt = l)}>{l}</button>
-						{/each}
-					</div>
-				</fieldset>
-				<fieldset>
-					<legend>Extras</legend>
-					<div class="chips">
-						<button class:active={hands} onclick={() => (hands = !hands)}>hands</button>
-						<button class:active={float} onclick={() => (float = !float)}>float</button>
-					</div>
-				</fieldset>
-			</div>
-
-			<fieldset>
-				<legend>Size · {size}px</legend>
-				<input type="range" min="80" max="360" bind:value={size} />
-			</fieldset>
-
-			<div class="code">
-				<pre><code>{code}</code></pre>
-				<button onclick={() => copy(code)}>{copied ? 'Copied!' : 'Copy'}</button>
-			</div>
-		</div>
-	</section>
-
-	<section>
-		<h2 class="section-title">Every mood</h2>
-		<p class="section-sub">Switch `mood` and the face morphs smoothly into the new expression.</p>
-		<div class="grid">
-			{#each MOODS as m (m)}
-				<figure class="card tile">
-					<Mascot mood={m} size={130} interactive={false} lookAt="wander" label="{m} mascot" />
-					<figcaption>{m}</figcaption>
-				</figure>
+	<main>
+		<section class="bento" aria-label="Features">
+			{#each features as f, i (f.title)}
+				<article
+					class="feature glass"
+					class:wide={f.wide}
+					{@attach reveal((i % 3) * 80)}
+					{@attach spotlight}
+				>
+					<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+						<path
+							d={f.icon}
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.7"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						/>
+					</svg>
+					<h3>{f.title}</h3>
+					<p>
+						{#each f.text.split('`') as part, j (j)}{#if j % 2}<code>{part}</code
+								>{:else}{part}{/if}{/each}
+					</p>
+				</article>
 			{/each}
+		</section>
+
+		<section id="playground" class="section">
+			<div class="section-head" {@attach reveal()}>
+				<span class="kicker">Playground</span>
+				<h2>Build your own in seconds.</h2>
+				<p>Tweak anything, roll the dice, then copy the snippet straight into your app.</p>
+			</div>
+			<div {@attach reveal(100)}>
+				<Playground />
+			</div>
+		</section>
+
+		<section id="talk" {@attach reveal()}>
+			<TalkDemo />
+		</section>
+
+		<Galleries />
+
+		<section id="usage" class="section">
+			<div class="section-head" {@attach reveal()}>
+				<span class="kicker">Get started</span>
+				<h2>Three lines to a new friend.</h2>
+				<p>Install the package, drop in the component and let it react to your app.</p>
+			</div>
+			<div class="usage glass" {@attach reveal(100)}>
+				<div class="window-bar">
+					<span></span><span></span><span></span>
+					<em>App.svelte</em>
+					<button class="copy" class:done={copied} onclick={copyUsage}
+						>{copied ? 'Copied' : 'Copy'}</button
+					>
+				</div>
+				<Code lines={usage} />
+			</div>
+		</section>
+	</main>
+
+	<footer>
+		<div class="footer-mascot">
+			<Mascot mood="sleepy" size={64} hands={false} interactive={false} label="sleeping mascot" />
 		</div>
-	</section>
-
-	<section>
-		<h2 class="section-title">A whole family</h2>
-		<p class="section-sub">Shapes, eyes, accessories and themes all combine freely.</p>
-		<div class="family">
-			<Mascot
-				theme="peach"
-				shape="orb"
-				accessories={['ears']}
-				mood="happy"
-				size={150}
-				lookAt="wander"
-			/>
-			<Mascot
-				theme="mint"
-				shape="bean"
-				eyes="pill"
-				accessories={['sprout']}
-				size={150}
-				lookAt="wander"
-			/>
-			<Mascot
-				theme="midnight"
-				shape="squircle"
-				eyes="wide"
-				accessories={['headphones']}
-				mood="listening"
-				size={150}
-			/>
-			<Mascot theme="bubblegum" shape="ghost" accessories={['halo']} mood="love" size={150} />
-			<Mascot
-				theme="sunny"
-				shape="pebble"
-				eyes="dot"
-				accessories={['antenna']}
-				mood="wink"
-				size={150}
-			/>
-		</div>
-	</section>
-
-	<section class="card usage">
-		<h2>Use it</h2>
-		<pre><code>{usage}</code></pre>
-	</section>
-</main>
-
-<footer>
-	<Mascot mood="sleepy" size={56} interactive={false} hands={false} label="sleeping mascot" />
-	<span>mascott · MIT</span>
-</footer>
+		<p>Made with Svelte 5 and a lot of boops. MIT licensed.</p>
+	</footer>
+</div>
 
 <style>
-	:global(html) {
-		color-scheme: dark;
-		background: #0b0b1e;
-	}
-	:global(body) {
-		margin: 0;
-		font-family:
-			ui-rounded,
-			'SF Pro Rounded',
-			system-ui,
-			-apple-system,
-			'Segoe UI',
-			sans-serif;
-		color: #e9e8ff;
-		overflow-x: hidden;
-	}
-
-	.aurora {
+	.backdrop {
 		position: fixed;
-		inset: -20vmax;
+		inset: 0;
 		z-index: -1;
+		overflow: hidden;
 		background:
-			radial-gradient(40vmax 30vmax at 20% 15%, #6d5dfc55, transparent 60%),
-			radial-gradient(35vmax 30vmax at 85% 20%, #ff7ac855, transparent 60%),
-			radial-gradient(40vmax 35vmax at 60% 90%, #22d3ee33, transparent 60%), #0b0b1e;
-		filter: blur(20px);
-		animation: drift 18s ease-in-out infinite alternate;
+			radial-gradient(120% 80% at 50% -10%, #1a1545 0%, transparent 60%),
+			linear-gradient(#07071a, #0a0a22 60%, #07071a);
 	}
-	@keyframes drift {
+	.blob {
+		position: absolute;
+		border-radius: 50%;
+		filter: blur(80px);
+		opacity: 0.55;
+		will-change: transform;
+	}
+	.b1 {
+		width: 55vmax;
+		height: 40vmax;
+		top: -15vmax;
+		left: -10vmax;
+		background: #5b4dfc;
+		animation: drift1 22s ease-in-out infinite alternate;
+	}
+	.b2 {
+		width: 45vmax;
+		height: 35vmax;
+		top: -5vmax;
+		right: -15vmax;
+		background: #d946ef;
+		opacity: 0.35;
+		animation: drift2 26s ease-in-out infinite alternate;
+	}
+	.b3 {
+		width: 50vmax;
+		height: 30vmax;
+		bottom: -20vmax;
+		left: 20vmax;
+		background: #06b6d4;
+		opacity: 0.22;
+		animation: drift1 30s ease-in-out infinite alternate-reverse;
+	}
+	@keyframes drift1 {
 		to {
-			transform: translate(3vmax, -2vmax) rotate(4deg);
+			transform: translate(8vmax, 5vmax) scale(1.1);
 		}
 	}
-
-	.hero {
-		max-width: 1160px;
-		margin: 0 auto;
-		padding: 6rem 1.5rem 3rem;
-		display: grid;
-		grid-template-columns: 1.1fr 1fr;
-		align-items: center;
-		gap: 2rem;
+	@keyframes drift2 {
+		to {
+			transform: translate(-6vmax, 8vmax) scale(0.9);
+		}
 	}
-	.badge {
-		display: inline-block;
-		padding: 0.35rem 0.8rem;
-		border-radius: 999px;
-		background: #ffffff12;
-		border: 1px solid #ffffff22;
-		font-size: 0.85rem;
-		color: #c9c6ff;
-	}
-	h1 {
-		font-size: clamp(3rem, 7vw, 5.5rem);
-		line-height: 1;
-		margin: 1.2rem 0 1rem;
-		letter-spacing: -0.03em;
-	}
-	.grad {
-		background: linear-gradient(100deg, #a5f3fc, #c4b5fd 45%, #f9a8d4);
-		background-clip: text;
-		color: transparent;
-	}
-	.lead {
-		font-size: 1.2rem;
-		line-height: 1.6;
-		color: #bdbbe0;
-		max-width: 34rem;
-	}
-	.hero-actions {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.8rem;
-		margin: 2rem 0 1.4rem;
-	}
-	.install {
-		display: flex;
-		align-items: center;
-		gap: 1rem;
-		padding: 0.8rem 1rem 0.8rem 1.2rem;
-		border-radius: 14px;
-		border: 1px solid #ffffff26;
-		background: #ffffff10;
-		color: inherit;
-		font: inherit;
-		cursor: pointer;
-	}
-	.install span {
-		font-size: 0.8rem;
-		padding: 0.25rem 0.6rem;
-		border-radius: 8px;
-		background: #c4b5fd;
-		color: #1a1740;
-		font-weight: 700;
-	}
-	.ghost {
-		display: flex;
-		align-items: center;
-		padding: 0.8rem 1.2rem;
-		border-radius: 14px;
-		color: #e9e8ff;
-		text-decoration: none;
-		font-weight: 600;
-	}
-	.ghost:hover {
-		background: #ffffff10;
-	}
-
-	.hero-stage {
-		position: relative;
-		display: grid;
-		place-items: center;
-	}
-	.glow {
+	/* Fine noise breaks up gradient banding on the large blurred blobs. */
+	.grain {
 		position: absolute;
-		width: 70%;
-		aspect-ratio: 1;
-		border-radius: 50%;
-		background: radial-gradient(circle, #a78bfa66, transparent 65%);
-		filter: blur(30px);
+		inset: 0;
+		opacity: 0.06;
+		mix-blend-mode: overlay;
+		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 	}
-	.hint {
-		margin: 0.5rem 0 0;
-		color: #8f8cc0;
+
+	nav {
+		position: sticky;
+		top: 0;
+		z-index: 50;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		max-width: 1200px;
+		margin: 0 auto;
+		padding: 0.9rem 1.5rem;
+		transition:
+			background 0.3s,
+			border-color 0.3s,
+			backdrop-filter 0.3s;
+		border-bottom: 1px solid transparent;
+	}
+	nav::before {
+		content: '';
+		position: absolute;
+		inset: 0 calc(50% - 50vw);
+		z-index: -1;
+		background: rgb(7 7 26 / 0);
+		border-bottom: 1px solid transparent;
+		transition:
+			background 0.3s,
+			border-color 0.3s;
+	}
+	nav.scrolled::before {
+		background: rgb(7 7 26 / 0.6);
+		backdrop-filter: blur(16px) saturate(160%);
+		-webkit-backdrop-filter: blur(16px) saturate(160%);
+		border-bottom-color: rgb(255 255 255 / 0.06);
+	}
+	.brand {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		color: var(--text-1);
+		text-decoration: none;
+		font-weight: 700;
+		font-size: 1.05rem;
+		letter-spacing: -0.02em;
+	}
+	.links {
+		display: flex;
+		gap: 0.25rem;
+	}
+	.links a {
+		padding: 0.45rem 0.8rem;
+		border-radius: 10px;
+		color: var(--text-2);
+		text-decoration: none;
 		font-size: 0.9rem;
+		font-weight: 500;
+		transition:
+			color 0.2s,
+			background 0.2s;
+	}
+	.links a:hover {
+		color: var(--text-1);
+		background: rgb(255 255 255 / 0.06);
 	}
 
 	main {
-		max-width: 1160px;
+		max-width: 1200px;
 		margin: 0 auto;
-		padding: 0 1.5rem 4rem;
+		padding: 2rem 1.5rem 5rem;
 		display: grid;
-		gap: 4rem;
-	}
-	.card {
-		background: linear-gradient(160deg, #ffffff12, #ffffff06);
-		border: 1px solid #ffffff1c;
-		border-radius: 28px;
-		backdrop-filter: blur(16px);
+		grid-template-columns: minmax(0, 1fr);
+		gap: clamp(5rem, 10vw, 8rem);
 	}
 
-	.features {
+	.bento {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+		grid-template-columns: repeat(4, 1fr);
 		gap: 1rem;
 	}
 	.feature {
-		padding: 1.4rem 1.5rem;
+		position: relative;
+		grid-column: span 1;
+		padding: 1.5rem;
+		overflow: hidden;
+		transition:
+			border-color 0.3s,
+			transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+	}
+	.feature.wide {
+		grid-column: span 2;
+	}
+	.feature::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		background: radial-gradient(
+			320px circle at var(--mx, 50%) var(--my, 0%),
+			rgb(165 243 252 / 0.1),
+			transparent 60%
+		);
+		opacity: 0;
+		transition: opacity 0.3s;
+		pointer-events: none;
+	}
+	.feature:hover {
+		border-color: rgb(255 255 255 / 0.16);
+		transform: translateY(-2px);
+	}
+	.feature:hover::before {
+		opacity: 1;
+	}
+	.feature svg {
+		color: #a5f3fc;
+		padding: 0.55rem;
+		border-radius: 12px;
+		background: rgb(165 243 252 / 0.08);
+		border: 1px solid rgb(165 243 252 / 0.14);
 	}
 	.feature h3 {
-		margin: 0 0 0.4rem;
+		margin: 1rem 0 0.35rem;
 		font-size: 1.05rem;
+		letter-spacing: -0.01em;
 	}
 	.feature p {
 		margin: 0;
-		color: #aeabd6;
-		line-height: 1.5;
-		font-size: 0.95rem;
+		color: var(--text-2);
+		font-size: 0.93rem;
+		line-height: 1.55;
 	}
 
-	.playground {
-		display: grid;
-		grid-template-columns: 1fr 1.1fr;
-		overflow: hidden;
-	}
-	.stage {
-		position: relative;
-		display: grid;
-		place-items: center;
-		min-height: 460px;
-		background:
-			radial-gradient(circle at 50% 45%, #ffffff14, transparent 60%),
-			repeating-linear-gradient(0deg, #ffffff06 0 1px, transparent 1px 28px),
-			repeating-linear-gradient(90deg, #ffffff06 0 1px, transparent 1px 28px);
-	}
-	.boops {
-		position: absolute;
-		bottom: 1rem;
-		left: 1.2rem;
-		font-size: 0.85rem;
-		color: #8f8cc0;
-	}
-	.controls {
-		padding: 2rem;
-		display: grid;
-		gap: 1.1rem;
-		align-content: start;
-		border-left: 1px solid #ffffff14;
-	}
-	.controls h2 {
-		margin: 0;
-	}
-	.row {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 1rem;
-	}
-	fieldset {
-		border: 0;
-		margin: 0;
-		padding: 0;
-		min-width: 0;
-	}
-	legend {
-		font-size: 0.75rem;
-		text-transform: uppercase;
-		letter-spacing: 0.1em;
-		color: #8f8cc0;
-		margin-bottom: 0.5rem;
-	}
-	.chips {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.4rem;
-	}
-	.chips button {
-		padding: 0.4rem 0.75rem;
-		border-radius: 999px;
-		border: 1px solid #ffffff1f;
-		background: #ffffff0a;
-		color: #d6d4f5;
-		font: inherit;
-		font-size: 0.88rem;
-		cursor: pointer;
-		transition:
-			background 0.15s,
-			transform 0.15s;
-	}
-	.chips button:hover {
-		background: #ffffff18;
-	}
-	.chips button:active {
-		transform: scale(0.95);
-	}
-	.chips button.active {
-		background: linear-gradient(120deg, #a5f3fc, #c4b5fd);
-		color: #17173a;
-		border-color: transparent;
-		font-weight: 700;
-	}
-	.chips.small button {
-		font-size: 0.8rem;
-	}
-	.swatches {
-		display: flex;
-		gap: 0.6rem;
-	}
-	.swatch {
-		width: 2.2rem;
-		height: 2.2rem;
-		border-radius: 50%;
-		border: 2px solid transparent;
-		background:
-			radial-gradient(circle at 50% 50%, var(--c) 0 18%, transparent 20%),
-			radial-gradient(circle at 35% 30%, var(--a), var(--b));
-		cursor: pointer;
-		transition: transform 0.15s;
-	}
-	.swatch:hover {
-		transform: scale(1.1);
-	}
-	.swatch.active {
-		border-color: #fff;
-		box-shadow: 0 0 0 3px #c4b5fd55;
-	}
-	input[type='range'] {
+	.usage {
+		max-width: 760px;
 		width: 100%;
-		accent-color: #c4b5fd;
+		margin: 0 auto;
+		padding: 0.5rem;
+		box-sizing: border-box;
 	}
-	.code {
-		position: relative;
+	.window-bar {
+		display: flex;
+		align-items: center;
+		gap: 0.45rem;
+		padding: 0.5rem 0.6rem 0.8rem;
 	}
-	pre {
-		margin: 0;
-		padding: 1rem 1.2rem;
-		border-radius: 16px;
-		background: #07071acc;
-		border: 1px solid #ffffff14;
-		overflow-x: auto;
-		font-size: 0.85rem;
-		line-height: 1.6;
-		color: #c9f7ff;
+	.window-bar span {
+		width: 0.7rem;
+		height: 0.7rem;
+		border-radius: 50%;
+		background: rgb(255 255 255 / 0.12);
 	}
-	.code button {
-		position: absolute;
-		top: 0.6rem;
-		right: 0.6rem;
+	.window-bar em {
+		flex: 1;
+		text-align: center;
+		font-style: normal;
+		font-size: 0.8rem;
+		color: var(--text-3);
+		font-family: var(--mono);
+	}
+	.copy {
 		padding: 0.3rem 0.7rem;
 		border-radius: 8px;
-		border: 0;
-		background: #ffffff18;
-		color: inherit;
+		border: 1px solid rgb(255 255 255 / 0.1);
+		background: rgb(255 255 255 / 0.06);
+		color: var(--text-2);
 		font: inherit;
-		font-size: 0.8rem;
-		cursor: pointer;
-	}
-
-	.section-title {
-		font-size: 2rem;
-		margin: 0;
-		text-align: center;
-	}
-	.section-sub {
-		text-align: center;
-		color: #aeabd6;
-		margin: 0.5rem 0 2rem;
-	}
-	.grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-		gap: 1rem;
-	}
-	.tile {
-		margin: 0;
-		padding: 1.2rem 0.5rem 1rem;
-		display: grid;
-		justify-items: center;
-		gap: 0.3rem;
-		transition: transform 0.2s;
-	}
-	.tile:hover {
-		transform: translateY(-4px);
-	}
-	figcaption {
+		font-size: 0.78rem;
 		font-weight: 600;
-		color: #d6d4f5;
+		cursor: pointer;
+		transition:
+			background 0.2s,
+			transform 0.15s;
 	}
-	.family {
-		display: flex;
-		flex-wrap: wrap;
-		justify-content: center;
-		gap: 1.5rem;
+	.copy:hover {
+		background: rgb(255 255 255 / 0.12);
 	}
-	.usage {
-		padding: 2rem;
+	.copy:active {
+		transform: scale(0.94);
 	}
-	.usage h2 {
-		margin-top: 0;
+	.copy.done {
+		background: #7cf3ff;
+		color: #0b1030;
 	}
 
 	footer {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 0.6rem;
-		padding: 2rem;
-		color: #8f8cc0;
+		display: grid;
+		justify-items: center;
+		gap: 0.25rem;
+		padding: 3rem 1.5rem 4rem;
+		border-top: 1px solid rgb(255 255 255 / 0.06);
+		color: var(--text-3);
+		font-size: 0.88rem;
+	}
+	footer p {
+		margin: 0;
 	}
 
-	@media (max-width: 860px) {
-		.hero,
-		.playground {
+	@media (max-width: 900px) {
+		.bento {
+			grid-template-columns: repeat(2, 1fr);
+		}
+	}
+	@media (max-width: 560px) {
+		.bento {
 			grid-template-columns: 1fr;
 		}
-		.hero {
-			padding-top: 3rem;
-			text-align: center;
+		.feature.wide {
+			grid-column: span 1;
 		}
-		.lead {
-			margin-inline: auto;
+		.hide-sm {
+			display: none;
 		}
-		.hero-actions,
-		.chips.small {
-			justify-content: center;
+		.links a {
+			padding: 0.4rem 0.55rem;
+			font-size: 0.85rem;
 		}
-		.controls {
-			border-left: 0;
-			border-top: 1px solid #ffffff14;
-		}
-		.row {
-			grid-template-columns: 1fr;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.blob {
+			animation: none;
 		}
 	}
 </style>
