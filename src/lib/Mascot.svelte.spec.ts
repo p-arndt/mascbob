@@ -47,6 +47,13 @@ describe('Mascot', () => {
 		expect(container.querySelector('.skin')).toBeNull();
 	});
 
+	it('drops the mood effects when disabled', async () => {
+		const on = render(Mascot, { mood: 'happy' });
+		expect(on.container.querySelector('.twinkle')).not.toBeNull();
+		const off = render(Mascot, { mood: 'happy', effects: false });
+		expect(off.container.querySelector('.twinkle')).toBeNull();
+	});
+
 	it('sets the size', async () => {
 		const { container } = render(Mascot, { size: 90 });
 		expect((container.querySelector('.mascott') as HTMLElement).style.width).toBe('90px');

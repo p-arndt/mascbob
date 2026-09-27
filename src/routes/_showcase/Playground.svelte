@@ -58,6 +58,7 @@
 	let shoes = $state<Shoes>(start.shoes);
 	let hands = $state(start.hands);
 	let float = $state(start.float);
+	let effects = $state(start.effects);
 	let lookAt = $state<Gaze>(start.lookAt);
 	let reactions = $state<Reaction[]>(start.reactions);
 	let size = $state(start.size);
@@ -76,6 +77,7 @@
 		shoes,
 		hands,
 		float,
+		effects,
 		lookAt,
 		reactions,
 		size,
@@ -108,6 +110,7 @@
 			shoes,
 			hands,
 			float,
+			effects,
 			lookAt,
 			reactions,
 			size,
@@ -408,6 +411,7 @@
 				{shoes}
 				{hands}
 				{float}
+				{effects}
 				{lookAt}
 				{reactions}
 				{onreaction}
@@ -601,6 +605,10 @@
 						<label class="toggle">
 							<input type="checkbox" bind:checked={float} />
 							<span>Float</span>
+						</label>
+						<label class="toggle">
+							<input type="checkbox" bind:checked={effects} />
+							<span>Effects</span>
 						</label>
 					</div>
 				</fieldset>

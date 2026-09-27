@@ -47,6 +47,8 @@
 		/** Pixels, or any CSS length. */
 		size?: number | string;
 		float?: boolean;
+		/** Particles around the head: mood effects (sparkles, hearts, zzz, …) and boop bursts. */
+		effects?: boolean;
 		motion?: Motion;
 		/** Renders as a button that reacts to clicks and fires `onboop`. */
 		interactive?: boolean;
@@ -80,6 +82,7 @@
 		level,
 		size = 160,
 		float = true,
+		effects = true,
 		motion = 'auto',
 		interactive = true,
 		label = 'Mascott',
@@ -603,7 +606,9 @@
 							{:else if hands}
 								<Hands />
 							{/if}
-							<Effects />
+							{#if effects}
+								<Effects />
+							{/if}
 						</g>
 					</g>
 				</g>

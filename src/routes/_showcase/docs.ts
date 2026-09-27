@@ -79,6 +79,12 @@ export const PROPS: PropDoc[] = [
 	},
 	{ name: 'float', type: 'boolean', default: 'true', description: 'Idle hover animation.' },
 	{
+		name: 'effects',
+		type: 'boolean',
+		default: 'true',
+		description: 'Particles around the head: mood effects (sparkles, hearts, zzz) and boop bursts.'
+	},
+	{
 		name: 'motion',
 		type: "'auto' | 'full' | 'reduced'",
 		default: "'auto'",

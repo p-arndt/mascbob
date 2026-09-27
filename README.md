@@ -61,6 +61,7 @@ import { MOODS, SHAPES, EYE_STYLES, ACCESSORIES, OUTFITS, SHOES, THEMES } from '
 | `level`       | mouth opening 0..1 while `talking` (e.g. mic amplitude); omit for automatic lip movement               | –         |
 | `size`        | px number or any CSS length                                                                            | `160`     |
 | `float`       | idle hover animation (head-only mode; the full figure stands)                                          | `true`    |
+| `effects`     | particles around the head: mood effects (sparkles, hearts, zzz) and boop bursts                        | `true`    |
 | `motion`      | `auto` (respects `prefers-reduced-motion`), `full`, `reduced`                                          | `auto`    |
 | `interactive` | render as a button that reacts to clicks                                                               | `true`    |
 | `reactions`   | pointer reactions: `true` (defaults), `false`, a list of `REACTIONS`, or `{ shy: true, bored: false }` | `true`    |

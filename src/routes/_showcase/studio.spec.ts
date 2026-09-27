@@ -20,6 +20,7 @@ describe('share links', () => {
 			shape: 'orb',
 			body: false,
 			float: false,
+			effects: false,
 			colors: { accent: '#12ab34', bodyMid: '#eeeeee' },
 			reactions: ['pet', 'shy'],
 			stage: '#ffe4d6'

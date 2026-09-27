@@ -43,6 +43,7 @@ export interface StudioConfig {
 	shoes: Shoes;
 	hands: boolean;
 	float: boolean;
+	effects: boolean;
 	lookAt: Gaze;
 	reactions: Reaction[];
 	size: number;
@@ -63,6 +64,7 @@ export const LIBRARY_DEFAULTS: StudioConfig = {
 	shoes: 'none',
 	hands: true,
 	float: true,
+	effects: true,
 	lookAt: 'pointer',
 	reactions: [...DEFAULT_REACTIONS],
 	size: 160,
@@ -90,7 +92,7 @@ export function toQuery(c: StudioConfig): string {
 		if (c[key] !== d[key]) q.set(key, c[key]);
 	}
 	if (c.accessories.length) q.set('acc', c.accessories.join(','));
-	for (const key of ['body', 'hands', 'float'] as const) {
+	for (const key of ['body', 'hands', 'float', 'effects'] as const) {
 		if (c[key] !== d[key]) q.set(key, c[key] ? '1' : '0');
 	}
 	if (!sameSet(c.reactions, d.reactions)) q.set('react', c.reactions.join(',') || 'none');
@@ -127,6 +129,7 @@ export function fromQuery(q: URLSearchParams): StudioConfig {
 		shoes: oneOf(SHOES, q.get('shoes')) ?? d.shoes,
 		hands: flag('hands', d.hands),
 		float: flag('float', d.float),
+		effects: flag('effects', d.effects),
 		lookAt: oneOf(GAZES, q.get('lookAt')) ?? d.lookAt,
 		reactions: q.has('react')
 			? REACTIONS.filter((r) => (q.get('react') ?? '').split(',').includes(r))
@@ -231,6 +234,7 @@ export function mascotAttrs(c: StudioConfig): Attr[] {
 		c.body && c.shoes !== d.shoes && { name: 'shoes', value: c.shoes },
 		c.hands !== d.hands && { name: 'hands', value: String(c.hands), expr: true },
 		c.float !== d.float && { name: 'float', value: String(c.float), expr: true },
+		c.effects !== d.effects && { name: 'effects', value: String(c.effects), expr: true },
 		c.lookAt !== d.lookAt && { name: 'lookAt', value: c.lookAt },
 		reactionsAttr(c),
 		c.size !== d.size && { name: 'size', value: String(c.size), expr: true }
