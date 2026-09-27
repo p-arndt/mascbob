@@ -100,6 +100,16 @@
 	const hop = new Tween(0);
 
 	let root = $state<HTMLElement>();
+	// Offscreen mascots pause their timers, pointer tracking and CSS loops: a page full of them stays smooth.
+	let onscreen = $state(true);
+	$effect(() => {
+		if (!root || typeof IntersectionObserver === 'undefined') return;
+		const io = new IntersectionObserver(([entry]) => (onscreen = entry.isIntersecting), {
+			rootMargin: '120px'
+		});
+		io.observe(root);
+		return () => io.disconnect();
+	});
 	let talk = $state(0);
 	let pointerX = $state(0);
 	let entered = $state(false);
@@ -171,7 +181,7 @@
 
 	// Rare idle fidgets keep it alive without being busy.
 	$effect(() => {
-		if (reduced) return;
+		if (reduced || !onscreen) return;
 		let timer: ReturnType<typeof setTimeout>;
 		const schedule = () => {
 			timer = setTimeout(
@@ -191,7 +201,7 @@
 
 	// Blinking, with the occasional double blink; sleepy eyes are already closed.
 	$effect(() => {
-		if (activeMood === 'sleepy') return;
+		if (activeMood === 'sleepy' || !onscreen) return;
 		let alive = true;
 		let timer: ReturnType<typeof setTimeout>;
 		const schedule = () => {
@@ -225,6 +235,7 @@
 			gaze.target = { x: 0, y: 0 };
 			return;
 		}
+		if (!onscreen) return;
 		if (target === 'wander') {
 			let timer: ReturnType<typeof setTimeout>;
 			const glance = () => {
@@ -411,6 +422,9 @@
 		},
 		get entered() {
 			return entered;
+		},
+		get onscreen() {
+			return onscreen;
 		}
 	});
 </script>
@@ -493,6 +507,7 @@
 		type="button"
 		class="mascott {className}"
 		class:still={reduced}
+		class:paused={!onscreen}
 		class:no-float={!float}
 		aria-label={label}
 		data-mood={activeMood}
@@ -521,6 +536,7 @@
 		role="img"
 		class="mascott {className}"
 		class:still={reduced}
+		class:paused={!onscreen}
 		class:no-float={!float}
 		aria-label={label}
 		data-mood={activeMood}
@@ -613,6 +629,9 @@
 	.no-float .contact,
 	.no-float .ground-glow {
 		animation: none;
+	}
+	.paused :global(*) {
+		animation-play-state: paused !important;
 	}
 	.still :global(*),
 	.still {

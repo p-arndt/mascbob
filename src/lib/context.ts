@@ -47,6 +47,8 @@ export interface MascotContext {
 	readonly squashY: number;
 	/** False while the mount pop-in plays (~650 ms); true immediately under reduced motion. */
 	readonly entered: boolean;
+	/** False while scrolled out of view; skip timers and per-frame work then. */
+	readonly onscreen: boolean;
 }
 
 const KEY = Symbol('mascott');

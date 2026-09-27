@@ -15,7 +15,25 @@ export const LED_STEP = 4.6;
 export const LED_TOP = 73;
 export const LED_ROWS = 13;
 
+/** Bounds of the pill-shaped LED patch; unlit LEDs are drawn as one patterned rect over it. */
+export function ledArea(width: number) {
+	const cols = Math.max(3, Math.floor(width / LED_STEP) + 1);
+	const height = (LED_ROWS - 1) * LED_STEP;
+	const halfW = ((cols - 1) * LED_STEP) / 2 + LED_STEP * 0.6;
+	const radius = height / 2 + LED_STEP * 0.6;
+	return {
+		x: 100 - halfW,
+		y: LED_TOP + height / 2 - radius,
+		width: halfW * 2,
+		height: radius * 2,
+		radius,
+		/** Center of the first column, so the pattern lines up with the lit LEDs. */
+		firstX: 100 - ((cols - 1) * LED_STEP) / 2
+	};
+}
+
 export interface LedDot {
+	id: number;
 	x: number;
 	y: number;
 	/** Diagonal index, used to stagger the power-on sweep. */
@@ -41,7 +59,7 @@ export function ledGrid(width: number): LedDot[] {
 			// Pill test: distance from the pill's straight core segment.
 			const dx = Math.max(0, Math.abs(x - 100) - (halfW - radius));
 			if (Math.hypot(dx, y - cy) > radius) continue;
-			dots.push({ x, y, wave: r + c });
+			dots.push({ id: r * cols + c, x, y, wave: r + c });
 		}
 	}
 	return dots;

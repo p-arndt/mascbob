@@ -6,6 +6,8 @@
 	import {
 		EYE_SIZES,
 		LED_STEP,
+		LED_TOP,
+		ledArea,
 		ledGrid,
 		lightAt,
 		type EyeShape,
@@ -36,7 +38,7 @@
 
 	// Tiny involuntary eye jumps keep a resting face from looking frozen.
 	$effect(() => {
-		if (m.reduced || m.mood === 'sleepy') {
+		if (m.reduced || m.mood === 'sleepy' || !m.onscreen) {
 			saccade.set({ x: 0, y: 0 }, { instant: true });
 			return;
 		}
@@ -129,37 +131,75 @@
 
 	/** Unlit LEDs stay faintly visible: they are what tells you this face is a display. */
 	const OFF = 0.07;
+	const area = $derived(ledArea(gridW));
+	// Only lit LEDs become elements; the dark ones are a single patterned rect.
 	const lit = $derived(
-		dots.map((d) => {
+		dots.flatMap((d) => {
 			const l = lightAt(d.x, d.y, scene);
 			const tone = l.white > 0.5 ? 'white' : l.pink > l.main ? 'pink' : 'main';
 			// A gamma below 1 keeps edge LEDs from looking washed out.
 			const level = Math.max(l.main, l.pink, l.white) ** 0.75;
-			return { ...d, tone, level: Math.max(OFF, level) };
+			return level > OFF + 0.03 ? [{ ...d, tone, level }] : [];
 		})
 	);
 	const leftEye = $derived(scene.eyes[0]);
 </script>
 
 <!-- Re-keyed on mood so the matrix replays its sweep: power-on at mount, a refresh on every change. -->
-<!-- Soft light spill around lit LEDs: keeps the face readable at small sizes and on dark shells. -->
-<g class="spill" filter={ref('soft')}>
-	{#each lit as d, i (i)}
-		{#if d.level > 0.3}
-			<circle class={d.tone} cx={d.x} cy={d.y} r={LED_STEP * 0.75} opacity={d.level * 0.45} />
-		{/if}
-	{/each}
-</g>
+<defs>
+	<pattern
+		id="{m.uid}-leds"
+		width={LED_STEP}
+		height={LED_STEP}
+		patternUnits="userSpaceOnUse"
+		x={area.firstX - LED_STEP / 2}
+		y={LED_TOP - LED_STEP / 2}
+	>
+		<circle class="main" cx={LED_STEP / 2} cy={LED_STEP / 2} r={LED_STEP * 0.4} opacity={OFF} />
+	</pattern>
+	<radialGradient id="{m.uid}-spill-main">
+		<stop offset="0" class="spill-main" stop-opacity="0.5" />
+		<stop offset="1" class="spill-main" stop-opacity="0" />
+	</radialGradient>
+	<radialGradient id="{m.uid}-spill-pink">
+		<stop offset="0" class="spill-pink" stop-opacity="0.5" />
+		<stop offset="1" class="spill-pink" stop-opacity="0" />
+	</radialGradient>
+</defs>
 
+<rect
+	class="panel"
+	x={area.x}
+	y={area.y}
+	width={area.width}
+	height={area.height}
+	rx={area.radius}
+	fill={ref('leds')}
+/>
+
+<!-- Soft light spill around lit LEDs keeps the face readable at small sizes and on dark shells. -->
+{#each lit as d (d.id)}
+	{#if d.level > 0.3 && d.tone !== 'white'}
+		<circle
+			cx={d.x}
+			cy={d.y}
+			r={LED_STEP * 1.1}
+			fill={ref(d.tone === 'pink' ? 'spill-pink' : 'spill-main')}
+			opacity={d.level}
+		/>
+	{/if}
+{/each}
+
+<!-- Re-keyed on mood so the lit LEDs replay their sweep: power-on at mount, a refresh on every change. -->
 {#key m.mood}
-	<g class="matrix">
-		{#each lit as d, i (i)}
+	<g>
+		{#each lit as d (d.id)}
 			<circle
 				class="led {d.tone}"
 				cx={d.x}
 				cy={d.y}
 				r={LED_STEP * 0.4}
-				style:opacity={d.level}
+				opacity={d.level}
 				style:animation-delay="{d.wave * 22}ms"
 			/>
 		{/each}
@@ -175,10 +215,15 @@
 
 <style>
 	.led {
-		transition: opacity 90ms linear;
 		transform-box: fill-box;
 		transform-origin: center;
 		animation: sweep 520ms ease-out backwards;
+	}
+	.spill-main {
+		stop-color: var(--c-eye);
+	}
+	.spill-pink {
+		stop-color: var(--c-cheek);
 	}
 	.main {
 		fill: var(--c-eye);
