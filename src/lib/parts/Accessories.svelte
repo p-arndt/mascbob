@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Tween } from 'svelte/motion';
+	import { Spring, Tween } from 'svelte/motion';
 	import { backOut } from 'svelte/easing';
 	import { getMascot, svgRef } from '../context.js';
 	import { SPARKLE_PATH } from '../geometry.js';
@@ -7,31 +7,49 @@
 		AUDIO_MOODS,
 		BAND_END_Y,
 		BLOOM_MOODS,
+		CAP_RISE,
 		DROP_MOODS,
+		FLOWER_STEM,
 		HOT_MOODS,
 		MONOCLE,
 		MONOCLE_DROP,
+		SHADES_SLIDE,
+		SLIDE_MOODS,
 		WILT_MOODS,
 		bandControlY,
+		beanieWidth,
+		capWidth,
 		chainPath,
 		contactShadows,
+		counterSquash,
+		followSwing,
+		hatLift,
+		headwear,
+		hornOffset,
 		monocleAnchor,
 		monocleHook,
+		mustacheTilt,
+		nightcapBend,
+		nightcapShape,
+		nightcapWidth,
 		propellerSpin,
+		propellerWidth,
 		starPath,
 		templeLine,
 		type Accessory
 	} from './accessories.js';
-	import { MISPRINT } from './face.js';
+	import { MISPRINT, halftone } from './face.js';
 
 	/** `back` draws behind the head shell, `front` on top of the face. */
 	let { layer }: { layer: 'back' | 'front' } = $props();
 
 	const m = getMascot();
 	const ref = (name: string) => svgRef(m.uid, name);
-	const has = (a: Accessory) => m.accessories.includes(a);
+	const worn = $derived(headwear(m.accessories));
+	const has = (a: Accessory) => worn.worn.includes(a);
 	const t = $derived(m.shape.top);
 	const hw = $derived(m.shape.halfWidth);
+	const cw = $derived(m.shape.crownHalfWidth);
 
 	// Re-keying on boops and mood replays one-shot wobbles on the antenna and bow.
 	const nudge = $derived(`${m.boops}:${m.mood}`);
@@ -47,9 +65,25 @@
 	// The band rests just above the crown instead of arching high over it.
 	const bandCtrl = $derived(bandControlY(BAND_END_Y, t - 6));
 	const shineCtrl = $derived(bandControlY(BAND_END_Y - 2, t - 8));
-	const shadows = $derived(contactShadows(m.accessories, t, hw));
+	const shadows = $derived(contactShadows(worn.worn, t, hw, cw));
 
-	const beanieW = $derived(hw * 0.8 + 6);
+	// Worn items trail the figure: springs chase the hop and lean, and the gap between the
+	// spring and the real value is how far an item lags behind (and overshoots on the way back).
+	const hopFollow = Spring.of(() => m.hop, { stiffness: 0.1, damping: 0.3 });
+	const leanFollow = Spring.of(() => m.lean, { stiffness: 0.07, damping: 0.25 });
+	const lift = $derived(m.reduced ? 0 : hatLift(hopFollow.current - m.hop));
+	const swing = $derived(
+		m.reduced ? 0 : followSwing(leanFollow.current - m.lean, hopFollow.current - m.hop)
+	);
+	// A topper standing on a hat rides along with it.
+	const topperY = $derived(worn.seat ? lift - worn.seat : 0);
+
+	/** Undoes the head squash around `(x, y)`, where a rigid item touches the head. */
+	const counter = (x: number, y: number) =>
+		`translate(${x} ${y}) scale(${1 / m.squashX} ${1 / m.squashY}) translate(${-x} ${-y})`;
+
+	const beanieW = $derived(beanieWidth(cw));
+	const hornX = $derived(100 - hornOffset(cw));
 	const STAR = starPath(8);
 	const HAT_DOTS = [
 		[-7, -6, 2.2],
@@ -71,18 +105,53 @@
 		duration: () => (instant ? 0 : 550),
 		easing: backOut
 	});
-	const chain = $derived(
-		chainPath(
-			(({ x, y }) => ({ x: x + gx, y: y + gy }))(monocleHook(drop.current)),
-			monocleAnchor(hw)
-		)
-	);
+	const chain = $derived.by(() => {
+		const hook = monocleHook(drop.current);
+		const center = { x: MONOCLE.cx, y: MONOCLE.cy };
+		const from = counterSquash({ x: hook.x + gx, y: hook.y + gy }, center, m.squashX, m.squashY);
+		return chainPath(from, monocleAnchor(hw));
+	});
 	const wilt = $derived(WILT_MOODS.includes(m.mood));
 	const spin = $derived(propellerSpin(m.mood));
-	const capW = $derived(hw * 0.5 + 8);
-	// Handlebar mustache around the origin; the ends curl up past the lip line.
-	const MUSTACHE =
-		'M0 -1.5C-4 -5 -10 -5 -14 -1C-17 2 -20 2 -22 -1C-21 4 -16 6 -11 4C-6 2 -2 1 0 2C2 1 6 2 11 4C16 6 21 4 22 -1C20 2 17 2 14 -1C10 -5 4 -5 0 -1.5Z';
+	const capW = $derived(propellerWidth(cw));
+	// Handlebar mustache, left half around the origin; the right half mirrors it. The end
+	// curls up past the lip line.
+	const STACHE_HALF =
+		'M0 -1.5C-4 -5 -10 -5 -14 -1C-17 2 -20 2 -22 -1C-21 4 -16 6 -11 4C-6 2 -2 1 0 2Z';
+	const stacheTilt = $derived(mustacheTilt(m.face.mouthCurve));
+
+	// Baseball cap: a dome from the rim up to the button, with the bill curving down in front.
+	const ballcap = $derived.by(() => {
+		const w = capWidth(cw);
+		const rim = t + 16;
+		const c = bandControlY(rim, t - CAP_RISE);
+		return {
+			w,
+			dome: `M${100 - w} ${rim}C${100 - w} ${c} ${100 + w} ${c} ${100 + w} ${rim}Z`,
+			bill: `M${96 - w} ${rim - 1}Q100 ${rim + 22} ${104 + w} ${rim - 1}Q100 ${rim + 7} ${96 - w} ${rim - 1}Z`,
+			dots: halftone(w * 0.75, 13, 2.8).map((d) => ({
+				...d,
+				x: d.x + 100 + w * 0.55,
+				y: d.y + t + 9
+			}))
+		};
+	});
+
+	// The droop springs toward the mood's bend and the tip trails the lean on top of that.
+	const bend = Spring.of(() => nightcapBend(m.mood), { stiffness: 0.05, damping: 0.35 });
+	const nightcap = $derived.by(() => {
+		const w = nightcapWidth(cw);
+		const deg = m.reduced ? nightcapBend(m.mood) : bend.current + swing * 1.6;
+		return { w, ...nightcapShape(w, t, deg) };
+	});
+	const NIGHTCAP_DOTS = halftone(12, 9, 2.6);
+
+	const slide = Tween.of(() => (SLIDE_MOODS.includes(m.mood) ? 1 : 0), {
+		duration: () => (instant ? 0 : 450),
+		easing: backOut
+	});
+	// A wayfarer lens around its own center.
+	const SHADE_LENS = 'M-15 -8H15Q16.5 -8 16 -5C15 5 9 10 0 10C-9 10 -15 5 -16 -5Q-16.5 -8 -15 -8Z';
 </script>
 
 {#if layer === 'back'}
@@ -151,41 +220,46 @@
 		/>
 	{/if}
 	{#if has('antenna')}
-		{#key nudge}
-			<g class="antenna" style:transform-origin="100px {t + 4}px">
-				<path class="stalk" d="M100 {t + 4}Q101.5 {t - 5} 100 {t - 13}" />
-				<circle class="tip-glow" cx="100" cy={t - 18} r="9" filter={ref('soft')} />
-				<circle class="antenna-tip" cx="100" cy={t - 18} r="5.6" fill={ref('tip')} />
-				<circle class="tip-flash" cx="100" cy={t - 18} r="3.2" />
-				<circle class="tip-shine" cx="98.2" cy={t - 20} r="1.4" />
-			</g>
-		{/key}
-		<ellipse class="collar" cx="100" cy={t + 3} rx="5" ry="2.2" />
+		<g transform="translate(0 {topperY}) rotate({swing} 100 {t + 4})">
+			{#key nudge}
+				<g class="antenna" style:transform-origin="100px {t + 4}px">
+					<path class="stalk" d="M100 {t + 4}Q101.5 {t - 5} 100 {t - 13}" />
+					<circle class="tip-glow" cx="100" cy={t - 18} r="9" filter={ref('soft')} />
+					<circle class="antenna-tip" cx="100" cy={t - 18} r="5.6" fill={ref('tip')} />
+					<circle class="tip-flash" cx="100" cy={t - 18} r="3.2" />
+					<circle class="tip-shine" cx="98.2" cy={t - 20} r="1.4" />
+				</g>
+			{/key}
+		</g>
+		<ellipse class="collar" cx="100" cy={t + 3 + topperY} rx="5" ry="2.2" />
 	{/if}
 	{#if has('sprout')}
-		<g class="sprout" style:transform-origin="100px {t}px">
-			<path class="stem" d="M100 {t + 4}Q98 {t - 6} 100 {t - 14}" />
-			<g class="leaf-l" style:transform-origin="100px {t - 12}px">
-				<path
-					class="leaf"
-					d="M100 {t - 12}C92 {t - 26} 78 {t - 22} 76 {t - 16}C84 {t - 8} 94 {t - 8} 100 {t - 12}Z"
-				/>
-				<path class="vein" d="M99 {t - 12.5}Q88 {t - 17} 79 {t - 16.5}" />
-			</g>
-			<g class="leaf-r" style:transform-origin="100px {t - 14}px">
-				<path
-					class="leaf"
-					d="M100 {t - 14}C106 {t - 30} 122 {t - 28} 124 {t - 22}C116 {t - 12} 106 {t - 10} 100 {t -
-						14}Z"
-				/>
-				<path class="vein" d="M101 {t - 14.5}Q111 {t - 22} 121 {t - 22.5}" />
-			</g>
-			<g transform="translate(100 {t - 16})">
-				<g class="flower" class:open={bloom && !m.reduced} class:shown={bloom}>
-					{#each [0, 72, 144, 216, 288] as a (a)}
-						<ellipse class="petal" cx="0" cy="-3.6" rx="2.6" ry="3.4" transform="rotate({a})" />
-					{/each}
-					<circle class="pistil" r="2.2" />
+		<g transform="translate(0 {topperY}) rotate({swing} 100 {t + 4})">
+			<g class="sprout" style:transform-origin="100px {t}px">
+				<path class="stem" d="M100 {t + 4}Q98 {t - 6} 100 {t - 14}" />
+				<g class="leaf-l" style:transform-origin="100px {t - 12}px">
+					<path
+						class="leaf"
+						d="M100 {t - 12}C92 {t - 26} 78 {t - 22} 76 {t - 16}C84 {t - 8} 94 {t - 8} 100 {t -
+							12}Z"
+					/>
+					<path class="vein" d="M99 {t - 12.5}Q88 {t - 17} 79 {t - 16.5}" />
+				</g>
+				<g class="leaf-r" style:transform-origin="100px {t - 14}px">
+					<path
+						class="leaf"
+						d="M100 {t - 14}C106 {t - 30} 122 {t - 28} 124 {t - 22}C116 {t - 12} 106 {t -
+							10} 100 {t - 14}Z"
+					/>
+					<path class="vein" d="M101 {t - 14.5}Q111 {t - 22} 121 {t - 22.5}" />
+				</g>
+				<g transform="translate(100 {t - 16})">
+					<g class="flower" class:open={bloom && !m.reduced} class:shown={bloom}>
+						{#each [0, 72, 144, 216, 288] as a (a)}
+							<ellipse class="petal" cx="0" cy="-3.6" rx="2.6" ry="3.4" transform="rotate({a})" />
+						{/each}
+						<circle class="pistil" r="2.2" />
+					</g>
 				</g>
 			</g>
 		</g>
@@ -193,7 +267,7 @@
 	{#if has('horns')}
 		{#each [-1, 1] as s (s)}
 			<g transform="translate(100 0) scale({s} 1) translate(-100 0)">
-				<g transform="translate({100 - hw * 0.42} {t + 12}) rotate(-14)" class:hot>
+				<g transform="{counter(hornX, t + 12)} translate({hornX} {t + 12}) rotate(-14)" class:hot>
 					<path
 						class="horn-glow"
 						d="M-8 6C-10 -6 -12 -14 -10 -22C-4 -16 6 -8 8 6Z"
@@ -223,13 +297,25 @@
 		</g>
 	{/if}
 	{#if has('mustache')}
-		<g transform="translate({100 + m.gazeX * 6} {107.5 + m.gazeY * 5 - m.talk * 2}) scale(0.82)">
-			<path
-				class="stache stache-accent"
-				d={MUSTACHE}
-				transform="translate({MISPRINT.x} {MISPRINT.y})"
-			/>
-			<path class="stache" d={MUSTACHE} />
+		<g
+			transform="translate({100 + m.face.mouthX + m.gazeX * 6} {107.5 +
+				m.gazeY * 5 -
+				m.talk * 2}) scale(0.82)"
+		>
+			{#each [-1, 1] as s (s)}
+				<g transform="scale({s} 1) rotate({stacheTilt})">
+					<path
+						class="stache stache-accent"
+						d={STACHE_HALF}
+						transform="translate({MISPRINT.x * s} {MISPRINT.y})"
+					/>
+				</g>
+			{/each}
+			{#each [-1, 1] as s (s)}
+				<g transform="scale({s} 1) rotate({stacheTilt})">
+					<path class="stache" d={STACHE_HALF} />
+				</g>
+			{/each}
 		</g>
 	{/if}
 	{#if has('headphones')}
@@ -270,9 +356,17 @@
 			<ellipse class="halo-glint" cx="100" cy={t - 12} rx="30" ry="7" pathLength="100" />
 		</g>
 	{/if}
+	{#if has('headband')}
+		{@const band = `M0 ${t + 6}Q100 ${t + 30} 200 ${t + 6}V${t + 15}Q100 ${t + 39} 0 ${t + 15}Z`}
+		<g clip-path={ref('shell-clip')}>
+			<path class="headband-plate" d={band} transform="translate({MISPRINT.x} {MISPRINT.y})" />
+			<path class="headband" d={band} />
+			<path class="headband-stripe" d="M0 {t + 10.5}Q100 {t + 34.5} 200 {t + 10.5}" />
+		</g>
+	{/if}
 	{#if has('beanie')}
 		{@const w = beanieW}
-		<g class="beanie">
+		<g class="beanie" transform="translate(0 {lift})">
 			<path
 				class="knit"
 				d="M{100 - w + 3} {t + 18}C{100 - w + 1} {t - 24} {100 + w - 1} {t - 24} {100 + w - 3} {t +
@@ -301,19 +395,17 @@
 					d="M{100 + k * w} {t + 16.5 + (1 - k * k) * 5}v{5.5 - Math.abs(k) * 0.5}"
 				/>
 			{/each}
-			<g transform="translate(100 {t - 18})">
-				<g class="pompom">
-					<circle class="pom" r="8" />
-					<circle class="pom" cx="-4.5" cy="2" r="4.5" />
-					<circle class="pom" cx="4.5" cy="2" r="4.5" />
-					<circle class="pom-shine" cx="-2" cy="-2.5" r="2.2" />
-				</g>
+			<g transform="translate(100 {t - 18}) rotate({swing * 1.3} 0 6)">
+				<circle class="pom" r="8" />
+				<circle class="pom" cx="-4.5" cy="2" r="4.5" />
+				<circle class="pom" cx="4.5" cy="2" r="4.5" />
+				<circle class="pom-shine" cx="-2" cy="-2.5" r="2.2" />
 			</g>
 		</g>
 	{/if}
 	{#if has('propeller')}
 		{@const w = capW}
-		<g class="propeller">
+		<g class="propeller" transform="translate(0 {lift})">
 			<path
 				class="cap"
 				d="M{100 - w} {t + 16}C{100 - w} {t - 10} {100 + w} {t - 10} {100 + w} {t + 16}Q100 {t +
@@ -333,26 +425,29 @@
 				d="M{100 - w * 0.72} {t + 8}C{100 - w * 0.7} {t + 1} {100 - w * 0.55} {t - 2.5} {100 -
 					w * 0.4} {t - 3}"
 			/>
-			<path class="prop-stem" d="M100 {t - 3}V{t - 12}" />
-			<g transform="translate(100 {t - 13})">
-				<g class="prop" class:spinning={spin > 0} style:animation-duration="{spin || 1}s">
-					<ellipse class="blade blade-a" cx="-9" cy="0" rx="9" ry="2.6" />
-					<ellipse class="blade blade-b" cx="9" cy="0" rx="9" ry="2.6" />
+			<g transform="rotate({swing} 100 {t - 3})">
+				<path class="prop-stem" d="M100 {t - 3}V{t - 12}" />
+				<g transform="translate(100 {t - 13})">
+					<g class="prop" class:spinning={spin > 0} style:animation-duration="{spin || 1}s">
+						<ellipse class="blade blade-a" cx="-9" cy="0" rx="9" ry="2.6" />
+						<ellipse class="blade blade-b" cx="9" cy="0" rx="9" ry="2.6" />
+					</g>
+					<circle class="prop-hub" r="2.6" />
 				</g>
-				<circle class="prop-hub" r="2.6" />
 			</g>
 		</g>
 	{/if}
 	{#if has('party-hat')}
-		<g transform="translate({100 - hw * 0.22} {t + 8}) rotate(-14)">
-			<g class="hat-bob">
+		{@const x = 100 - cw * 0.3}
+		<g transform="translate(0 {lift}) {counter(x, t + 8)} translate({x} {t + 8}) rotate(-14)">
+			<g transform="rotate({swing})">
 				<path class="hat" d="M-17 0L-1.2 -37.5Q0 -39.5 1.2 -37.5L17 0Q0 6 -17 0Z" />
 				{#each HAT_DOTS as [x, y, r] (`${x},${y}`)}
 					<circle class="hat-dot" cx={x} cy={y} {r} />
 				{/each}
 				<path class="hat-shine" d="M-11 -6L-3 -28" />
 				<path class="hat-trim" d="M-18 -0.5Q0 5.5 18 -0.5" />
-				<g transform="translate(0 -39)">
+				<g transform="translate(0 -39) rotate({swing * 0.7} 0 2)">
 					<circle class="hat-pom" r="3.6" />
 					<circle class="hat-pom" cx="-3" cy="-1.5" r="2.4" />
 					<circle class="hat-pom" cx="3" cy="-1.5" r="2.4" />
@@ -362,8 +457,12 @@
 		</g>
 	{/if}
 	{#if has('crown')}
-		<g transform="translate({100 + hw * 0.12} {t + 4}) rotate(-9) scale(1.15)">
-			<g class="crown-bounce">
+		{@const x = 100 + cw * 0.16}
+		<g
+			transform="translate(0 {lift}) {counter(x, t + 4)} translate({x} {t +
+				4}) rotate(-9) scale(1.15)"
+		>
+			<g>
 				<path class="crown" d="M-15 0L-16 -12L-8 -5L0 -17L8 -5L16 -12L15 0Z" fill={ref('gold')} />
 				<rect class="crown-band" x="-15.5" y="-4.5" width="31" height="5" rx="2.2" />
 				<circle class="gem gem-cheek" cx="0" cy="-2" r="2" />
@@ -375,6 +474,52 @@
 				<g transform="translate(-6 -9) scale(3)">
 					<path class="crown-glint" d={SPARKLE_PATH} />
 				</g>
+			</g>
+		</g>
+	{/if}
+	{#if has('cap')}
+		{@const { w, dome, bill, dots } = ballcap}
+		<g transform="translate(0 {lift}) {counter(100, t + 16)}">
+			<g class="plate" transform="translate({MISPRINT.x} {MISPRINT.y})">
+				<path d={dome} />
+				<path d={bill} />
+			</g>
+			<path class="ballcap" d={dome} />
+			<g clip-path={ref('ballcap-clip')}>
+				<clipPath id="{m.uid}-ballcap-clip"><path d={dome} /></clipPath>
+				{#each dots as d, i (i)}
+					<circle class="ballcap-dot" cx={d.x} cy={d.y} r={d.r} />
+				{/each}
+			</g>
+			<path
+				class="ballcap-seam"
+				d="M100 {t - CAP_RISE}Q{100 - w * 0.45} {t} {100 - w * 0.55} {t + 15}M100 {t -
+					CAP_RISE}Q{100 + w * 0.45} {t} {100 + w * 0.55} {t + 15}"
+			/>
+			<path class="ballcap-bill" d={bill} />
+			<circle class="ballcap-button" cx="100" cy={t - CAP_RISE + 0.6} r="2.4" />
+		</g>
+	{/if}
+	{#if has('nightcap')}
+		{@const { w, d, tip } = nightcap}
+		<g transform="translate(0 {lift})">
+			<path class="plate" {d} transform="translate({MISPRINT.x} {MISPRINT.y})" />
+			<path class="nightcap" {d} />
+			<g clip-path={ref('nightcap-clip')}>
+				<clipPath id="{m.uid}-nightcap-clip"><path {d} /></clipPath>
+				{#each NIGHTCAP_DOTS as dot, i (i)}
+					<circle class="nightcap-dot" cx={dot.x + 100 + w * 0.45} cy={dot.y + t + 4} r={dot.r} />
+				{/each}
+			</g>
+			<path
+				class="cuff nightcap-cuff"
+				d="M{100 - w} {t + 13}Q100 {t + 19} {100 + w} {t + 13}L{100 + w} {t + 21}Q100 {t +
+					28} {100 - w} {t + 21}Z"
+			/>
+			<!-- The tassel always hangs straight down from the tip, whichever way the cap flops. -->
+			<g transform="translate({tip.x} {tip.y})">
+				<path class="tassel" d="M-2.5 2L-4 12M0 2V13M2.5 2L4 12" />
+				<circle class="tassel-knot" r="4.4" />
 			</g>
 		</g>
 	{/if}
@@ -405,8 +550,14 @@
 	{/if}
 	{#if has('flower')}
 		<g transform="translate({100 - hw * 0.86} {t + 38})">
-			<g class="blossom-sway">
-				<g class="blossom" class:bloom class:wilt>
+			<g class="blossom-sway" style:transform-origin="{FLOWER_STEM.x}px {FLOWER_STEM.y}px">
+				<g
+					class="blossom"
+					class:bloom
+					class:wilt
+					style:transform-origin="{FLOWER_STEM.x}px {FLOWER_STEM.y}px"
+				>
+					<path class="blossom-stem" d="M0 0Q1 7 {FLOWER_STEM.x} {FLOWER_STEM.y}" />
 					<path class="blossom-leaf" d="M2 4C8 6 14 12 15 17C9 17 3 12 2 4Z" />
 					{#each [0, 60, 120, 180, 240, 300] as a (a)}
 						<ellipse
@@ -427,7 +578,7 @@
 		</g>
 	{/if}
 	{#if has('glasses')}
-		<g transform="translate({gx} {gy})">
+		<g transform="{counter(100, 96)} translate({gx} {gy})">
 			{#each [80, 120] as cx (cx)}
 				<circle class="lens" {cx} cy="96" r="16.5" />
 				<path class="lens-glint" d="M{cx - 9} {90}L{cx - 3} {84}M{cx - 10} {96}L{cx - 1} {87}" />
@@ -438,11 +589,43 @@
 			<path class="rim temple" d="M{200 - temple.x0} {temple.y0}L{200 - temple.x1} {temple.y1}" />
 		</g>
 	{/if}
+	{#if has('shades')}
+		<g transform="{counter(100, 96)} translate({gx} {gy + SHADES_SLIDE * slide.current})">
+			<clipPath id="{m.uid}-shades-clip">
+				{#each [80, 120] as cx (cx)}
+					<path d={SHADE_LENS} transform="translate({cx} 96)" />
+				{/each}
+			</clipPath>
+			<path
+				class="shades-temple"
+				d="M{temple.x0 + 1} {temple.y0 - 3}L{temple.x1} {temple.y1 - 2}"
+			/>
+			<path
+				class="shades-temple"
+				d="M{199 - temple.x0} {temple.y0 - 3}L{200 - temple.x1} {temple.y1 - 2}"
+			/>
+			<path class="shades-bridge" d="M95 91Q100 88 105 91" />
+			{#each [80, 120] as cx (cx)}
+				<path
+					class="plate"
+					d={SHADE_LENS}
+					transform="translate({cx + MISPRINT.x} {96 + MISPRINT.y})"
+				/>
+				<path class="shades-lens" d={SHADE_LENS} transform="translate({cx} 96)" />
+			{/each}
+			<g clip-path={ref('shades-clip')}>
+				{#each [80, 120] as cx (cx)}
+					<path class="shades-glint" d="M{cx - 16} 104L{cx - 4} 86H{cx + 2}L{cx - 10} 104Z" />
+					<path class="shades-glint thin" d="M{cx - 4} 108L{cx + 8} 86H{cx + 10}L{cx - 2} 108Z" />
+				{/each}
+			</g>
+		</g>
+	{/if}
 	{#if has('monocle')}
 		{@const anchor = monocleAnchor(hw)}
 		<path class="chain" d={chain} />
 		<circle class="chain-pin" cx={anchor.x} cy={anchor.y} r="1.6" />
-		<g transform="translate({gx} {gy})">
+		<g transform="{counter(MONOCLE.cx, MONOCLE.cy)} translate({gx} {gy})">
 			<g
 				transform="translate({MONOCLE_DROP.x * drop.current} {MONOCLE_DROP.y *
 					drop.current}) rotate({MONOCLE_DROP.angle * drop.current} {MONOCLE.cx} {MONOCLE.cy})"
@@ -700,9 +883,6 @@
 		stroke-linecap: round;
 		opacity: 0.45;
 	}
-	.pompom {
-		animation: pom 1.6s ease-in-out infinite alternate;
-	}
 	.pom {
 		fill: var(--c-body-light);
 		stroke: var(--c-body-mid);
@@ -739,9 +919,6 @@
 		transform-box: fill-box;
 		transform-origin: center;
 		animation: glint 3.1s ease-in-out 0.4s infinite;
-	}
-	.crown-bounce {
-		animation: bob 2.4s ease-in-out infinite alternate;
 	}
 
 	/* bow */
@@ -940,9 +1117,6 @@
 	.hat-pom {
 		fill: var(--c-cheek);
 	}
-	.hat-bob {
-		animation: bob 2s ease-in-out 0.3s infinite alternate;
-	}
 
 	/* hair flower */
 	.blossom-sway {
@@ -959,6 +1133,12 @@
 	.blossom.wilt {
 		transform: translateY(2px) scale(0.86) rotate(-28deg);
 		filter: saturate(0.45);
+	}
+	.blossom-stem {
+		fill: none;
+		stroke: var(--c-sprout);
+		stroke-width: 1.8;
+		stroke-linecap: round;
 	}
 	.blossom-leaf {
 		fill: var(--c-sprout);
@@ -992,6 +1172,90 @@
 	}
 	.chain-pin {
 		fill: #f2a93a;
+	}
+
+	/* Screen-printed extras: flat ink over an accent plate printed slightly off register. */
+	.plate {
+		fill: var(--c-accent);
+		opacity: 0.9;
+	}
+
+	/* baseball cap */
+	.ballcap {
+		fill: color-mix(in oklab, var(--c-body-dark), var(--c-visor) 30%);
+	}
+	.ballcap-dot {
+		fill: var(--c-visor);
+		opacity: 0.35;
+	}
+	.ballcap-seam {
+		fill: none;
+		stroke: var(--c-visor);
+		stroke-width: 1;
+		stroke-linecap: round;
+		opacity: 0.3;
+	}
+	.ballcap-bill,
+	.ballcap-button {
+		fill: var(--c-accent);
+	}
+
+	/* nightcap */
+	.nightcap {
+		fill: color-mix(in oklab, var(--c-accent), #fff 55%);
+	}
+	.nightcap-dot {
+		fill: var(--c-accent);
+		opacity: 0.55;
+	}
+	.nightcap-cuff {
+		fill: var(--c-body-light);
+		stroke: var(--c-body-dark);
+		stroke-width: 0.8;
+	}
+	.tassel {
+		fill: none;
+		stroke: var(--c-body-light);
+		stroke-width: 1.6;
+		stroke-linecap: round;
+	}
+	.tassel-knot {
+		fill: var(--c-body-light);
+		stroke: var(--c-body-dark);
+		stroke-width: 0.8;
+	}
+
+	/* shades */
+	.shades-lens {
+		fill: var(--c-visor);
+	}
+	.shades-glint {
+		fill: #fff;
+		opacity: 0.28;
+	}
+	.shades-glint.thin {
+		opacity: 0.16;
+	}
+	.shades-bridge,
+	.shades-temple {
+		fill: none;
+		stroke: var(--c-visor);
+		stroke-width: 2.6;
+		stroke-linecap: round;
+	}
+
+	/* headband */
+	.headband {
+		fill: var(--c-accent);
+	}
+	.headband-plate {
+		fill: var(--c-visor);
+		opacity: 0.8;
+	}
+	.headband-stripe {
+		fill: none;
+		stroke: var(--c-body-light);
+		stroke-width: 1.6;
 	}
 
 	/* Contact shadows: inked like the shell's occlusion, lit from the top left. */
@@ -1130,11 +1394,6 @@
 		}
 		to {
 			transform: rotate(-6deg);
-		}
-	}
-	@keyframes pom {
-		to {
-			transform: translateY(-1.5px) scale(1.04, 0.96);
 		}
 	}
 	@keyframes bow-wiggle {

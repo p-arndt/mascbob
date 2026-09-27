@@ -1,3 +1,5 @@
+import { clamp } from '../geometry.js';
+
 export const ACCESSORIES = [
 	'halo',
 	'antenna',
@@ -14,9 +16,148 @@ export const ACCESSORIES = [
 	'horns',
 	'flower',
 	'monocle',
-	'mustache'
+	'mustache',
+	'cap',
+	'nightcap',
+	'shades',
+	'headband'
 ] as const;
 export type Accessory = (typeof ACCESSORIES)[number];
+
+/**
+ * Hats share one slot on top of the head. Stacking two brims never looks right, so only the
+ * first one listed is worn.
+ */
+export const HATS = ['crown', 'beanie', 'propeller', 'party-hat', 'cap', 'nightcap'] as const;
+export type Hat = (typeof HATS)[number];
+
+/** Things that grow out of the top of the head; also one at a time, they'd share a stem. */
+export const TOPPERS = ['antenna', 'sprout'] as const;
+export type Topper = (typeof TOPPERS)[number];
+
+export const HEADWEAR: readonly Accessory[] = [...HATS, ...TOPPERS];
+
+/** How high the baseball cap's button sits above the head top. */
+export const CAP_RISE = 5;
+
+/**
+ * How far a topper is raised to poke out of each hat. Hats that aren't listed have a pompom,
+ * point or rotor where the topper would go, so they leave no room for one.
+ */
+const SEATS: Partial<Record<Hat, number>> = { cap: CAP_RISE + 2 };
+
+export interface Headwear {
+	/** The accessories actually drawn, in the given order. */
+	worn: Accessory[];
+	hat: Hat | null;
+	/** How far a worn topper is raised to stand on the hat, 0 when bare-headed. */
+	seat: number;
+}
+
+/** Resolves the headwear slot: one hat, and one topper as long as the hat can seat it. */
+export function headwear(list: readonly Accessory[]): Headwear {
+	const hat = (list.find((a) => (HATS as readonly string[]).includes(a)) as Hat) ?? null;
+	const seat = hat ? SEATS[hat] : 0;
+	const topper =
+		seat === undefined
+			? null
+			: ((list.find((a) => (TOPPERS as readonly string[]).includes(a)) as Topper) ?? null);
+	const worn = [...new Set(list)].filter((a) => !HEADWEAR.includes(a) || a === hat || a === topper);
+	return { worn, hat, seat: seat ?? 0 };
+}
+
+/**
+ * Rigid items (crown, glasses, monocle, party hat, horns, cap, shades) keep their shape while
+ * the head squashes: they're wrapped in the inverse scale around where they touch the head.
+ * Soft ones (beanie, bow, flower, nightcap, headband) squash along.
+ *
+ * Where `p`, drawn in squashed head space, ends up once counter-scaled around `anchor`.
+ */
+export function counterSquash(p: Point, anchor: Point, sx: number, sy: number): Point {
+	return { x: anchor.x + (p.x - anchor.x) / sx, y: anchor.y + (p.y - anchor.y) / sy };
+}
+
+/**
+ * Follow-through for worn hats: `lag` is how far a spring chasing the hop trails it. Only a
+ * falling head (negative lag, the spring still above it) leaves the hat behind, so it lifts a
+ * little on landing and settles late; on take-off it stays seated instead of sinking in.
+ */
+export function hatLift(lag: number): number {
+	return clamp(lag * 0.3, -2.5, 0);
+}
+
+/**
+ * Degrees a tall item (party hat, antenna, sprout, rotor, pompom) swings around its base:
+ * it trails the lean and overshoots when the lean stops, and nods on hops.
+ */
+export function followSwing(leanLag: number, hopLag: number): number {
+	return clamp(leanLag * 1.4 + hopLag * 0.5, -16, 16);
+}
+
+/** Degrees each mustache half turns with the mouth: ends up on a smile, down on a frown. */
+export function mustacheTilt(mouthCurve: number): number {
+	return mouthCurve * 2;
+}
+
+/** Hat sizes from the crown half width, so they hug narrow crowns and don't overhang. */
+export const beanieWidth = (cw: number) => cw + 5;
+export const propellerWidth = (cw: number) => cw * 0.9;
+export const capWidth = (cw: number) => cw + 3;
+export const nightcapWidth = (cw: number) => cw + 4;
+/** Horizontal offset of each horn's base from the center line. */
+export const hornOffset = (cw: number) => cw * 0.58;
+
+/** Moods that let the nightcap flop down the side of the head. */
+export const DROOP_MOODS: readonly string[] = ['sleepy', 'sad'];
+
+/** Degrees the nightcap's tip bends away from upright for a mood. */
+export function nightcapBend(mood: string): number {
+	return DROOP_MOODS.includes(mood) ? 125 : 70;
+}
+
+export const NIGHTCAP_LENGTH = 38;
+
+/** Where the nightcap's floppy part hinges, right of center so a drooping tip clears the rim. */
+export function nightcapRoot(w: number, t: number): Point {
+	return { x: 100 + w * 0.25, y: t - 8 };
+}
+
+/**
+ * Floppy nightcap outline from its rim at `t + 18` to a tip `bend` degrees clockwise from
+ * upright. Both edges bulge toward the fold so the cap reads as cloth hanging over, not a cone.
+ * The bend is clamped: cloth this soft never stands up straight, and the tip must stay inside
+ * the viewBox on the tallest heads.
+ */
+export function nightcapShape(w: number, t: number, bend: number): { d: string; tip: Point } {
+	const a = (clamp(bend, 60, 150) * Math.PI) / 180;
+	const root = nightcapRoot(w, t);
+	const tip = {
+		x: root.x + Math.sin(a) * NIGHTCAP_LENGTH,
+		y: root.y - Math.cos(a) * NIGHTCAP_LENGTH
+	};
+	const fold = (k: number, dx: number, dy: number) => ({
+		x: 100 + Math.sin(a / 2) * NIGHTCAP_LENGTH * k + dx,
+		y: t - 8 - Math.cos(a / 2) * NIGHTCAP_LENGTH * k + dy
+	});
+	const outer = fold(0.8, -6, -12);
+	const inner = fold(0.45, 5, 4);
+	const f = (n: number) => n.toFixed(2);
+	const d =
+		`M${f(100 - w)} ${f(t + 18)}C${f(100 - w)} ${f(t - 10)} ${f(outer.x)} ${f(outer.y)} ${f(tip.x)} ${f(tip.y)}` +
+		`C${f(inner.x)} ${f(inner.y)} ${f(100 + w)} ${f(t - 2)} ${f(100 + w)} ${f(t + 18)}Z`;
+	return { d, tip };
+}
+
+/** Moods that make the shades slide down the nose. */
+export const SLIDE_MOODS: readonly string[] = ['surprised'];
+/** How far the shades slide down when they do. */
+export const SHADES_SLIDE = 9;
+
+/**
+ * Where the hair flower's stem meets the head, relative to the blossom center. Sway and wilt
+ * pivot here so the blossom swings on its stem instead of spinning in place.
+ */
+export const FLOWER_STEM = { x: 5, y: 11 } as const;
 
 /** Moods that make the sprout's flower bloom. */
 export const BLOOM_MOODS: readonly string[] = ['happy', 'love'];
@@ -145,7 +286,8 @@ function rotated(x: number, y: number, deg: number): Point {
 export function contactShadows(
 	accessories: readonly Accessory[],
 	t: number,
-	hw: number
+	hw: number,
+	cw: number
 ): ContactShadow[] {
 	const out: ContactShadow[] = [];
 	const add = (x: number, y: number, rx: number, ry: number, angle = 0) =>
@@ -159,18 +301,24 @@ export function contactShadows(
 	for (const a of accessories) {
 		switch (a) {
 			case 'beanie':
-				add(100, t + 22, hw * 0.8 + 5, 5.5);
+				add(100, t + 22, beanieWidth(cw) - 1, 5.5);
+				break;
+			case 'nightcap':
+				add(100, t + 22, nightcapWidth(cw) - 1, 5.5);
+				break;
+			case 'cap':
+				add(100, t + 21, capWidth(cw), 4.5);
 				break;
 			case 'propeller':
-				add(100, t + 13, hw * 0.5 + 7, 4);
+				add(100, t + 13, propellerWidth(cw) - 1, 4);
 				break;
 			case 'party-hat': {
-				const p = under(100 - hw * 0.22, t + 8, -14, 0, 3);
+				const p = under(100 - cw * 0.3, t + 8, -14, 0, 3);
 				add(p.x, p.y, 16, 4, -14);
 				break;
 			}
 			case 'crown': {
-				const p = under(100 + hw * 0.12, t + 4, -9, 0, 0.5);
+				const p = under(100 + cw * 0.16, t + 4, -9, 0, 0.5);
 				add(p.x, p.y, 17, 3.5, -9);
 				break;
 			}
@@ -181,11 +329,11 @@ export function contactShadows(
 				add(100 - hw * 0.56 + 2, t + 16, 9, 4.5, -16);
 				break;
 			case 'flower':
-				add(100 - hw * 0.86 + 1, t + 40, 10, 8);
+				add(100 - hw * 0.86 + FLOWER_STEM.x - 3, t + 38 + FLOWER_STEM.y - 8, 10, 8);
 				break;
 			case 'horns':
 				for (const s of [-1, 1]) {
-					const p = under(100 - hw * 0.42, t + 12, -14, 0, 6);
+					const p = under(100 - hornOffset(cw), t + 12, -14, 0, 6);
 					add(100 - s * (p.x - 100), p.y, 9, 3.5, 14 * s);
 				}
 				break;

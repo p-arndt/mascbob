@@ -47,6 +47,8 @@ describe('shapes', () => {
 	it.each(defs)('%s leaves room for the face and matches its bounds', (_, s) => {
 		expect(s.halfWidth).toBeGreaterThanOrEqual(48);
 		expect(s.top).toBeLessThan(60);
+		expect(s.crownHalfWidth).toBeGreaterThan(20);
+		expect(s.crownHalfWidth).toBeLessThanOrEqual(s.halfWidth);
 		expect(s.bottom).toBeGreaterThan(150);
 		// Ears may poke past `top`, but nothing hangs below the declared bottom (the squash pivot).
 		const ys = hullPoints(s.d).map((p) => p.y);

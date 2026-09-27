@@ -1,20 +1,37 @@
 import { describe, expect, it } from 'vitest';
 import { SHAPE_DEFS } from '../geometry.js';
+import { SHAPES } from '../types.js';
 import {
 	ACCESSORIES,
 	BAND_END_Y,
+	CAP_RISE,
+	HATS,
+	HEADWEAR,
 	MONOCLE,
+	NIGHTCAP_LENGTH,
+	TOPPERS,
 	bandControlY,
+	beanieWidth,
+	capWidth,
 	chainPath,
 	contactShadows,
+	counterSquash,
+	followSwing,
+	hatLift,
+	headwear,
+	hornOffset,
 	monocleAnchor,
 	monocleHook,
+	mustacheTilt,
+	nightcapBend,
+	nightcapRoot,
+	nightcapShape,
+	nightcapWidth,
 	propellerSpin,
+	propellerWidth,
 	starPath,
 	templeLine
 } from './accessories.js';
-
-const SHAPES = ['capsule', 'tv', 'egg', 'cat', 'cloud', 'orb', 'pebble'] as const;
 
 /** Even-odd ray cast against a flattened SVG path, enough to tell inside from outside. */
 function inside(shape: (typeof SHAPES)[number], x: number, y: number): boolean {
@@ -112,7 +129,7 @@ describe('accessories', () => {
 	});
 
 	describe.each(SHAPES)('on the %s head', (shape) => {
-		const { top: t, halfWidth: hw } = SHAPE_DEFS[shape];
+		const { top: t, halfWidth: hw, crownHalfWidth: cw } = SHAPE_DEFS[shape];
 
 		it('rests the headphone band just above the crown', () => {
 			const c = bandControlY(BAND_END_Y, t - 6);
@@ -137,6 +154,46 @@ describe('accessories', () => {
 			expect(inside(shape, l.x1, l.y1)).toBe(true);
 		});
 
+		it('declares the crown half width the head really has 16 units below the top', () => {
+			expect(inside(shape, 100 - cw, t + 16)).toBe(true);
+			expect(inside(shape, 100 + cw, t + 16)).toBe(true);
+			expect(inside(shape, 100 - cw - 1.5, t + 16) && inside(shape, 100 + cw + 1.5, t + 16)).toBe(
+				false
+			);
+		});
+
+		it('fits the hats to the crown without overhanging it', () => {
+			// Knit and cloth hug the head at their rim; a few units stand for the fabric's thickness.
+			for (const w of [beanieWidth(cw), capWidth(cw), nightcapWidth(cw)]) {
+				expect(inside(shape, 100 - (w - 6), t + 18)).toBe(true);
+				expect(inside(shape, 100 + (w - 6), t + 18)).toBe(true);
+			}
+			const pw = propellerWidth(cw);
+			expect(inside(shape, 100 - pw, t + 16)).toBe(true);
+			expect(inside(shape, 100 + pw, t + 16)).toBe(true);
+		});
+
+		it('roots the horns on the head', () => {
+			const x = 100 - hornOffset(cw);
+			// The horn's base runs ±8 along its own -14° frame, 6 units below its anchor.
+			const a = (-14 * Math.PI) / 180;
+			for (const lx of [-8, 8]) {
+				const px = x + lx * Math.cos(a) - 6 * Math.sin(a);
+				const py = t + 12 + lx * Math.sin(a) + 6 * Math.cos(a);
+				expect(inside(shape, px, py)).toBe(true);
+				expect(inside(shape, 200 - px, py)).toBe(true);
+			}
+		});
+
+		it('flops the nightcap tip within the viewBox', () => {
+			for (const bend of [0, nightcapBend('idle'), nightcapBend('sleepy') + 25]) {
+				const { d, tip } = nightcapShape(nightcapWidth(cw), t, bend);
+				expect(d.endsWith('Z')).toBe(true);
+				expect(tip.x).toBeLessThan(200 - 6);
+				expect(tip.y).toBeGreaterThan(0);
+			}
+		});
+
 		it('pins the monocle chain inside the head', () => {
 			const a = monocleAnchor(hw);
 			expect(inside(shape, a.x, a.y)).toBe(true);
@@ -144,7 +201,7 @@ describe('accessories', () => {
 		});
 
 		it('clips every contact shadow to a spot near the head', () => {
-			for (const sh of contactShadows(ACCESSORIES, t, hw)) {
+			for (const sh of contactShadows(ACCESSORIES, t, hw, cw)) {
 				expect(sh.cy).toBeGreaterThan(t - 2);
 				expect(Math.abs(sh.cx - 100)).toBeLessThan(hw + 10);
 			}
@@ -172,10 +229,89 @@ describe('accessories', () => {
 	});
 
 	it('casts shadows only for worn head accessories, down and right of the light', () => {
-		expect(contactShadows(['glasses', 'monocle', 'mustache', 'halo'], 36, 48)).toEqual([]);
-		expect(contactShadows(['horns', 'ears'], 36, 48)).toHaveLength(4);
-		const [beanie] = contactShadows(['beanie'], 36, 48);
+		expect(
+			contactShadows(['glasses', 'monocle', 'mustache', 'halo', 'shades', 'headband'], 36, 48, 35)
+		).toEqual([]);
+		expect(contactShadows(['horns', 'ears'], 36, 48, 35)).toHaveLength(4);
+		const [beanie] = contactShadows(['beanie'], 36, 48, 35);
 		expect(beanie.cx).toBeGreaterThan(100);
 		expect(beanie.cy).toBeGreaterThan(36 + 22);
+		for (const hat of ['cap', 'nightcap'] as const) {
+			const [sh] = contactShadows([hat], 36, 48, 35);
+			expect(sh.cy).toBeGreaterThan(36 + 16);
+			expect(sh.rx).toBeLessThanOrEqual(35 + 7);
+		}
+	});
+
+	it('registers the new hats and eyewear', () => {
+		expect(ACCESSORIES).toEqual(expect.arrayContaining(['cap', 'nightcap', 'shades', 'headband']));
+		for (const a of HEADWEAR) expect(ACCESSORIES).toContain(a);
+	});
+});
+
+describe('headwear slot', () => {
+	it('wears only the first hat listed', () => {
+		const w = headwear(['glasses', 'beanie', 'crown', 'cap']);
+		expect(w.hat).toBe('beanie');
+		expect(w.worn).toEqual(['glasses', 'beanie']);
+	});
+
+	it('keeps everything that is not headwear, once', () => {
+		expect(headwear(['ears', 'bow', 'ears', 'headband']).worn).toEqual(['ears', 'bow', 'headband']);
+		expect(headwear([]).hat).toBeNull();
+	});
+
+	it('grows one topper on a bare head', () => {
+		const w = headwear(['sprout', 'antenna']);
+		expect(w.worn).toEqual(['sprout']);
+		expect(w.seat).toBe(0);
+	});
+
+	it('stands a topper on the cap and drops it under hats with no room', () => {
+		const onCap = headwear(['antenna', 'cap']);
+		expect(onCap.worn).toEqual(['antenna', 'cap']);
+		expect(onCap.seat).toBeGreaterThan(CAP_RISE);
+		for (const hat of HATS.filter((h) => h !== 'cap')) {
+			expect(headwear(['antenna', hat]).worn).toEqual([hat]);
+		}
+		for (const topper of TOPPERS) expect(HATS).not.toContain(topper);
+	});
+});
+
+describe('follow-through', () => {
+	it('lifts a hat only while the head falls away from it, by a couple of units', () => {
+		expect(hatLift(6)).toBe(0);
+		expect(hatLift(-4)).toBeLessThan(0);
+		expect(hatLift(-40)).toBeCloseTo(-2.5);
+	});
+
+	it('swings tall items against the lean and clamps the swing', () => {
+		expect(followSwing(0, 0)).toBe(0);
+		expect(followSwing(-5, 0)).toBeLessThan(0);
+		expect(followSwing(5, 0)).toBeGreaterThan(0);
+		expect(Math.abs(followSwing(100, 100))).toBeLessThanOrEqual(16);
+	});
+
+	it('counters the squash around the anchor', () => {
+		const anchor = { x: 100, y: 96 };
+		expect(counterSquash(anchor, anchor, 1.2, 0.8)).toEqual(anchor);
+		const p = counterSquash({ x: 112, y: 88 }, anchor, 1.2, 0.8);
+		expect(p.x).toBeCloseTo(110);
+		expect(p.y).toBeCloseTo(86);
+	});
+
+	it('droops the nightcap when sleepy and bends further the more it droops', () => {
+		expect(nightcapBend('sleepy')).toBeGreaterThan(nightcapBend('idle'));
+		const up = nightcapShape(40, 36, nightcapBend('idle')).tip;
+		const down = nightcapShape(40, 36, nightcapBend('sleepy')).tip;
+		expect(down.y).toBeGreaterThan(up.y);
+		const root = nightcapRoot(40, 36);
+		expect(Math.hypot(up.x - root.x, up.y - root.y)).toBeCloseTo(NIGHTCAP_LENGTH);
+	});
+
+	it('tilts the mustache ends with the mouth curve', () => {
+		expect(mustacheTilt(0)).toBe(0);
+		expect(mustacheTilt(3)).toBeCloseTo(6);
+		expect(mustacheTilt(-4)).toBeLessThan(0);
 	});
 });
