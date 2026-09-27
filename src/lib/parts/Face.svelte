@@ -60,11 +60,16 @@
 	const grow = $derived(1 + curious.current * 0.1);
 	const gridW = $derived(Math.min(100, m.shape.halfWidth * 2 - 30));
 	const dots = $derived(ledGrid(gridW));
-	const eyeY = $derived(97 + m.gazeY * 6 + saccade.current.y);
+	const area = $derived(ledArea(gridW));
+	// Features sit on LED centers, like pixel art: both eyes get the same shape and the gaze
+	// moves in whole-LED steps instead of smearing across two columns.
+	const snapX = (x: number) => area.firstX + Math.round((x - area.firstX) / LED_STEP) * LED_STEP;
+	const snapY = (y: number) => LED_TOP + Math.round((y - LED_TOP) / LED_STEP) * LED_STEP;
+	const eyeY = $derived(snapY(97 + m.gazeY * 6 + saccade.current.y));
 
 	function eye(p: EyeParams, baseX: number, side: Side): { shape: EyeShape; brow: Segment } {
 		const base = EYE_SIZES[m.eyes] ?? EYE_SIZES.round;
-		const cx = baseX + m.gazeX * 8 + saccade.current.x;
+		const cx = snapX(baseX + m.gazeX * 8 + saccade.current.x);
 		const size = p.scale * grow * pop;
 		const w = base.w * size;
 		const fullH = base.h * size;
@@ -111,10 +116,10 @@
 			eyes: [left.shape, right.shape],
 			brows: [left.brow, right.brow],
 			mouth: {
-				cx: 100 + f.mouthX + m.gazeX * 6,
-				y: 116 + m.gazeY * 5,
+				cx: snapX(100 + f.mouthX + m.gazeX * 6),
+				y: snapY(116 + m.gazeY * 5),
 				// Wider than the vector face: a mouth needs a few LEDs to show a curve.
-				width: f.mouthWidth * 1.4,
+				width: f.mouthWidth * 2,
 				curve: f.mouthCurve,
 				open,
 				round: f.mouthRound,
@@ -130,16 +135,17 @@
 	});
 
 	/** Unlit LEDs stay faintly visible: they are what tells you this face is a display. */
-	const OFF = 0.07;
-	const area = $derived(ledArea(gridW));
+	const OFF = 0.05;
 	// Only lit LEDs become elements; the dark ones are a single patterned rect.
 	const lit = $derived(
 		dots.flatMap((d) => {
 			const l = lightAt(d.x, d.y, scene);
-			const tone = l.white > 0.5 ? 'white' : l.pink > l.main ? 'pink' : 'main';
+			// Blush is fainter than the features, so it gets its own, lower threshold.
+			const pink = l.pink >= 0.25 && l.main < 0.45;
+			const tone = l.white > 0.5 ? 'white' : pink ? 'pink' : 'main';
 			// A gamma below 1 keeps edge LEDs from looking washed out.
-			const level = Math.max(l.main, l.pink, l.white) ** 0.75;
-			return level > OFF + 0.03 ? [{ ...d, tone, level }] : [];
+			// Real LEDs are on or off: half-lit edge dots read as blur, not as smoothness.
+			return pink || Math.max(l.main, l.white) >= 0.45 ? [{ ...d, tone }] : [];
 		})
 	);
 	const leftEye = $derived(scene.eyes[0]);
@@ -155,7 +161,7 @@
 		x={area.firstX - LED_STEP / 2}
 		y={LED_TOP - LED_STEP / 2}
 	>
-		<circle class="main" cx={LED_STEP / 2} cy={LED_STEP / 2} r={LED_STEP * 0.4} opacity={OFF} />
+		<circle class="main" cx={LED_STEP / 2} cy={LED_STEP / 2} r={LED_STEP * 0.3} opacity={OFF} />
 	</pattern>
 	<radialGradient id="{m.uid}-spill-main">
 		<stop offset="0" class="spill-main" stop-opacity="0.5" />
@@ -177,15 +183,15 @@
 	fill={ref('leds')}
 />
 
-<!-- Soft light spill around lit LEDs keeps the face readable at small sizes and on dark shells. -->
+<!-- Light spill for dark shells; `screen` makes it vanish on light shells, where it would only smudge. -->
 {#each lit as d (d.id)}
-	{#if d.level > 0.3 && d.tone !== 'white'}
+	{#if d.tone !== 'white'}
 		<circle
 			cx={d.x}
 			cy={d.y}
 			r={LED_STEP * 1.1}
+			class="spill"
 			fill={ref(d.tone === 'pink' ? 'spill-pink' : 'spill-main')}
-			opacity={d.level}
 		/>
 	{/if}
 {/each}
@@ -198,8 +204,7 @@
 				class="led {d.tone}"
 				cx={d.x}
 				cy={d.y}
-				r={LED_STEP * 0.4}
-				opacity={d.level}
+				r={LED_STEP * 0.44}
 				style:animation-delay="{d.wave * 22}ms"
 			/>
 		{/each}
@@ -218,6 +223,9 @@
 		transform-box: fill-box;
 		transform-origin: center;
 		animation: sweep 520ms ease-out backwards;
+	}
+	.spill {
+		mix-blend-mode: screen;
 	}
 	.spill-main {
 		stop-color: var(--c-eye);
