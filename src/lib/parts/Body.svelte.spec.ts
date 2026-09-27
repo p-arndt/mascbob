@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import Mascot from '../Mascot.svelte';
-import { BODY_VIEWBOX_HEIGHT, OUTFITS } from './body.js';
+import { BODY_VIEWBOX_HEIGHT, BUILDS, BUILD_DEFS, OUTFITS } from './body.js';
 
 describe('Body', () => {
 	it('stands on plain feet by default', async () => {
@@ -110,6 +110,57 @@ describe('Body', () => {
 	it('rolls the skates on two wheels each', async () => {
 		const { container } = render(Mascot, { shoes: 'skates' });
 		expect(container.querySelectorAll('.shoe-skates .wheel')).toHaveLength(4);
+	});
+
+	it.each(BUILDS.flatMap((build) => OUTFITS.map((outfit) => [build, outfit] as const)))(
+		'dresses the %s build in %s',
+		async (build, outfit) => {
+			const { container } = render(Mascot, { build, outfit, shoes: 'sneakers' });
+			const b = BUILD_DEFS[build];
+			expect(container.querySelector('svg')?.getAttribute('viewBox')).toBe(
+				`0 0 200 ${b.viewHeight}`
+			);
+			expect(container.querySelector('.edge')).not.toBeNull();
+			expect(container.querySelectorAll('.hand')).toHaveLength(2);
+			expect(container.querySelectorAll('.leg')).toHaveLength(b.legs ? 2 : 0);
+			if (outfit !== 'none') {
+				const cls = outfit === 'overalls' ? '.denim' : outfit === 'bowtie' ? '.bow' : `.${outfit}`;
+				expect(container.querySelector(cls)).not.toBeNull();
+			}
+		}
+	);
+
+	it('rests the blob on its base without legs or shoes and lets it bob', async () => {
+		const { container } = render(Mascot, { build: 'blob', shoes: 'boots', outfit: 'overalls' });
+		expect(container.querySelector('.leg')).toBeNull();
+		expect(container.querySelector('.foot')).toBeNull();
+		expect(container.querySelector('.shorts')).toBeNull();
+		expect(container.querySelector('.foot-contact')).toBeNull();
+		expect(container.querySelector('ellipse.contact')).not.toBeNull();
+		expect(container.querySelector('.float')).not.toBeNull();
+		expect(container.querySelector('.stand')).toBeNull();
+	});
+
+	it('plants the other builds on their own ground line', async () => {
+		for (const build of ['chubby', 'lanky', 'chibi'] as const) {
+			const { container } = render(Mascot, { build });
+			const stand = container.querySelector('.stand') as SVGGElement;
+			expect(stand.style.transformOrigin).toBe(`100px ${BUILD_DEFS[build].groundY}px`);
+			const contact = container.querySelector('ellipse.foot-contact')!.parentElement!;
+			expect(contact.getAttribute('transform')).toContain(
+				`translate(100 ${BUILD_DEFS[build].groundY + 1})`
+			);
+		}
+	});
+
+	it('scales the head per build', async () => {
+		const head = (build: 'standard' | 'chibi' | 'lanky') =>
+			render(Mascot, { build, motion: 'reduced' })
+				.container.querySelector('.head')!
+				.getBoundingClientRect();
+		const standard = head('standard');
+		expect(head('chibi').height).toBeGreaterThan(standard.height);
+		expect(head('lanky').height).toBeLessThan(standard.height);
 	});
 
 	it('taps a foot only in idle moods', async () => {

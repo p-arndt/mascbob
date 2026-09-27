@@ -47,7 +47,7 @@ export const EYE_STYLES = [
 export type EyeStyle = (typeof EYE_STYLES)[number];
 
 export { ACCESSORIES, type Accessory } from './parts/accessories.js';
-export { OUTFITS, SHOES, type Outfit, type Shoes } from './parts/body.js';
+export { BUILDS, OUTFITS, SHOES, type Build, type Outfit, type Shoes } from './parts/body.js';
 
 export type Effect =
 	'sparkles' | 'waves' | 'dots' | 'zzz' | 'tear' | 'hearts' | 'question' | 'sweat';

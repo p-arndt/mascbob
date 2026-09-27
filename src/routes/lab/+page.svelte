@@ -3,18 +3,20 @@
 	import {
 		ACCESSORIES,
 		EYE_STYLES,
+		BUILDS,
 		MOODS,
 		Mascot,
 		OUTFITS,
 		SHAPES,
 		SHOES,
 		type EyeStyle,
+		type Build,
 		type Outfit,
 		type Shoes,
 		type ThemeName
 	} from '$lib/index.js';
 
-	// Visual test bench: /lab?body=1&theme=mint&size=180&acc=ring,ears&outfit=scarf&shoes=boots
+	// Visual test bench: /lab?body=1&theme=mint&size=180&acc=ring,ears&outfit=scarf&shoes=boots&build=chubby
 	// &eyes=cat&bg=ffe9a8 (hex without #, or a CSS color name), &pair=1 for every figure on white and black.
 	const body = $derived(page.url.searchParams.get('body') !== '0');
 	const theme = $derived((page.url.searchParams.get('theme') ?? 'og') as ThemeName);
@@ -37,6 +39,10 @@
 		return /^[a-z]+$/i.test(v) ? v : '#0b0b1e';
 	});
 	const grounds = $derived(page.url.searchParams.get('pair') === '1' ? ['#fff', '#111'] : [null]);
+	const buildParam = $derived(page.url.searchParams.get('build') ?? '');
+	const build = $derived<Build | undefined>(
+		(BUILDS as readonly string[]).includes(buildParam) ? (buildParam as Build) : undefined
+	);
 	const acc = $derived(
 		(page.url.searchParams.get('acc') ?? '')
 			.split(',')
@@ -64,6 +70,7 @@
 							{body}
 							{outfit}
 							{shoes}
+							{build}
 							{theme}
 							{size}
 							accessories={acc}

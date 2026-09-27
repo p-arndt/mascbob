@@ -7,7 +7,7 @@
 	import { SHAPE_DEFS, clamp } from './geometry.js';
 	import Accessories from './parts/Accessories.svelte';
 	import Body from './parts/Body.svelte';
-	import { BODY_GROUND_Y, BODY_VIEWBOX_HEIGHT, FOOT_SCALE, HIP_Y, LEG_X } from './parts/body.js';
+	import { buildDef, torsoHalfWidth, type Build } from './parts/body.js';
 	import Effects from './parts/Effects.svelte';
 	import Face from './parts/Face.svelte';
 	import Hands from './parts/Hands.svelte';
@@ -43,6 +43,8 @@
 		outfit?: Outfit;
 		/** Footwear on the full figure; plain feet by default. */
 		shoes?: Shoes;
+		/** Body proportions of the full figure; `blob` has no legs and bobs instead of standing. */
+		build?: Build;
 		lookAt?: LookAt;
 		/** Mouth opening 0..1 while `mood` is `talking`, e.g. from audio amplitude. Omit to animate on its own. */
 		level?: number;
@@ -80,6 +82,7 @@
 		body = true,
 		outfit = 'none',
 		shoes = 'none',
+		build = 'standard',
 		lookAt = 'pointer',
 		level,
 		size = 160,
@@ -590,7 +593,7 @@
 	const NO_REACTIONS = resolveReactions(false);
 	$effect(() => {
 		reactor.configure(interactive ? reactionFlags : NO_REACTIONS, reduced, mood, {
-			viewHeight: body ? BODY_VIEWBOX_HEIGHT : 200,
+			viewHeight: viewH,
 			head
 		});
 	});
@@ -601,7 +604,7 @@
 	$effect(() => {
 		const el = root;
 		if (!el || !interactive || !onscreen || !Object.values(reactionFlags).some(Boolean)) return;
-		const viewHeight = body ? BODY_VIEWBOX_HEIGHT : 200;
+		const viewHeight = viewH;
 		let rect: DOMRect | null = null;
 		const forget = () => (rect = null);
 		const sample: PointerSample = { x: 0, y: 0, scale: 1, t: 0, hovering: false, pressed: false };
@@ -642,29 +645,41 @@
 	const t = $derived(head.top);
 	const hw = $derived(head.halfWidth);
 	const cssSize = $derived(typeof size === 'number' ? `${size}px` : size);
-	const viewH = $derived(body ? BODY_VIEWBOX_HEIGHT : 200);
-	const groundY = $derived(body ? BODY_GROUND_Y + 1 : head.bottom + 14);
+	const fig = $derived(buildDef(build));
+	// Legless builds bob like the bare head instead of standing.
+	const standing = $derived(body && fig.motion === 'stand');
+	const legs = $derived(body && fig.legs);
+	const viewH = $derived(body ? fig.viewHeight : 200);
+	const groundY = $derived(body ? fig.groundY + 1 : head.bottom + 14);
 	// With a body, the whole figure leans around its hips instead of the head's center.
-	const tiltPivot = $derived(body ? '100 214' : '100 110');
+	const tiltPivot = $derived(body ? `100 ${fig.hipY}` : '100 110');
 	// Lean and wobble rock from the base (the soles with a body), like something standing.
-	const rockPivot = $derived(body ? `100 ${BODY_GROUND_Y}` : `100 ${head.bottom}`);
+	const rockPivot = $derived(body ? `100 ${fig.groundY}` : `100 ${head.bottom}`);
 	const rock = $derived(wobble.current);
 	// With a body the head trails the figure; a lone head is the whole figure.
 	const headDrag = $derived(body ? clamp(headLag.current - rock, -6, 6) : 0);
 	const headDrop = $derived(
 		(body ? clamp(headBob.current - hop.current, -5, 5) * 0.5 : 0) + sag.current * 2.5
 	);
-	const neckY = $derived(head.bottom - 6);
+	// Builds resize the head around its bottom, where it meets the collar.
+	const headScale = $derived(body ? fig.headScale : 1);
+	const headY = $derived(body ? fig.headY : 0);
+	const neckY = $derived(head.bottom + headY - 6);
 	// The ground reacts to the hop and the squash: smaller and fainter while airborne.
 	const air = $derived(clamp(-hop.current / 24, 0, 1));
 	const groundScale = $derived((1 - air * 0.35) * (1 + (squish.current.x - 1) * 0.8));
 	// Feet point outward, so the shoes reach past the head's shadow; body.ts draws them in local foot units.
 	const sole = $derived(SOLES[shoes] ?? SOLES.none);
-	const footSpan = $derived(LEG_X + sole.toe * FOOT_SCALE);
-	const shadowRx = $derived(body ? Math.max(hw * 0.72, footSpan + 4) : hw * 0.72);
+	const footSpan = $derived(fig.legX + sole.toe * fig.footScale);
+	// A legless body rests on its own base, so that is what the shadow has to cover.
+	const baseHw = $derived(torsoHalfWidth(hw, fig) * fig.torso.hip);
+	const shadowRx = $derived(
+		legs ? Math.max(hw * 0.72, footSpan + 4) : body ? Math.max(hw * 0.72, baseHw + 4) : hw * 0.72
+	);
+	const contactRx = $derived(body ? baseHw * 0.7 : hw * 0.36);
 	const footContact = $derived({
-		x: LEG_X + ((sole.toe + sole.heel) / 2) * FOOT_SCALE,
-		rx: ((sole.toe - sole.heel) / 2) * FOOT_SCALE * 0.85
+		x: fig.legX + ((sole.toe + sole.heel) / 2) * fig.footScale,
+		rx: ((sole.toe - sole.heel) / 2) * fig.footScale * 0.85
 	});
 	// Feet squash with the figure (see figureSquash) and lift off entirely on a hop.
 	const footContactScale = $derived(1 + (sx - 1) * 0.35);
@@ -676,7 +691,7 @@
 	// In full-body mode the legs take some of the squash so the head doesn't sink into the torso.
 	const figureSquash = $derived(
 		body
-			? `translate(100 ${BODY_GROUND_Y}) scale(${1 + (sx - 1) * 0.35} ${1 + (sy - 1) * 0.35}) translate(-100 ${-BODY_GROUND_Y})`
+			? `translate(100 ${fig.groundY}) scale(${1 + (sx - 1) * 0.35} ${1 + (sy - 1) * 0.35}) translate(-100 ${-fig.groundY})`
 			: ''
 	);
 
@@ -741,6 +756,9 @@
 		get shoes() {
 			return shoes;
 		},
+		get build() {
+			return fig;
+		},
 		get lean() {
 			return rock + headTurn.current + headDrag;
 		},
@@ -802,11 +820,11 @@
 		<g transform="translate(100 {groundY}) scale({groundScale} 1)" opacity={1 - air * 0.5}>
 			<ellipse class="ground-glow" rx={hw * 1.15} ry="14" fill={ref('ground-glow')} />
 			<ellipse class="shadow" rx={shadowRx} ry="6.5" fill={ref('ground-shadow')} />
-			{#if !body}
-				<ellipse class="contact" rx={hw * 0.36} ry="2.6" fill={ref('ground-shadow')} />
+			{#if !legs}
+				<ellipse class="contact" rx={contactRx} ry="2.6" fill={ref('ground-shadow')} />
 			{/if}
 		</g>
-		{#if body}
+		{#if legs}
 			<g
 				transform="translate(100 {groundY}) scale({footContactScale} 1)"
 				opacity={clamp(1 - air * 2.5, 0, 1)}
@@ -825,7 +843,10 @@
 
 		<g class="pop">
 			<!-- Standing figures shift their weight instead of floating. -->
-			<g class={body ? 'stand' : 'float'}>
+			<g
+				class={standing ? 'stand' : 'float'}
+				style:transform-origin={standing ? `100px ${fig.groundY}px` : undefined}
+			>
 				<g transform="translate(0 {hop.current}) rotate({rock} {rockPivot})">
 					<g transform={figureSquash}>
 						<!-- Feet stay planted while the upper body tilts with the mood. -->
@@ -835,7 +856,7 @@
 						<g transform="rotate({f.tilt} {tiltPivot})">
 							{#if body}
 								<!-- The torso turns a little with the head so no torso corner peeks out behind it. -->
-								<g transform="rotate({headTurn.current * 0.45} 100 {HIP_Y})">
+								<g transform="rotate({headTurn.current * 0.45} 100 {fig.hipY})">
 									<Body layer="back" />
 								</g>
 							{/if}
@@ -845,7 +866,8 @@
 							>
 								<g
 									class="head"
-									transform="translate(100 {head.bottom}) scale({headSx} {headSy}) translate(-100 {-head.bottom})"
+									transform="translate(100 {head.bottom + headY}) scale({headSx *
+										headScale} {headSy * headScale}) translate(-100 {-head.bottom})"
 								>
 									<g class="breathe" class:lift={body}>
 										<Accessories layer="back" />
@@ -857,7 +879,7 @@
 								</g>
 							</g>
 							{#if body}
-								<g transform="rotate({headTurn.current * 0.45} 100 {HIP_Y})">
+								<g transform="rotate({headTurn.current * 0.45} 100 {fig.hipY})">
 									<Body layer="front" />
 								</g>
 							{:else if hands}
@@ -881,7 +903,7 @@
 		class="mascott {className}"
 		class:still={reduced}
 		class:paused={!onscreen}
-		class:no-float={!float || body}
+		class:no-float={!float || standing}
 		aria-label={label}
 		data-mood={activeMood}
 		{style}
@@ -914,7 +936,7 @@
 		class="mascott {className}"
 		class:still={reduced}
 		class:paused={!onscreen}
-		class:no-float={!float || body}
+		class:no-float={!float || standing}
 		aria-label={label}
 		data-mood={activeMood}
 		{style}

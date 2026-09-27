@@ -26,6 +26,10 @@ export const SHOES = [
 ] as const;
 export type Shoes = (typeof SHOES)[number];
 
+/** Body proportions for the full-body figure. */
+export const BUILDS = ['standard', 'chubby', 'lanky', 'chibi', 'blob'] as const;
+export type Build = (typeof BUILDS)[number];
+
 /** Full-body mode draws in a 200×300 viewBox: the head keeps its 200×200 coordinates on top. */
 export const BODY_VIEWBOX_HEIGHT = 300;
 /** Where the soles touch the ground; squash, rocking and the shadow all anchor here. */
@@ -47,6 +51,201 @@ export const SNEAKER_H = 36;
 export const FOOT_SCALE = 1.22;
 
 /**
+ * Torso silhouette. Widths are multiples of the torso half width (see `torsoHalfWidth`):
+ * the sides run from `shoulder` at the top out (or in) to `belly` at `bellyY`, then to
+ * `hip` where the rounded bottom starts, `round` units above the hips.
+ */
+export interface TorsoDef {
+	/** Torso half width as a share of the head's half width, capped at `max`. */
+	ratio: number;
+	max: number;
+	shoulder: number;
+	belly: number;
+	bellyY: number;
+	hip: number;
+	round: number;
+	/** How far out the bottom curve's control point sits, 0..1: higher is a flatter base. */
+	base: number;
+	/** Where the arms attach, as a share of the torso half width. */
+	arms: number;
+}
+
+export interface BuildDef {
+	viewHeight: number;
+	groundY: number;
+	torsoTop: number;
+	/** Torso bottom; for legless builds it is the ground contact. */
+	hipY: number;
+	shoulderY: number;
+	upperArm: number;
+	forearm: number;
+	armWidth: number;
+	legs: boolean;
+	legX: number;
+	legWidth: number;
+	footScale: number;
+	torso: TorsoDef;
+	/** The head scales around its bottom by this much, then shifts down by `headY`. */
+	headScale: number;
+	headY: number;
+	/** Standing figures shift their weight; `float` bobs in the air like the bare head. */
+	motion: 'stand' | 'float';
+}
+
+export const BUILD_DEFS: Record<Build, BuildDef> = {
+	standard: {
+		viewHeight: BODY_VIEWBOX_HEIGHT,
+		groundY: BODY_GROUND_Y,
+		torsoTop: TORSO_TOP,
+		hipY: HIP_Y,
+		shoulderY: SHOULDER_Y,
+		upperArm: UPPER_ARM,
+		forearm: FOREARM,
+		armWidth: 14,
+		legs: true,
+		legX: LEG_X,
+		legWidth: 17,
+		footScale: FOOT_SCALE,
+		torso: {
+			ratio: 1,
+			max: 48,
+			shoulder: 1,
+			belly: 1,
+			bellyY: HIP_Y - 26,
+			hip: 1,
+			round: 26,
+			base: 0.55,
+			arms: 1
+		},
+		headScale: 1,
+		headY: 0,
+		motion: 'stand'
+	},
+	// Pear-shaped: narrow shoulders, a belly that bulges past the arms, short thick legs.
+	chubby: {
+		viewHeight: 292,
+		groundY: 266,
+		torsoTop: TORSO_TOP,
+		hipY: 222,
+		shoulderY: 186,
+		upperArm: 16,
+		forearm: 14,
+		armWidth: 16,
+		legs: true,
+		legX: 21,
+		legWidth: 20,
+		footScale: 1.3,
+		torso: {
+			ratio: 1.12,
+			max: 56,
+			shoulder: 0.9,
+			belly: 1.14,
+			bellyY: 194,
+			hip: 1.02,
+			round: 20,
+			base: 0.62,
+			arms: 1.08
+		},
+		headScale: 1,
+		headY: 0,
+		motion: 'stand'
+	},
+	// Tall and thin: a narrow torso that tapers to the hips, long legs and arms, smaller head.
+	lanky: {
+		viewHeight: 340,
+		groundY: 314,
+		torsoTop: TORSO_TOP,
+		hipY: 220,
+		shoulderY: 184,
+		upperArm: 22,
+		forearm: 20,
+		armWidth: 11,
+		legs: true,
+		legX: 13,
+		legWidth: 13,
+		footScale: 1.08,
+		torso: {
+			ratio: 0.78,
+			max: 38,
+			shoulder: 1,
+			belly: 0.92,
+			bellyY: 196,
+			hip: 0.86,
+			round: 18,
+			base: 0.55,
+			arms: 0.95
+		},
+		headScale: 0.9,
+		headY: 0,
+		motion: 'stand'
+	},
+	// Big head on a tiny body with stubby legs.
+	chibi: {
+		viewHeight: 266,
+		groundY: 240,
+		torsoTop: TORSO_TOP,
+		hipY: 202,
+		shoulderY: 180,
+		upperArm: 12,
+		forearm: 11,
+		armWidth: 12,
+		legs: true,
+		legX: 14,
+		legWidth: 16,
+		footScale: 1,
+		torso: {
+			ratio: 0.72,
+			max: 36,
+			shoulder: 1,
+			belly: 1.04,
+			bellyY: 188,
+			hip: 1,
+			round: 16,
+			base: 0.6,
+			arms: 1
+		},
+		headScale: 1.12,
+		headY: 0,
+		motion: 'stand'
+	},
+	// No legs: a bell of a body that rests on its own flat base and bobs like the bare head.
+	blob: {
+		viewHeight: 260,
+		groundY: 234,
+		torsoTop: TORSO_TOP,
+		hipY: 234,
+		shoulderY: 190,
+		upperArm: 11,
+		forearm: 10,
+		armWidth: 14,
+		legs: false,
+		legX: LEG_X,
+		legWidth: 17,
+		footScale: FOOT_SCALE,
+		torso: {
+			ratio: 1.18,
+			max: 62,
+			shoulder: 0.8,
+			belly: 1.04,
+			bellyY: 206,
+			hip: 1.14,
+			round: 16,
+			base: 0.86,
+			arms: 0.98
+		},
+		headScale: 1,
+		headY: 0,
+		motion: 'float'
+	}
+};
+
+const STANDARD = BUILD_DEFS.standard;
+
+export function buildDef(build: Build | undefined): BuildDef {
+	return (build && BUILD_DEFS[build]) || STANDARD;
+}
+
+/**
  * Height of each foot's collar (the opening the leg steps into) above the ground, in local
  * foot units. Plain feet have no collar; the leg simply merges into the foot.
  */
@@ -62,42 +261,78 @@ export const FOOT_COLLAR: Record<Shoes, number> = {
 };
 
 /** Where the leg ends: a little below the collar, hidden inside the shoe or foot. */
-export function legBottomY(shoes: Shoes): number {
-	return BODY_GROUND_Y - ((FOOT_COLLAR[shoes] ?? FOOT_COLLAR.none) - 6) * FOOT_SCALE;
+export function legBottomY(shoes: Shoes, b: BuildDef = STANDARD): number {
+	return b.groundY - ((FOOT_COLLAR[shoes] ?? FOOT_COLLAR.none) - 6) * b.footScale;
 }
 
 /** Top of a shoe's collar in figure coordinates. */
-export function collarTopY(shoes: Shoes): number {
-	return BODY_GROUND_Y - (FOOT_COLLAR[shoes] ?? FOOT_COLLAR.none) * FOOT_SCALE;
+export function collarTopY(shoes: Shoes, b: BuildDef = STANDARD): number {
+	return b.groundY - (FOOT_COLLAR[shoes] ?? FOOT_COLLAR.none) * b.footScale;
 }
 
 /**
- * Where the overalls' shorts end on the leg: just below the hips, but always above the
- * collar so tall shoes never swallow the hem.
+ * Where the overalls' shorts end on the leg: just below the hips, above the collar so tall
+ * shoes never swallow the hem. Short legs in tall shoes have no room for that; the hem then
+ * tucks into the shoe, which is drawn over it.
  */
-export function shortsBottomY(shoes: Shoes): number {
-	return Math.min(HIP_Y + 10, collarTopY(shoes) - 2);
+export function shortsBottomY(shoes: Shoes, b: BuildDef = STANDARD): number {
+	return Math.max(Math.min(b.hipY + 10, collarTopY(shoes, b) - 2), b.hipY + 3);
 }
 
 /** The torso stays compact under wide heads, otherwise it'd read as a barrel. */
-export function torsoHalfWidth(headHalfWidth: number): number {
-	return Math.min(headHalfWidth, 48);
+export function torsoHalfWidth(headHalfWidth: number, b: BuildDef = STANDARD): number {
+	return Math.min(headHalfWidth * b.torso.ratio, b.torso.max);
 }
 
-/** Lower half of the capsule: straight sides, rounded hips. */
-export function torsoPath(hw: number): string {
-	const l = 100 - hw;
-	const r = 100 + hw;
+/** Widest point of the torso of half width `hw`, for fabric that has to cover all of it. */
+export function torsoOuterWidth(hw: number, b: BuildDef = STANDARD): number {
+	const t = b.torso;
+	return hw * Math.max(t.shoulder, t.belly, t.hip);
+}
+
+/** Lower half of the capsule: sides from shoulder over the belly to the hips, rounded bottom. */
+export function torsoPath(hw: number, b: BuildDef = STANDARD): string {
+	const t = b.torso;
+	const top = b.torsoTop;
+	const hip = b.hipY;
+	const end = hip - t.round;
+	if (t.shoulder === 1 && t.belly === 1 && t.hip === 1) {
+		const l = 100 - hw;
+		const r = 100 + hw;
+		return (
+			`M${l} ${top}L${r} ${top}L${r} ${end}` +
+			`C${r} ${hip - (t.round * 4) / 13} ${100 + hw * t.base} ${hip} 100 ${hip}` +
+			`C${100 - hw * t.base} ${hip} ${l} ${hip - (t.round * 4) / 13} ${l} ${end}Z`
+		);
+	}
+	const s = hw * t.shoulder;
+	const m = hw * t.belly;
+	const h = hw * t.hip;
+	const upper = (t.bellyY - top) / 2;
+	const lower = (end - t.bellyY) / 2;
+	// Each side is two cubics with vertical tangents at the shoulder, belly and hip, so the
+	// silhouette stays smooth whether it bulges or tapers.
+	const side = (k: 1 | -1) => ({
+		down:
+			`C${100 + k * s} ${top + upper} ${100 + k * m} ${t.bellyY - upper} ${100 + k * m} ${t.bellyY}` +
+			`C${100 + k * m} ${t.bellyY + lower} ${100 + k * h} ${end - lower} ${100 + k * h} ${end}`,
+		up:
+			`C${100 + k * h} ${end - lower} ${100 + k * m} ${t.bellyY + lower} ${100 + k * m} ${t.bellyY}` +
+			`C${100 + k * m} ${t.bellyY - upper} ${100 + k * s} ${top + upper} ${100 + k * s} ${top}`
+	});
 	return (
-		`M${l} ${TORSO_TOP}L${r} ${TORSO_TOP}L${r} ${HIP_Y - 26}` +
-		`C${r} ${HIP_Y - 8} ${100 + hw * 0.55} ${HIP_Y} 100 ${HIP_Y}` +
-		`C${100 - hw * 0.55} ${HIP_Y} ${l} ${HIP_Y - 8} ${l} ${HIP_Y - 26}Z`
+		`M${100 - s} ${top}L${100 + s} ${top}` +
+		side(1).down +
+		`C${100 + h} ${hip - (t.round * 4) / 13} ${100 + h * t.base} ${hip} 100 ${hip}` +
+		`C${100 - h * t.base} ${hip} ${100 - h} ${hip - (t.round * 4) / 13} ${100 - h} ${end}` +
+		side(-1).up +
+		'Z'
 	);
 }
 
 /** Left shoulder x; the right arm mirrors around x = 100. */
-export function shoulderX(torsoHw: number): number {
-	return 100 - torsoHw + 3;
+export function shoulderX(torsoHw: number, b: BuildDef = STANDARD): number {
+	return 100 - torsoHw * b.torso.arms + 3;
 }
 
 /**
@@ -228,10 +463,10 @@ export function limbEnd(x: number, y: number, deg: number, len: number) {
 }
 
 /** Joint positions of the left arm (mirror x around 100 for the right one). */
-export function armJoints(angles: ArmAngles, drop = 0, x = shoulderX(48)) {
-	const shoulder = { x, y: SHOULDER_Y + drop };
-	const elbow = limbEnd(shoulder.x, shoulder.y, angles.a1, UPPER_ARM);
-	const wrist = limbEnd(elbow.x, elbow.y, angles.a1 + angles.a2, FOREARM);
+export function armJoints(angles: ArmAngles, drop = 0, x = shoulderX(48), b: BuildDef = STANDARD) {
+	const shoulder = { x, y: b.shoulderY + drop };
+	const elbow = limbEnd(shoulder.x, shoulder.y, angles.a1, b.upperArm);
+	const wrist = limbEnd(elbow.x, elbow.y, angles.a1 + angles.a2, b.forearm);
 	return { shoulder, elbow, wrist };
 }
 

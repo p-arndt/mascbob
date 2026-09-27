@@ -1,6 +1,7 @@
 import { getContext, setContext } from 'svelte';
 import type { ShapeDef } from './geometry.js';
 import type { Reaction } from './interaction.js';
+import type { BuildDef } from './parts/body.js';
 import type { Accessory, EyeStyle, FaceParams, Mood, MoodConfig, Outfit, Shoes } from './types.js';
 
 /**
@@ -38,6 +39,8 @@ export interface MascotContext {
 	readonly body: boolean;
 	readonly outfit: Outfit;
 	readonly shoes: Shoes;
+	/** Body proportions of the full figure (the resolved `build` prop). */
+	readonly build: BuildDef;
 	/**
 	 * Degrees the whole figure currently rocks around its base (hover lean toward the
 	 * pointer plus wobbles from boops, mood changes and fidgets). Positive leans right.

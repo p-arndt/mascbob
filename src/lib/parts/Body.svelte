@@ -2,23 +2,17 @@
 	import { Spring } from 'svelte/motion';
 	import { getMascot, svgRef } from '../context.js';
 	import {
-		BODY_GROUND_Y,
 		COLLAR_H,
 		COLLAR_Y,
-		FOOT_SCALE,
-		FOREARM,
 		HIP_Y,
-		LEG_X,
-		SHOULDER_Y,
-		UPPER_ARM,
 		bodyPose,
 		coreBeat,
 		FOOT_COLLAR,
 		legBottomY,
 		shortsBottomY,
 		shoulderX,
-		TORSO_TOP,
 		torsoHalfWidth,
+		torsoOuterWidth,
 		torsoPath,
 		type ArmAngles
 	} from './body.js';
@@ -62,28 +56,49 @@
 	const left = $derived({ a1: arms.current.la1 + lift, a2: arms.current.la2 });
 	const right = $derived({ a1: arms.current.ra1 + lift, a2: arms.current.ra2 });
 
-	const hw = $derived(torsoHalfWidth(m.shape.halfWidth));
-	const collarHw = $derived(Math.min(m.shape.halfWidth, 56) + 7);
-	const shoulder = $derived(shoulderX(hw));
+	const b = $derived(m.build);
+	const hw = $derived(torsoHalfWidth(m.shape.halfWidth, b));
+	const hipHw = $derived(hw * b.torso.hip);
+	/** Fabric that spans the whole torso (clipped to it) has to cover a belly too. */
+	const outerHw = $derived(torsoOuterWidth(hw, b));
+	/** Stripes running top to bottom stay inside wherever the torso is narrowest. */
+	const innerHw = $derived(hw * Math.min(b.torso.shoulder, b.torso.hip));
+	// Neckwear and chest details follow the torso width, within limits so they stay readable.
+	const u = $derived(Math.min(Math.max(hw / 48, 0.75), 1.2));
+	// Room between collar and hips, relative to the standard build: ties and scarves hang to fit.
+	const v = $derived((b.hipY - COLLAR_Y) / (HIP_Y - COLLAR_Y));
+	// The head is scaled around its bottom per build; the hood has to wrap the scaled head.
+	const headHw = $derived(m.shape.halfWidth * b.headScale);
+	const headTop = $derived(m.shape.bottom + b.headY - (m.shape.bottom - m.shape.top) * b.headScale);
+	// Small torsos (chibi) keep the collar close so it reads as a collar, not a ruff.
+	const collarHw = $derived(Math.min(headHw, 56, hw + 15) + 7);
+	const shoulder = $derived(shoulderX(hw, b));
 	const outfit = $derived(m.outfit);
 	const shoes = $derived(m.shoes);
 	const beat = $derived(coreBeat(m.mood));
 	// Idle and chatty moods tap a foot; everything else stands still.
 	const tapping = $derived(m.mood === 'idle' || m.mood === 'talking' || m.mood === 'listening');
-	const legTop = HIP_Y - 10;
-	const legBottom = $derived(legBottomY(shoes));
-	const shortsBottom = $derived(shortsBottomY(shoes));
-	const tieBlade = `M96 ${COLLAR_Y + 25}L93 ${COLLAR_Y + 58}L100 ${COLLAR_Y + 66}L107 ${COLLAR_Y + 58}L104 ${COLLAR_Y + 25}Z`;
+	const legTop = $derived(b.hipY - 10);
+	const legHw = $derived(b.legWidth / 2);
+	const legBottom = $derived(legBottomY(shoes, b));
+	const shortsBottom = $derived(shortsBottomY(shoes, b));
+	const tieY = (dy: number) => COLLAR_Y + 25 + dy * v;
+	const tieBlade = $derived(
+		`M${100 - 4 * u} ${COLLAR_Y + 25}L${100 - 7 * u} ${tieY(33)}L100 ${tieY(41)}L${100 + 7 * u} ${tieY(33)}L${100 + 4 * u} ${COLLAR_Y + 25}Z`
+	);
+	const scarfLength = $derived(Math.min(62, b.hipY - COLLAR_Y - 10));
+	// Without legs the torso reaches the ground, so the cape stops just above it.
+	const capeHem = $derived(Math.min(b.hipY + 18, b.groundY - 4));
 </script>
 
 {#snippet arm(p: ArmAngles, swing: boolean)}
-	<g transform="translate({shoulder} {SHOULDER_Y + arms.current.drop}) rotate({p.a1})">
-		<path class="tube-edge" d="M0 0V{UPPER_ARM}" />
-		<path class="tube upper-arm" d="M0 0V{UPPER_ARM}" />
+	<g transform="translate({shoulder} {b.shoulderY + arms.current.drop}) rotate({p.a1})">
+		<path class="tube-edge" d="M0 0V{b.upperArm}" />
+		<path class="tube upper-arm" d="M0 0V{b.upperArm}" />
 		{#if outfit === 'jersey'}
-			<path class="sleeve-band" d="M-7 {UPPER_ARM - 8}H7" />
+			<path class="sleeve-band" d="M{-b.armWidth / 2} {b.upperArm - 8}H{b.armWidth / 2}" />
 		{/if}
-		<g transform="translate(0 {UPPER_ARM}) rotate({p.a2})">
+		<g transform="translate(0 {b.upperArm}) rotate({p.a2})">
 			<g
 				class="fore"
 				class:swing
@@ -91,12 +106,12 @@
 				class:cheer={pose.swing === 'cheer'}
 				class:gesture={pose.swing === 'gesture'}
 			>
-				<path class="tube-edge" d="M0 0V{FOREARM}" />
-				<path class="tube" d="M0 0V{FOREARM}" />
-				<circle class="hand" cy={FOREARM + 1} r="8" />
+				<path class="tube-edge" d="M0 0V{b.forearm}" />
+				<path class="tube" d="M0 0V{b.forearm}" />
+				<circle class="hand" cy={b.forearm + 1} r={(b.armWidth * 8) / 14} />
 			</g>
 		</g>
-		<circle class="joint" r="7.5" />
+		<circle class="joint" r={b.armWidth / 2 + 0.5} />
 	</g>
 {/snippet}
 
@@ -232,97 +247,120 @@
 {/snippet}
 
 {#if layer === 'feet'}
-	<defs>
-		<linearGradient id={id('shoe')} x1="0" y1="0" x2="0" y2="1">
-			<stop offset="0" class="stop-light" />
-			<stop offset="1" class="stop-mid" />
-		</linearGradient>
-		<linearGradient id={id('shoe-ao')} x1="0" y1="0" x2="0" y2="1">
-			<stop offset="0.5" class="stop-ink" stop-opacity="0" />
-			<stop offset="1" class="stop-ink" stop-opacity="0.18" />
-		</linearGradient>
-		<linearGradient id={id('midsole')} x1="0" y1="0" x2="0" y2="1">
-			<stop offset="0" class="stop-light" />
-			<stop offset="1" class="stop-dark" />
-		</linearGradient>
-		<linearGradient id={id('leg-ao')} x1="0" y1="0" x2="0" y2="1">
-			<stop offset="0" class="stop-ink" stop-opacity="0.2" />
-			<stop offset="1" class="stop-ink" stop-opacity="0" />
-		</linearGradient>
-	</defs>
+	{#if b.legs}
+		<defs>
+			<linearGradient id={id('shoe')} x1="0" y1="0" x2="0" y2="1">
+				<stop offset="0" class="stop-light" />
+				<stop offset="1" class="stop-mid" />
+			</linearGradient>
+			<linearGradient id={id('shoe-ao')} x1="0" y1="0" x2="0" y2="1">
+				<stop offset="0.5" class="stop-ink" stop-opacity="0" />
+				<stop offset="1" class="stop-ink" stop-opacity="0.18" />
+			</linearGradient>
+			<linearGradient id={id('midsole')} x1="0" y1="0" x2="0" y2="1">
+				<stop offset="0" class="stop-light" />
+				<stop offset="1" class="stop-dark" />
+			</linearGradient>
+			<linearGradient id={id('leg-ao')} x1="0" y1="0" x2="0" y2="1">
+				<stop offset="0" class="stop-ink" stop-opacity="0.2" />
+				<stop offset="1" class="stop-ink" stop-opacity="0" />
+			</linearGradient>
+		</defs>
 
-	{#snippet foot(side: number, rim: boolean)}
-		{@const x = 100 + side * LEG_X}
-		<!-- Both passes run the same animation from mount, so they stay in lockstep. -->
-		<g
-			class="foot"
-			class:tap={side === 1 && tapping}
-			style:transform-origin="{x}px {BODY_GROUND_Y - (FOOT_COLLAR[shoes] ?? 0) * FOOT_SCALE}px"
-		>
-			<g transform="translate({x} {BODY_GROUND_Y}) scale({side * FOOT_SCALE} {FOOT_SCALE})">
-				{#if rim}
-					{#if shoes !== 'none'}
-						<ellipse
-							class="opening"
-							cx="0"
-							cy={-FOOT_COLLAR[shoes]}
-							rx={shoes === 'boots' ? 9 : shoes === 'rainboots' ? 9.5 : 8.6}
-							ry="3"
-						/>
+		{#snippet foot(side: number, rim: boolean)}
+			{@const x = 100 + side * b.legX}
+			<!-- Both passes run the same animation from mount, so they stay in lockstep. -->
+			<g
+				class="foot"
+				class:tap={side === 1 && tapping}
+				style:transform-origin="{x}px {b.groundY - (FOOT_COLLAR[shoes] ?? 0) * b.footScale}px"
+			>
+				<g transform="translate({x} {b.groundY}) scale({side * b.footScale} {b.footScale})">
+					{#if rim}
+						{#if shoes !== 'none'}
+							<ellipse
+								class="opening"
+								cx="0"
+								cy={-FOOT_COLLAR[shoes]}
+								rx={shoes === 'boots' ? 9 : shoes === 'rainboots' ? 9.5 : 8.6}
+								ry="3"
+							/>
+						{/if}
+					{:else if shoes === 'sneakers' || shoes === 'hightops'}
+						{@render sneaker(shoes === 'hightops', side)}
+					{:else if shoes === 'boots'}
+						{@render boot()}
+					{:else if shoes === 'slippers'}
+						{@render slipper()}
+					{:else if shoes === 'rainboots'}
+						{@render rainboot()}
+					{:else if shoes === 'skates'}
+						{@render skate(side)}
+					{:else}
+						{@render plainFoot()}
 					{/if}
-				{:else if shoes === 'sneakers' || shoes === 'hightops'}
-					{@render sneaker(shoes === 'hightops', side)}
-				{:else if shoes === 'boots'}
-					{@render boot()}
-				{:else if shoes === 'slippers'}
-					{@render slipper()}
-				{:else if shoes === 'rainboots'}
-					{@render rainboot()}
-				{:else if shoes === 'skates'}
-					{@render skate(side)}
-				{:else}
-					{@render plainFoot()}
-				{/if}
+				</g>
 			</g>
-		</g>
-	{/snippet}
+		{/snippet}
 
-	{#each [-1, 1] as side (side)}
-		{@render foot(side, true)}
-	{/each}
+		{#each [-1, 1] as side (side)}
+			{@render foot(side, true)}
+		{/each}
 
-	{#each [-1, 1] as side (side)}
-		<g transform="translate({100 + side * LEG_X} 0)">
-			<rect class="leg" x="-8.5" y={legTop} width="17" height={legBottom - legTop} rx="8.5" />
-			<rect class="knee" x="-9" y={(legTop + legBottom) / 2} width="18" height="2.6" rx="1.3" />
-			{#if outfit === 'overalls'}
-				<rect class="shorts" x="-10" y={legTop} width="20" height={shortsBottom - legTop} rx="4" />
+		{#each [-1, 1] as side (side)}
+			<g transform="translate({100 + side * b.legX} 0)">
 				<rect
-					class="shorts-cuff"
-					x="-10"
-					y={shortsBottom - 3.5}
-					width="20"
-					height="3.5"
-					rx="1.75"
+					class="leg"
+					x={-legHw}
+					y={legTop}
+					width={legHw * 2}
+					height={legBottom - legTop}
+					rx={legHw}
 				/>
-			{/if}
-			<!-- The torso's hem shades the top of each leg so the legs tuck in instead of being pinned on. -->
-			<rect
-				class="leg-ao"
-				x="-10"
-				y={legTop}
-				width="20"
-				height="22"
-				rx="8.5"
-				fill={ref('leg-ao')}
-			/>
-		</g>
-	{/each}
+				<rect
+					class="knee"
+					x={-legHw - 0.5}
+					y={(legTop + legBottom) / 2}
+					width={legHw * 2 + 1}
+					height="2.6"
+					rx="1.3"
+				/>
+				{#if outfit === 'overalls'}
+					<rect
+						class="shorts"
+						x={-legHw - 1.5}
+						y={legTop}
+						width={legHw * 2 + 3}
+						height={shortsBottom - legTop}
+						rx="4"
+					/>
+					<rect
+						class="shorts-cuff"
+						x={-legHw - 1.5}
+						y={shortsBottom - 3.5}
+						width={legHw * 2 + 3}
+						height="3.5"
+						rx="1.75"
+					/>
+				{/if}
+				<!-- The torso's hem shades the top of each leg so the legs tuck in instead of being pinned on. -->
+				<rect
+					class="leg-ao"
+					x={-legHw - 1.5}
+					y={legTop}
+					width={legHw * 2 + 3}
+					height="22"
+					rx={legHw}
+					fill={ref('leg-ao')}
+				/>
+			</g>
+		{/each}
 
-	<!-- Each foot is centered on its leg: the leg steps into the collar instead of standing on the shoe. -->
-	{#each [-1, 1] as side (side)}
-		{@render foot(side, false)}
-	{/each}
+		<!-- Each foot is centered on its leg: the leg steps into the collar instead of standing on the shoe. -->
+		{#each [-1, 1] as side (side)}
+			{@render foot(side, false)}
+		{/each}
+	{/if}
 {:else if layer === 'back'}
 	<defs>
 		<linearGradient id={id('torso-ao')} x1="0" y1="0" x2="0" y2="1">
@@ -332,7 +370,7 @@
 			<stop offset="1" class="stop-ink" stop-opacity="0.14" />
 		</linearGradient>
 		<clipPath id={id('torso')}>
-			<path d={torsoPath(hw)} />
+			<path d={torsoPath(hw, b)} />
 		</clipPath>
 		<radialGradient id={id('head-shadow')}>
 			<stop offset="0" class="stop-ink" stop-opacity="0.22" />
@@ -343,69 +381,86 @@
 
 	{#if outfit === 'cape'}
 		<!-- Hangs from the shoulders behind the torso; the hem arches up in the middle so it never hides the legs. -->
-		<g class="cape-wave" style:transform-origin="100px {TORSO_TOP + 10}px">
+		<g class="cape-wave" style:transform-origin="100px {b.torsoTop + 10}px">
 			<path
 				class="cape"
-				d="M{100 - hw - 2} {TORSO_TOP + 10}H{100 + hw + 2}L{100 + hw + 14} {HIP_Y + 18}Q{100 +
-					hw * 0.55} {HIP_Y - 2} 100 {HIP_Y - 12}Q{100 - hw * 0.55} {HIP_Y - 2} {100 -
-					hw -
-					14} {HIP_Y + 18}Z"
+				d="M{100 - outerHw - 2} {b.torsoTop + 10}H{100 + outerHw + 2}L{100 +
+					outerHw +
+					14} {capeHem}Q{100 + hipHw * 0.55} {b.hipY - 2} 100 {b.hipY - 12}Q{100 -
+					hipHw * 0.55} {b.hipY - 2} {100 - outerHw - 14} {capeHem}Z"
 			/>
 			<path
 				class="cape-fold"
-				d="M{100 - hw - 5} {TORSO_TOP + 40}L{100 - hw - 10} {HIP_Y + 12}M{100 + hw + 5} {TORSO_TOP +
-					40}L{100 + hw + 10} {HIP_Y + 12}"
+				d="M{100 - outerHw - 5} {b.torsoTop + 40}L{100 - outerHw - 10} {capeHem - 6}M{100 +
+					outerHw +
+					5} {b.torsoTop + 40}L{100 + outerHw + 10} {capeHem - 6}"
 			/>
 		</g>
 	{:else if outfit === 'hoodie'}
 		<rect
 			class="hood"
-			x={100 - m.shape.halfWidth - 7}
-			y={m.shape.top + 34}
-			width={m.shape.halfWidth * 2 + 14}
-			height={COLLAR_Y + 8 - m.shape.top - 34}
-			rx={m.shape.halfWidth}
+			x={100 - headHw - 7}
+			y={headTop + 34 * b.headScale}
+			width={headHw * 2 + 14}
+			height={COLLAR_Y + 8 - headTop - 34 * b.headScale}
+			rx={headHw}
 		/>
 	{/if}
 
-	<path d={torsoPath(hw)} fill={ref('body')} />
-	<path d={torsoPath(hw)} fill="url(#{id('torso-ao')})" />
+	<path d={torsoPath(hw, b)} fill={ref('body')} />
+	<path d={torsoPath(hw, b)} fill="url(#{id('torso-ao')})" />
 	{#if outfit === 'hoodie'}
-		<path class="hoodie" d={torsoPath(hw + 1.5)} />
+		<path class="hoodie" d={torsoPath(hw + 1.5, b)} />
 		<path
 			class="pocket"
-			d="M{100 - hw * 0.55} {HIP_Y - 8}L{100 - hw * 0.45} {HIP_Y - 26}H{100 + hw * 0.45}L{100 +
-				hw * 0.55} {HIP_Y - 8}"
+			d="M{100 - hipHw * 0.55} {b.hipY - 8}L{100 - hipHw * 0.45} {b.hipY - 26}H{100 +
+				hipHw * 0.45}L{100 + hipHw * 0.55} {b.hipY - 8}"
 		/>
-		<rect class="hem" x={100 - hw * 0.8} y={HIP_Y - 7} width={hw * 1.6} height="3" rx="1.5" />
+		<rect
+			class="hem"
+			x={100 - hipHw * 0.8}
+			y={b.hipY - 7}
+			width={hipHw * 1.6}
+			height="3"
+			rx="1.5"
+		/>
 	{:else if outfit === 'overalls'}
 		<g class="overalls" clip-path={ref('torso')}>
 			<path
 				class="strap"
-				d="M{100 - hw * 0.62} {TORSO_TOP}L{100 - hw * 0.42} {COLLAR_Y + 40}M{100 +
-					hw * 0.62} {TORSO_TOP}L{100 + hw * 0.42} {COLLAR_Y + 40}"
+				d="M{100 - hw * 0.62} {b.torsoTop}L{100 - hw * 0.42} {COLLAR_Y + 40}M{100 +
+					hw * 0.62} {b.torsoTop}L{100 + hw * 0.42} {COLLAR_Y + 40}"
 			/>
 			<rect class="denim" x={100 - hw * 0.5} y={COLLAR_Y + 36} width={hw} height="40" rx="4" />
-			<rect class="denim" x={100 - hw - 2} y={HIP_Y - 18} width={hw * 2 + 4} height="22" />
+			<rect
+				class="denim"
+				x={100 - outerHw - 2}
+				y={b.hipY - 18}
+				width={outerHw * 2 + 4}
+				height="22"
+			/>
 			<path
 				class="bib-pocket"
 				d="M{100 - hw * 0.26} {COLLAR_Y + 52}V{COLLAR_Y + 60}Q100 {COLLAR_Y + 64} {100 +
 					hw * 0.26} {COLLAR_Y + 60}V{COLLAR_Y + 52}Z"
 			/>
-			<path class="stitch" d="M{100 - hw - 2} {HIP_Y - 15}H{100 + hw + 2}" />
+			<path class="stitch" d="M{100 - outerHw - 2} {b.hipY - 15}H{100 + outerHw + 2}" />
 			{#each [-1, 1] as k (k)}
 				<circle class="button" cx={100 + k * hw * 0.42} cy={COLLAR_Y + 40} r="2.4" />
 			{/each}
 		</g>
 	{:else if outfit === 'jersey'}
-		<path class="jersey" d={torsoPath(hw + 1.5)} />
+		<path class="jersey" d={torsoPath(hw + 1.5, b)} />
 		<g clip-path={ref('torso')}>
 			{#each [-1, 1] as k (k)}
-				<path class="jersey-stripe" d="M{100 + k * (hw - 5)} {TORSO_TOP}V{HIP_Y}" />
+				<path class="jersey-stripe" d="M{100 + k * (innerHw - 5)} {b.torsoTop}V{b.hipY}" />
 			{/each}
 		</g>
 		<!-- The number sits under the status light, like a player's number under the crest. -->
-		<path class="jersey-number" d="M93.5 {HIP_Y - 20}H106.5L99 {HIP_Y - 5}" />
+		<path
+			class="jersey-number"
+			d="M{100 - 6.5 * u} {b.hipY - 20}H{100 + 6.5 * u}L{100 - u} {b.hipY - 5}"
+		/>
 	{/if}
 	<!-- Drawn over the outfit because the head shades whatever the torso wears; the head itself
 	     covers the top half, so only the falloff below the chin shows. Offset right, away from
@@ -414,12 +469,12 @@
 		class="head-shadow"
 		clip-path={ref('torso')}
 		cx={100 + hw * 0.08}
-		cy={m.shape.bottom}
+		cy={m.shape.bottom + b.headY}
 		rx={hw * 0.8}
 		ry="8"
 		fill={ref('head-shadow')}
 	/>
-	<path class="edge" d={torsoPath(hw)} />
+	<path class="edge" d={torsoPath(hw, b)} />
 
 	<!-- A tiny status light on the chest echoes the LED face; it beats with the mood. -->
 	<g class="status {beat.mode}" class:love={m.mood === 'love'} style:--beat="{beat.period}s">
@@ -475,23 +530,26 @@
 		{#each [-2, 0, 2] as k (k)}
 			<path class="scarf-stripe" d="M{100 + k * 12} {COLLAR_Y + 6}V{COLLAR_Y + 22}" />
 		{/each}
-		<g class="tail" style:transform-origin="{100 - 18}px {COLLAR_Y + 18}px">
+		{@const len = scarfLength}
+		{@const at = (y: number) => COLLAR_Y + (y * len) / 62}
+		<g class="tail" style:transform-origin="{100 - 18 * u}px {COLLAR_Y + 18}px">
 			<path
 				class="scarf"
-				d="M{100 - 26} {COLLAR_Y + 16}H{100 - 12}L{100 - 14} {COLLAR_Y + 62}H{100 - 28}Z"
+				d="M{100 - 26 * u} {COLLAR_Y + 16}H{100 - 12 * u}L{100 - 14 * u} {COLLAR_Y + len}H{100 -
+					28 * u}Z"
 			/>
 			<path
 				class="scarf-stripe"
-				d="M{100 - 27} {COLLAR_Y + 40}H{100 - 13}M{100 - 27.5} {COLLAR_Y + 48}H{100 - 13.5}"
+				d="M{100 - 27 * u} {at(40)}H{100 - 13 * u}M{100 - 27.5 * u} {at(48)}H{100 - 13.5 * u}"
 			/>
 			<path
 				class="fringe"
-				d="M{100 - 26} {COLLAR_Y + 62}V{COLLAR_Y + 67}M{100 - 21} {COLLAR_Y + 62}V{COLLAR_Y +
-					67}M{100 - 16} {COLLAR_Y + 62}V{COLLAR_Y + 67}"
+				d="M{100 - 26 * u} {COLLAR_Y + len}V{COLLAR_Y + len + 5}M{100 - 21 * u} {COLLAR_Y +
+					len}V{COLLAR_Y + len + 5}M{100 - 16 * u} {COLLAR_Y + len}V{COLLAR_Y + len + 5}"
 			/>
 		</g>
 	{:else if outfit === 'bowtie'}
-		<g transform="translate(100 {COLLAR_Y + 22})">
+		<g transform="translate(100 {COLLAR_Y + 22}) scale({u})">
 			<path class="bow" d="M0 0L-13 -8C-16 -9 -17 -7 -17 0C-17 7 -16 9 -13 8Z" />
 			<path class="bow" d="M0 0L13 -8C16 -9 17 -7 17 0C17 7 16 9 13 8Z" />
 			<rect class="bow-knot" x="-4" y="-5" width="8" height="10" rx="3" />
@@ -507,10 +565,11 @@
 		/>
 		<path
 			class="string"
-			d="M94 {COLLAR_Y + 22}V{COLLAR_Y + 44}M106 {COLLAR_Y + 22}V{COLLAR_Y + 40}"
+			d="M{100 - 6 * u} {COLLAR_Y + 22}V{COLLAR_Y + 44}M{100 + 6 * u} {COLLAR_Y + 22}V{COLLAR_Y +
+				40}"
 		/>
-		<rect class="aglet" x="92.8" y={COLLAR_Y + 43} width="2.4" height="5" rx="1.2" />
-		<rect class="aglet" x="104.8" y={COLLAR_Y + 39} width="2.4" height="5" rx="1.2" />
+		<rect class="aglet" x={100 - 6 * u - 1.2} y={COLLAR_Y + 43} width="2.4" height="5" rx="1.2" />
+		<rect class="aglet" x={100 + 6 * u - 1.2} y={COLLAR_Y + 39} width="2.4" height="5" rx="1.2" />
 	{:else if outfit === 'jersey'}
 		<rect
 			class="neck-band"
@@ -524,8 +583,8 @@
 		<!-- Shirt collar points first, so the knot sits on top of them. -->
 		<path
 			class="shirt-collar"
-			d="M100 {COLLAR_Y + 20}L{100 - 16} {COLLAR_Y + 12}L{100 - 12} {COLLAR_Y + 30}ZM100 {COLLAR_Y +
-				20}L{100 + 16} {COLLAR_Y + 12}L{100 + 12} {COLLAR_Y + 30}Z"
+			d="M100 {COLLAR_Y + 20}L{100 - 16 * u} {COLLAR_Y + 12}L{100 - 12 * u} {COLLAR_Y +
+				30}ZM100 {COLLAR_Y + 20}L{100 + 16 * u} {COLLAR_Y + 12}L{100 + 12 * u} {COLLAR_Y + 30}Z"
 		/>
 		<clipPath id={id('tie')}>
 			<path d={tieBlade} />
@@ -534,12 +593,12 @@
 			<path class="tie" d={tieBlade} />
 			<path
 				class="tie-stripe"
-				d="M92 {COLLAR_Y + 36}L108 {COLLAR_Y + 30}M92 {COLLAR_Y + 46}L108 {COLLAR_Y +
-					40}M92 {COLLAR_Y + 56}L108 {COLLAR_Y + 50}"
+				d="M{100 - 8 * u} {tieY(11)}L{100 + 8 * u} {tieY(5)}M{100 - 8 * u} {tieY(21)}L{100 +
+					8 * u} {tieY(15)}M{100 - 8 * u} {tieY(31)}L{100 + 8 * u} {tieY(25)}"
 				clip-path={ref('tie')}
 			/>
 		</g>
-		<rect class="tie-knot" x="95" y={COLLAR_Y + 17} width="10" height="9" rx="3" />
+		<rect class="tie-knot" x={100 - 5 * u} y={COLLAR_Y + 17} width={10 * u} height="9" rx="3" />
 	{:else if outfit === 'cape'}
 		<rect
 			class="cape-band"
@@ -555,6 +614,7 @@
 
 	<g
 		class="arms"
+		style:--arm="{b.armWidth}px"
 		class:sleeve={outfit === 'hoodie'}
 		class:short={outfit === 'jersey'}
 		class:fidget={m.hovered}
@@ -959,14 +1019,14 @@
 	.tube-edge {
 		fill: none;
 		stroke: var(--c-visor);
-		stroke-width: 15.6;
+		stroke-width: calc(var(--arm, 14px) + 1.6px);
 		stroke-linecap: round;
 		opacity: 0.14;
 	}
 	.tube {
 		fill: none;
 		stroke: var(--c-body-mid);
-		stroke-width: 14;
+		stroke-width: var(--arm, 14px);
 		stroke-linecap: round;
 	}
 	.sleeve .tube {

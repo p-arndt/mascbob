@@ -53,6 +53,13 @@ export const PROPS: PropDoc[] = [
 		description: 'Footwear, only visible with `body`.'
 	},
 	{
+		name: 'build',
+		type: 'Build',
+		default: "'standard'",
+		description:
+			'Body proportions with `body`: `chubby`, `lanky`, `chibi`, or `blob` (no legs, bobs in place).'
+	},
+	{
 		name: 'hands',
 		type: 'boolean',
 		default: 'true',

@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { MOODS } from '../types.js';
 import {
+	BUILDS,
+	BUILD_DEFS,
+	BODY_VIEWBOX_HEIGHT,
+	FOOT_SCALE,
+	LEG_X,
+	buildDef,
+	torsoOuterWidth,
+	type BuildDef,
 	FOREARM,
 	HIP_Y,
 	OUTFITS,
@@ -166,5 +174,95 @@ describe('torso', () => {
 			.filter((_, i) => i % 2 === 1);
 		expect(Math.min(...ys)).toBe(TORSO_TOP);
 		expect(Math.max(...ys)).toBe(HIP_Y);
+	});
+});
+
+describe('builds', () => {
+	const legged = BUILDS.filter((b) => BUILD_DEFS[b].legs);
+	const pathYs = (d: string) =>
+		(d.match(/-?\d+(\.\d+)?/g) ?? []).map(Number).filter((_, i) => i % 2 === 1);
+
+	it('starts with the standard build and has a definition for each', () => {
+		expect(BUILDS[0]).toBe('standard');
+		for (const build of BUILDS) expect(buildDef(build)).toBe(BUILD_DEFS[build]);
+		expect(buildDef(undefined)).toBe(BUILD_DEFS.standard);
+	});
+
+	it('keeps the standard build on the original proportions', () => {
+		const b = BUILD_DEFS.standard;
+		expect(b).toMatchObject({
+			viewHeight: BODY_VIEWBOX_HEIGHT,
+			groundY: BODY_GROUND_Y,
+			torsoTop: TORSO_TOP,
+			hipY: HIP_Y,
+			shoulderY: SHOULDER_Y,
+			upperArm: UPPER_ARM,
+			forearm: FOREARM,
+			legX: LEG_X,
+			footScale: FOOT_SCALE,
+			headScale: 1,
+			headY: 0,
+			legs: true,
+			motion: 'stand'
+		});
+		expect(torsoPath(48, b)).toBe(
+			'M52 136L148 136L148 188C148 206 126.4 214 100 214C73.6 214 52 206 52 188Z'
+		);
+		expect(torsoHalfWidth(70, b)).toBe(48);
+		expect(shoulderX(48, b)).toBe(55);
+	});
+
+	it.each(BUILDS)('fits the %s figure inside its viewBox', (build) => {
+		const b = BUILD_DEFS[build];
+		expect(b.hipY).toBeLessThanOrEqual(b.groundY);
+		expect(b.groundY).toBeLessThan(b.viewHeight);
+		const ys = pathYs(torsoPath(torsoHalfWidth(48, b), b));
+		expect(Math.min(...ys)).toBe(b.torsoTop);
+		expect(Math.max(...ys)).toBeCloseTo(b.hipY);
+	});
+
+	it.each(legged)('keeps the %s legs under the torso in every shoe', (build) => {
+		const b = BUILD_DEFS[build];
+		const legTop = b.hipY - 10;
+		for (const shoes of SHOES) {
+			expect(legBottomY(shoes, b)).toBeGreaterThan(legTop);
+			expect(legBottomY(shoes, b)).toBeLessThan(b.groundY);
+			expect(shortsBottomY(shoes, b)).toBeGreaterThan(b.hipY);
+		}
+		expect(b.legX + b.legWidth / 2).toBeLessThan(torsoHalfWidth(48, b) * b.torso.hip);
+	});
+
+	it.each(legged)('lets the %s hands hang down to the hips', (build) => {
+		const b = BUILD_DEFS[build];
+		const x = shoulderX(torsoHalfWidth(48, b), b);
+		const { wrist } = armJoints(bodyPose('rest', 'idle').left, 0, x, b);
+		expect(wrist.y).toBeGreaterThan(b.hipY - 8);
+		expect(wrist.y).toBeLessThan(b.groundY - 30);
+	});
+
+	it('keeps the blob hands off the ground', () => {
+		const b = BUILD_DEFS.blob;
+		const x = shoulderX(torsoHalfWidth(48, b), b);
+		const { wrist } = armJoints(bodyPose('rest', 'idle').left, 0, x, b);
+		expect(b.legs).toBe(false);
+		expect(b.motion).toBe('float');
+		expect(wrist.y).toBeLessThan(b.groundY - 12);
+	});
+
+	it('shapes each build distinctly', () => {
+		const std = BUILD_DEFS.standard;
+		const widest = (b: BuildDef) => torsoOuterWidth(torsoHalfWidth(48, b), b);
+		expect(widest(BUILD_DEFS.chubby)).toBeGreaterThan(widest(std) + 10);
+		expect(widest(BUILD_DEFS.lanky)).toBeLessThan(widest(std) - 8);
+		const legLength = (b: BuildDef) => b.groundY - b.hipY;
+		expect(legLength(BUILD_DEFS.lanky)).toBeGreaterThan(legLength(std));
+		expect(legLength(BUILD_DEFS.chubby)).toBeLessThan(legLength(std));
+		expect(legLength(BUILD_DEFS.chibi)).toBeLessThan(legLength(std));
+		expect(BUILD_DEFS.chibi.headScale).toBeGreaterThan(1);
+		expect(BUILD_DEFS.lanky.headScale).toBeLessThan(1);
+		// A bell: the blob is widest at its base, which is also where it touches the ground.
+		const blob = BUILD_DEFS.blob;
+		expect(blob.torso.hip).toBeGreaterThan(blob.torso.shoulder);
+		expect(blob.hipY).toBe(blob.groundY);
 	});
 });
