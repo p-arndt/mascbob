@@ -63,6 +63,27 @@ export interface EyeShape {
 	/** Lid drop at the left and right end, as a fraction of the height. */
 	lidLeft: number;
 	lidRight: number;
+	/**
+	 * 0..1 moves the top edge down onto the bottom edge, after lids and crescent: 1 closes
+	 * the eye as a shutter onto the lower lid instead of squashing it to the middle.
+	 */
+	lidDrop?: number;
+}
+
+/** Share of a blink's travel done by the lower lid; real lids close mostly from above. */
+export const BLINK_LOWER = 0.15;
+
+/**
+ * How blinking and downward gaze close the eye: the lower lid rises a little (a symmetric
+ * height scale around the center) and the upper lid covers the rest by dropping.
+ */
+export function eyeClosure(blink: number, down: number): { hScale: number; lidDrop: number } {
+	const b = clamp(blink, 0, 1);
+	const gaze = clamp(down, 0, 1) * 0.3;
+	return {
+		hScale: 1 - BLINK_LOWER * 2 * b,
+		lidDrop: 1 - (1 - b) * (1 - gaze)
+	};
 }
 
 type Point = [number, number];
@@ -98,6 +119,7 @@ export function eyeOutline(e: EyeShape): Point[] {
 	const hw = Math.max(0.5, e.w / 2);
 	const full = Math.max(0, e.h) / 2;
 	const lift = clamp(e.lift / 0.8, 0, 1);
+	const drop = clamp(e.lidDrop ?? 0, 0, 1);
 	const top: Point[] = [];
 	const bottom: Point[] = [];
 	for (let i = 0; i <= SAMPLES; i++) {
@@ -107,11 +129,15 @@ export function eyeOutline(e: EyeShape): Point[] {
 		const edge = Math.pow(1 - Math.pow(Math.abs(u), e.round), 1 / e.round);
 		let t = e.cy - full * edge;
 		let b = e.cy + full * edge;
+		// A shut eye lies along the lower lid; boxy styles would close into a "⊔", so the lower
+		// edge relaxes toward an oval as the lid comes down (quadratic, so gaze droop barely moves it).
+		b = Math.min(b, b + (e.cy + full * Math.sqrt(1 - u * u) - b) * drop * drop);
 		// Crescent: the lower edge becomes the upper one pushed down by a band, which arches the eye.
 		const band = Math.max(full * 0.62, SHUT + 1) * edge;
 		b = b + (Math.min(b, t + band) - b) * lift;
 		const lid = e.cy - full + full * 2 * (e.lidLeft + (e.lidRight - e.lidLeft) * ((u + 1) / 2));
 		t = Math.min(Math.max(t, lid), b);
+		t += (b - t) * drop;
 		// A lens-shaped minimum keeps shut eyes as a tapered stroke.
 		const min = SHUT * Math.sqrt(1 - u * u);
 		if (b - t < min) {

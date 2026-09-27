@@ -4,6 +4,7 @@ import { EYE_STYLES } from '../types.js';
 import {
 	EYE_SIZES,
 	catMouthPath,
+	eyeClosure,
 	eyeLids,
 	eyeOutline,
 	halftone,
@@ -70,6 +71,82 @@ describe('eyeOutline', () => {
 		const xs = lidded.map((p) => p[0]);
 		const rightX = Math.max(...xs.filter((x) => x < 87));
 		expect(top(rightX)).toBeGreaterThan(top(80));
+	});
+});
+
+describe('eye closure', () => {
+	const closed = (blink: number, down = 0, p: Partial<EyeShape> = {}) => {
+		const c = eyeClosure(blink, down);
+		return eyeOutline(eye({ ...p, h: (p.h ?? 21) * c.hScale, lidDrop: c.lidDrop }));
+	};
+	const commands = (d: string) => d.replace(/-?[\d.]+/g, '#');
+
+	it('blinks as a shutter: the top edge travels much further than the bottom', () => {
+		const open = bounds(closed(0));
+		const shut = bounds(closed(1));
+		const topTravel = shut.minY - open.minY;
+		const bottomTravel = open.maxY - shut.maxY;
+		expect(topTravel).toBeGreaterThan(bottomTravel * 4);
+		expect(bottomTravel).toBeGreaterThan(0);
+		// Closed into a thin line in the lower part of the eye, not the middle.
+		expect(column(closed(1), 80)).toBeLessThan(4);
+		expect(
+			Math.min(
+				...closed(1)
+					.filter((p) => Math.abs(p[0] - 80) < 0.01)
+					.map((p) => p[1])
+			)
+		).toBeGreaterThan(96 + 21 * 0.25);
+	});
+
+	it('closes every style into a thin, gently curved line', () => {
+		for (const style of EYE_STYLES) {
+			const base = EYE_SIZES[style];
+			const lids = eyeLids(base, { open: 1, lift: 0, lidInner: 0, lidOuter: 0 });
+			const shut = closed(1, 0, {
+				w: base.w,
+				h: base.h,
+				round: base.round,
+				lidLeft: lids.outer,
+				lidRight: lids.inner
+			});
+			const half = shut.length / 2;
+			for (let i = 1; i < half; i++) {
+				const top = shut[i];
+				const bottom = shut[shut.length - i];
+				expect(bottom[1] - top[1], style).toBeLessThan(4);
+			}
+			expect(bounds(shut).maxY - bounds(shut).minY, style).toBeLessThan(base.h * 0.5);
+		}
+	});
+
+	it('moves the top edge down part way mid-blink', () => {
+		const open = bounds(closed(0));
+		const half = bounds(closed(0.5));
+		expect(half.minY).toBeGreaterThan(open.minY + 21 * 0.3);
+		expect(open.maxY - half.maxY).toBeLessThan(21 * 0.1);
+	});
+
+	it('droops the upper lid when looking down', () => {
+		const ahead = bounds(closed(0, 0));
+		const down = bounds(closed(0, 1));
+		expect(down.minY).toBeGreaterThan(ahead.minY + 21 * 0.2);
+		expect(down.maxY).toBeCloseTo(ahead.maxY);
+	});
+
+	it('keeps the path command structure across lid drops', () => {
+		for (const style of EYE_STYLES) {
+			const base = EYE_SIZES[style];
+			const lids = eyeLids(base, { open: 1, lift: 0.8, lidInner: 0, lidOuter: 0 });
+			const shape = { w: base.w, round: base.round, lidLeft: lids.outer, lidRight: lids.inner };
+			const ref = commands(smoothPath(eyeOutline(eye(shape))));
+			for (const lidDrop of [0, 0.3, 0.7, 1]) {
+				for (const lift of [0, 0.8]) {
+					const d = smoothPath(eyeOutline(eye({ ...shape, lift, lidDrop })));
+					expect(commands(d), `${style} ${lidDrop} ${lift}`).toBe(ref);
+				}
+			}
+		}
 	});
 });
 

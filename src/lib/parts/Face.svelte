@@ -7,6 +7,7 @@
 		EYE_SIZES,
 		MISPRINT,
 		catMouthPath,
+		eyeClosure,
 		eyeLids,
 		eyeOutline,
 		halftone,
@@ -108,21 +109,24 @@
 		const heart = clamp(p.heart, 0, 1);
 		const size = p.scale * grow * pop * (1 - heart) * (1 + m.focus * 0.08);
 		const fullH = base.h * size;
-		// Looking up opens the eyes wide; looking down flattens them a little. No straight lid
-		// cut: it made the eyes look flat and sleepy. Both eyes always share one shape.
+		// Looking up opens the eyes wide; looking down droops the upper lid, like a real eye
+		// following its gaze. Both eyes always share one shape.
 		const up = Math.max(0, -m.gazeY);
 		const down = Math.max(0, m.gazeY);
 		const lids = eyeLids(base, p);
+		const closure = eyeClosure(m.blink, down);
 		const shape: EyeShape = {
 			cx,
 			cy: eyeY,
 			w: base.w * size,
-			h: fullH * Math.max(0, p.open) * (1 + up * 0.12 - down * 0.16) * (1 - m.blink) * (1 - sq),
+			h: fullH * Math.max(0, p.open) * (1 + up * 0.12) * closure.hScale * (1 - sq),
 			round: base.round,
 			lift: p.lift,
 			lidLeft: side === 'left' ? lids.outer : lids.inner,
-			lidRight: side === 'left' ? lids.inner : lids.outer
+			lidRight: side === 'left' ? lids.inner : lids.outer,
+			lidDrop: closure.lidDrop
 		};
+		const lid = (lids.inner + lids.outer) / 2;
 		const len = clamp(base.w * p.scale * 0.85, 9, 15);
 		// Brows bounce with the voice: talking faces are mostly eyebrows.
 		const browY =
@@ -138,10 +142,11 @@
 			shape,
 			d: smoothPath(eyeOutline(shape)),
 			heart: { cx, cy: eyeY, s: heart * base.w * 1.5 * p.scale * grow },
-			lid: (lids.inner + lids.outer) / 2,
+			// The glint rides under the dropping lid too, or a blink would slice through it.
+			lid: lid + (1 - lid) * closure.lidDrop,
 			glint: base.glint ?? 1,
 			shine:
-				clamp((shape.h / base.h - 0.3) * 2.5, 0, 1) *
+				clamp(((shape.h / base.h) * (1 - closure.lidDrop) - 0.3) * 2.5, 0, 1) *
 				clamp(1.6 - p.lift * 2, 0, 1) *
 				(1 - heart) *
 				(1 - sq),
