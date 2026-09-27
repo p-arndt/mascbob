@@ -61,7 +61,7 @@ describe('THEMES', () => {
 describe('themeStyle', () => {
 	it('emits private custom properties for every color', () => {
 		const style = themeStyle(THEMES.og);
-		expect(style).toContain('--_mascott-eye: #1d1d1f');
+		expect(style).toContain('--_mascbob-eye: #1d1d1f');
 		expect(style.split('; ')).toHaveLength(Object.keys(THEMES.og).length);
 	});
 });

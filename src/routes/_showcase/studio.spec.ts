@@ -103,7 +103,7 @@ describe('code generation', () => {
 	it('turns custom colors into a theme object on top of the preset', () => {
 		const file = svelteFile(config({ theme: 'bred', colors: { accent: '#00ff00' } }));
 		expect(file).toContain("theme={{ base: 'bred', accent: '#00ff00' }}");
-		expect(file).toContain("import { Mascot } from 'mascott';");
+		expect(file).toContain("import { Mascot } from 'mascbob';");
 	});
 
 	it('lists reactions only when they differ from the defaults', () => {

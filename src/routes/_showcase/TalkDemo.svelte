@@ -174,7 +174,7 @@
 				accessories={['headphones']}
 				size="min(250px, 56vw)"
 				interactive={false}
-				label="mascott listening"
+				label="mascbob listening"
 			/>
 		</div>
 		<div class="meter" aria-hidden="true">

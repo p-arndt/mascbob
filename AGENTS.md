@@ -1,4 +1,4 @@
-# mascott
+# mascbob
 
 Svelte 5 component library that ships `<Mascot>`, an animated SVG mascot with
 moods, themes, shapes, eye styles and accessories. The SvelteKit app in
@@ -22,7 +22,7 @@ moods, themes, shapes, eye styles and accessories. The SvelteKit app in
 - `src/lib/parts/Body.svelte` + `body.ts`: torso, outfits, arms (`front`), legs and
   `shoes` (`feet`, kept outside the mood tilt so they stay planted).
 - `src/lib/themes.ts`: sneaker-style colorways (matte neutral body + one loud accent). Colors reach the SVG through CSS variables
-  (`--_mascott-*` from the prop, overridable by public `--mascott-*`).
+  (`--_mascbob-*` from the prop, overridable by public `--mascbob-*`).
 - `*.spec.ts` run in node; `*.svelte.spec.ts` run in Chromium via vitest browser mode.
 
 ## Rules

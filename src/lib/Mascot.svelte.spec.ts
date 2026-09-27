@@ -39,9 +39,9 @@ describe('Mascot', () => {
 
 	it('applies the theme as overridable custom properties', async () => {
 		const { container } = render(Mascot, { theme: { base: 'ice', eye: '#123456' } });
-		const style = (container.querySelector('.mascott') as HTMLElement).getAttribute('style') ?? '';
-		expect(style).toContain('--_mascott-eye: #123456');
-		expect(style).toContain('--_mascott-visor: #0f1b2d');
+		const style = (container.querySelector('.mascbob') as HTMLElement).getAttribute('style') ?? '';
+		expect(style).toContain('--_mascbob-eye: #123456');
+		expect(style).toContain('--_mascbob-visor: #0f1b2d');
 	});
 
 	it('hides the floating hands of a head-only mascot when disabled', async () => {
@@ -58,7 +58,7 @@ describe('Mascot', () => {
 
 	it('sets the size', async () => {
 		const { container } = render(Mascot, { size: 90 });
-		expect((container.querySelector('.mascott') as HTMLElement).style.width).toBe('90px');
+		expect((container.querySelector('.mascbob') as HTMLElement).style.width).toBe('90px');
 	});
 });
 
@@ -89,7 +89,7 @@ describe('Mascot motion', () => {
 		button.element().dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
 		await new Promise((r) => setTimeout(r, 200));
 		expect(headScale(container)).toEqual({ x: 1, y: 1 });
-		expect(container.querySelector('.mascott')?.classList.contains('still')).toBe(true);
+		expect(container.querySelector('.mascbob')?.classList.contains('still')).toBe(true);
 	});
 
 	it('pops in once on mount', async () => {

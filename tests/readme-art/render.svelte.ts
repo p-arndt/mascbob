@@ -91,7 +91,7 @@ it('renders the README art', async () => {
 	const figureX = banner.width - FIGURE.width - 24;
 	const text =
 		`<g font-family="ui-rounded, 'SF Pro Rounded', system-ui, -apple-system, 'Segoe UI', sans-serif" fill="#1d1d1f">` +
-		`<text x="8" y="112" font-size="72" font-weight="800" letter-spacing="-3">mascott</text>` +
+		`<text x="8" y="112" font-size="72" font-weight="800" letter-spacing="-3">mascbob</text>` +
 		`<text x="10" y="148" font-size="19" fill="#57534e">An animated SVG mascot for Svelte 5</text>` +
 		`<rect x="10" y="172" width="118" height="30" rx="15" fill="#ff5a1f"/>` +
 		`<text x="69" y="192" font-size="13" font-weight="700" fill="#fff" text-anchor="middle">${MOODS.length} moods</text>` +

@@ -124,7 +124,7 @@
 
 	let installCopied = $state(false);
 	async function copyInstall() {
-		installCopied = await copyText('pnpm add mascott');
+		installCopied = await copyText('pnpm add mascbob');
 		setTimeout(() => (installCopied = false), 1400);
 	}
 
@@ -152,7 +152,7 @@
 		<div class="actions">
 			<a class="btn-primary" href="#playground">Open the studio</a>
 			<button class="install" onclick={copyInstall} aria-label="Copy install command">
-				<code>pnpm add mascott</code>
+				<code>pnpm add mascbob</code>
 				<span>{installCopied ? 'Copied' : 'Copy'}</span>
 			</button>
 		</div>
@@ -179,7 +179,7 @@
 				body
 				shoes="sneakers"
 				size="clamp(200px, 22vw, 320px)"
-				label="mascott, boop me"
+				label="mascbob, boop me"
 				onboop={boop}
 			/>
 		</div>

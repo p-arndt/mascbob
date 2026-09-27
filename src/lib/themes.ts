@@ -137,19 +137,19 @@ export function resolveTheme(input: ThemeInput = 'og'): ThemeColors {
 }
 
 const CSS_VARS: Record<keyof ThemeColors, string> = {
-	bodyLight: '--_mascott-body-light',
-	bodyMid: '--_mascott-body-mid',
-	bodyDark: '--_mascott-body-dark',
-	visor: '--_mascott-visor',
-	eye: '--_mascott-eye',
-	cheek: '--_mascott-cheek',
-	accent: '--_mascott-accent'
+	bodyLight: '--_mascbob-body-light',
+	bodyMid: '--_mascbob-body-mid',
+	bodyDark: '--_mascbob-body-dark',
+	visor: '--_mascbob-visor',
+	eye: '--_mascbob-eye',
+	cheek: '--_mascbob-cheek',
+	accent: '--_mascbob-accent'
 };
 
 /**
  * Theme as inline custom properties. They are private fallbacks: the component
- * reads `var(--mascott-eye, var(--_mascott-eye))`, so a consumer's own
- * `--mascott-*` variables (set on the mascot or any ancestor) win over the prop.
+ * reads `var(--mascbob-eye, var(--_mascbob-eye))`, so a consumer's own
+ * `--mascbob-*` variables (set on the mascot or any ancestor) win over the prop.
  */
 export function themeStyle(theme: ThemeColors): string {
 	return (Object.keys(CSS_VARS) as (keyof ThemeColors)[])

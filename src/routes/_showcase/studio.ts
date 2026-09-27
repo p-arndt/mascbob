@@ -317,5 +317,5 @@ export function svelteFile(c: StudioConfig): string {
 	const tag = attrs.length
 		? `<Mascot\n${attrs.map((a) => `\t${attrText(a)}`).join('\n')}\n/>`
 		: '<Mascot />';
-	return `<script>\n\timport { Mascot } from 'mascott';\n</script>\n\n${tag}\n`;
+	return `<script>\n\timport { Mascot } from 'mascbob';\n</script>\n\n${tag}\n`;
 }

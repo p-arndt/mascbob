@@ -61,7 +61,7 @@
 			['t-attr', '  import'],
 			['', ' { Mascot } '],
 			['t-attr', 'from'],
-			['t-str', " 'mascott'"],
+			['t-str', " 'mascbob'"],
 			['', ';']
 		],
 		[
@@ -99,11 +99,11 @@
 		[
 			['t-tag', '.brand'],
 			['', ' { '],
-			['t-attr', '--mascott-eye'],
+			['t-attr', '--mascbob-eye'],
 			['', ': '],
 			['t-str', '#00ffc6'],
 			['', '; '],
-			['t-attr', '--mascott-accent'],
+			['t-attr', '--mascbob-accent'],
 			['', ': '],
 			['t-str', '#ff4fd8'],
 			['', '; }']
@@ -120,7 +120,7 @@
 </script>
 
 <svelte:head>
-	<title>mascott · an animated companion for Svelte</title>
+	<title>mascbob · an animated companion for Svelte</title>
 	<meta
 		name="description"
 		content="An animated, endlessly customizable SVG mascot for Svelte 5: moods, themes, full body, outfits, shoes and voice lip-sync."
@@ -194,7 +194,7 @@
 					<div class="text">
 						<h3>Colorways for every brand</h3>
 						<p>
-							{themeNames.length} presets, per-color overrides, or plain <code>--mascott-*</code> CSS
+							{themeNames.length} presets, per-color overrides, or plain <code>--mascbob-*</code> CSS
 							variables.
 						</p>
 						<div class="swatches" role="group" aria-label="Try a colorway">

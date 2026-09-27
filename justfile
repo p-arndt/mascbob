@@ -1,5 +1,5 @@
-# mascott — task runner. Shared recipes live in .just/ (from p-arndt/just-common):
-# edit them there and run `just sync-common`. This file holds only mascott's own.
+# mascbob — task runner. Shared recipes live in .just/ (from p-arndt/just-common):
+# edit them there and run `just sync-common`. This file holds only mascbob's own.
 
 import '.just/common.just'
 import '.just/release.just'

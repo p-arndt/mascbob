@@ -33,7 +33,7 @@ function setup(reactions?: ReactionsInput) {
 		onreaction,
 		...(reactions === undefined ? {} : { reactions })
 	});
-	const el = container.querySelector('.mascott') as HTMLElement;
+	const el = container.querySelector('.mascbob') as HTMLElement;
 	return { el, onreaction };
 }
 

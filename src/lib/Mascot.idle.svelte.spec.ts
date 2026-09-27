@@ -43,7 +43,7 @@ describe('Mascot idle ladder', () => {
 		fake();
 		const onreaction = vi.fn();
 		const { container } = render(Mascot, { label: 'Buddy', motion: 'full', onreaction });
-		const el = container.querySelector('.mascott') as HTMLElement;
+		const el = container.querySelector('.mascbob') as HTMLElement;
 		await advance(REACTION_TIMING.boredAfter - 1000);
 		expect(el.getAttribute('data-mood')).toBe('idle');
 		await advance(1500);
@@ -64,7 +64,7 @@ describe('Mascot idle ladder', () => {
 		fake();
 		const { container } = render(Mascot, { interactive: false, motion: 'full' });
 		await advance(REACTION_TIMING.boredAfter * 2);
-		expect(container.querySelector('.mascott')?.getAttribute('data-mood')).toBe('idle');
+		expect(container.querySelector('.mascbob')?.getAttribute('data-mood')).toBe('idle');
 	});
 
 	it('moves nothing under reduced motion', async () => {
@@ -109,7 +109,7 @@ describe('Mascot gestures', () => {
 		for (const mood of ['waving', 'no-such-mood', 'laughing', 'nervous', 'sad', 'grumpy']) {
 			await rerender({ mood: mood as Mood });
 			await wait(120);
-			expect(container.querySelector('.mascott')?.getAttribute('data-mood')).toBe(mood);
+			expect(container.querySelector('.mascbob')?.getAttribute('data-mood')).toBe(mood);
 		}
 		await wait(400);
 		window.removeEventListener('error', onerror);

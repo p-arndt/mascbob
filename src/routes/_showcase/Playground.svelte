@@ -273,7 +273,7 @@
 
 	type Tab = 'svelte' | 'link';
 	let tab = $state<Tab>('svelte');
-	const INSTALL = 'pnpm add mascott';
+	const INSTALL = 'pnpm add mascbob';
 
 	const tokens = $derived<Token[][]>(svelteTokens(config));
 	const shareUrl = $derived.by(() => {
@@ -293,7 +293,7 @@
 				['t-kw', '  import'],
 				['t-p', ' { Mascot } '],
 				['t-kw', 'from'],
-				['t-str', " 'mascott'"],
+				['t-str', " 'mascbob'"],
 				['t-p', ';']
 			],
 			[
@@ -336,7 +336,7 @@
 		const rect = svg.getBoundingClientRect();
 		return { text: snapshotSvg(svg, rect), width: rect.width, height: rect.height };
 	}
-	const fileName = $derived(`mascott-${mood}-${theme}`);
+	const fileName = $derived(`mascbob-${mood}-${theme}`);
 
 	async function exportSvg() {
 		const s = await snapshot();

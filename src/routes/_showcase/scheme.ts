@@ -1,7 +1,7 @@
 export type Scheme = 'light' | 'dark';
 
 /** Must match the key the boot script in app.html reads before first paint. */
-export const SCHEME_KEY = 'mascott-theme';
+export const SCHEME_KEY = 'mascbob-theme';
 
 /** The scheme pinned on <html>, or null while the page follows the system. */
 export function pinnedScheme(): Scheme | null {

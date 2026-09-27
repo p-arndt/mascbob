@@ -28,9 +28,9 @@
 <svelte:window onscroll={() => (scrolled = scrollY > 8)} />
 
 <nav class:scrolled>
-	<a class="brand" href={resolve('/')} aria-label="mascott home">
+	<a class="brand" href={resolve('/')} aria-label="mascbob home">
 		<Mascot size={28} hands={false} float={false} interactive={false} label="" />
-		<span>mascott</span>
+		<span>mascbob</span>
 	</a>
 	<!-- resolve() takes no fragment, so the section links append one to the resolved home path. -->
 	<!-- eslint-disable svelte/no-navigation-without-resolve -->

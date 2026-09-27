@@ -30,7 +30,7 @@
 
 	interface Props {
 		mood?: Mood;
-		/** Preset name or `{ base?, ...colors }`. `--mascott-*` CSS variables override it. */
+		/** Preset name or `{ base?, ...colors }`. `--mascbob-*` CSS variables override it. */
 		theme?: ThemeInput;
 		shape?: Shape;
 		eyes?: EyeStyle;
@@ -90,7 +90,7 @@
 		effects = true,
 		motion = 'auto',
 		interactive = true,
-		label = 'Mascott',
+		label = 'Mascbob',
 		onboop,
 		reactions = true,
 		onreaction,
@@ -900,7 +900,7 @@
 	<button
 		bind:this={root}
 		type="button"
-		class="mascott {className}"
+		class="mascbob {className}"
 		class:still={reduced}
 		class:paused={!onscreen}
 		class:no-float={!float || standing}
@@ -933,7 +933,7 @@
 	<div
 		bind:this={root}
 		role="img"
-		class="mascott {className}"
+		class="mascbob {className}"
 		class:still={reduced}
 		class:paused={!onscreen}
 		class:no-float={!float || standing}
@@ -948,15 +948,15 @@
 {/if}
 
 <style>
-	.mascott {
-		--c-body-light: var(--mascott-body-light, var(--_mascott-body-light));
-		--c-body-mid: var(--mascott-body-mid, var(--_mascott-body-mid));
-		--c-body-dark: var(--mascott-body-dark, var(--_mascott-body-dark));
-		--c-visor: var(--mascott-visor, var(--_mascott-visor));
-		--c-eye: var(--mascott-eye, var(--_mascott-eye));
-		--c-cheek: var(--mascott-cheek, var(--_mascott-cheek));
-		--c-accent: var(--mascott-accent, var(--_mascott-accent));
-		--c-sprout: var(--mascott-sprout, #6fdc8c);
+	.mascbob {
+		--c-body-light: var(--mascbob-body-light, var(--_mascbob-body-light));
+		--c-body-mid: var(--mascbob-body-mid, var(--_mascbob-body-mid));
+		--c-body-dark: var(--mascbob-body-dark, var(--_mascbob-body-dark));
+		--c-visor: var(--mascbob-visor, var(--_mascbob-visor));
+		--c-eye: var(--mascbob-eye, var(--_mascbob-eye));
+		--c-cheek: var(--mascbob-cheek, var(--_mascbob-cheek));
+		--c-accent: var(--mascbob-accent, var(--_mascbob-accent));
+		--c-sprout: var(--mascbob-sprout, #6fdc8c);
 
 		--float-speed: 3.2s;
 
@@ -967,11 +967,11 @@
 		line-height: 0;
 		-webkit-tap-highlight-color: transparent;
 	}
-	button.mascott {
+	button.mascbob {
 		cursor: pointer;
 		border-radius: 50%;
 	}
-	button.mascott:focus-visible {
+	button.mascbob:focus-visible {
 		outline: 2px solid var(--c-accent);
 		outline-offset: 4px;
 	}

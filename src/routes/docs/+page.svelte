@@ -102,7 +102,7 @@
 </script>
 
 <svelte:head>
-	<title>Docs · mascott</title>
+	<title>Docs · mascbob</title>
 	<meta
 		name="description"
 		content="Everything <Mascot> can do: moods, colorways, shapes, accessories, outfits, reactions, voice lip-sync and styling."
@@ -154,7 +154,7 @@
 			<section id="install">
 				<h2>Install</h2>
 				<p>Svelte 5 is the only peer dependency.</p>
-				<CodeBlock code="pnpm add mascott" file="terminal" />
+				<CodeBlock code="pnpm add mascbob" file="terminal" />
 				<CodeBlock code={EXAMPLES.QUICK_START} file="App.svelte" />
 				<p>
 					Every list on this page is exported, so pickers you build stay in sync with the library:

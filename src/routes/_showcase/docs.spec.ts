@@ -39,7 +39,7 @@ describe('highlight', () => {
 	});
 
 	it('keeps every character of the source', () => {
-		const code = "import { Mascot } from 'mascott'; // hi";
+		const code = "import { Mascot } from 'mascbob'; // hi";
 		expect(
 			highlight(code)[0]
 				.map(([, t]) => t)

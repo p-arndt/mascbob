@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src=".github/assets/hero.svg" alt="mascott, a capsule-shaped robot mascot that hops through moods and outfits" width="720">
+<img src=".github/assets/hero.svg" alt="mascbob, a capsule-shaped robot mascot that hops through moods and outfits" width="720">
 
 <br>
 
@@ -24,7 +24,7 @@ cursor, reacts to boops, switches moods and lip-syncs to your voice.
 
 ---
 
-## Why mascott?
+## Why mascbob?
 
 |                         |                                                                                              |
 | ----------------------- | -------------------------------------------------------------------------------------------- |
@@ -38,14 +38,14 @@ cursor, reacts to boops, switches moods and lip-syncs to your voice.
 ## Install
 
 ```sh
-pnpm add mascott
+pnpm add mascbob
 ```
 
 ## Quick start
 
 ```svelte
 <script>
-	import { Mascot } from 'mascott';
+	import { Mascot } from 'mascbob';
 	let mood = $state('idle');
 </script>
 
@@ -100,7 +100,7 @@ The value lists grow over time, so the library exports them. Import `MOODS`, `SH
 every option or to build your own pickers:
 
 ```ts
-import { MOODS, SHAPES, EYE_STYLES, ACCESSORIES, OUTFITS, SHOES, BUILDS, THEMES } from 'mascott';
+import { MOODS, SHAPES, EYE_STYLES, ACCESSORIES, OUTFITS, SHOES, BUILDS, THEMES } from 'mascbob';
 ```
 
 | Prop          | Type                                                                                                   | Default    |
@@ -123,7 +123,7 @@ import { MOODS, SHAPES, EYE_STYLES, ACCESSORIES, OUTFITS, SHOES, BUILDS, THEMES 
 | `motion`      | `auto` (respects `prefers-reduced-motion`), `full`, `reduced`                                          | `auto`     |
 | `interactive` | render as a button that reacts to clicks                                                               | `true`     |
 | `reactions`   | pointer reactions: `true` (defaults), `false`, a list of `REACTIONS`, or `{ shy: true, bored: false }` | `true`     |
-| `label`       | accessible name                                                                                        | `Mascott`  |
+| `label`       | accessible name                                                                                        | `Mascbob`  |
 | `onboop`      | click/tap handler                                                                                      | –          |
 | `onreaction`  | called with a `ReactionEvent` (`pet`, `startle`, `dizzy`, `shy`, `tickle`, `bored`, `wake`)            | –          |
 | `accessory`   | snippet `({ top, halfWidth })` drawing custom SVG in the head's 200×200 viewBox                        | –          |
@@ -134,14 +134,14 @@ Every color is also a CSS variable, which wins over the `theme` prop:
 
 ```css
 .brand {
-	--mascott-body-light: #fff;
-	--mascott-body-mid: #ffe1f0;
-	--mascott-body-dark: #ffb3d9;
-	--mascott-visor: #1b1030;
-	--mascott-eye: #00ffc6;
-	--mascott-cheek: #ff7ab8;
-	--mascott-accent: #ff4fd8;
-	--mascott-sprout: #6fdc8c;
+	--mascbob-body-light: #fff;
+	--mascbob-body-mid: #ffe1f0;
+	--mascbob-body-dark: #ffb3d9;
+	--mascbob-visor: #1b1030;
+	--mascbob-eye: #00ffc6;
+	--mascbob-cheek: #ff7ab8;
+	--mascbob-accent: #ff4fd8;
+	--mascbob-sprout: #6fdc8c;
 }
 ```
 
@@ -162,7 +162,7 @@ that is a few lines:
 
 ```svelte
 <script>
-	import { Mascot } from 'mascott';
+	import { Mascot } from 'mascbob';
 	let level = $state(0);
 
 	async function listen() {

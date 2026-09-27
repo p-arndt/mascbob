@@ -103,7 +103,7 @@ export const PROPS: PropDoc[] = [
 		default: 'true',
 		description: 'Renders a real `<button>` that squishes and fires `onboop`.'
 	},
-	{ name: 'label', type: 'string', default: "'Mascott'", description: 'Accessible name.' },
+	{ name: 'label', type: 'string', default: "'Mascbob'", description: 'Accessible name.' },
 	{
 		name: 'onboop',
 		type: '() => void',
@@ -144,20 +144,20 @@ export const REACTION_DOCS: Record<string, string> = {
 };
 
 export const CSS_VARS = [
-	['--mascott-body-light', 'Body highlight'],
-	['--mascott-body-mid', 'Body base color'],
-	['--mascott-body-dark', 'Body shade'],
-	['--mascott-visor', 'Ink: soles, outlines'],
-	['--mascott-eye', 'Face print'],
-	['--mascott-cheek', 'Blush'],
-	['--mascott-accent', 'Accent plate and gear'],
-	['--mascott-sprout', 'Sprout accessory']
+	['--mascbob-body-light', 'Body highlight'],
+	['--mascbob-body-mid', 'Body base color'],
+	['--mascbob-body-dark', 'Body shade'],
+	['--mascbob-visor', 'Ink: soles, outlines'],
+	['--mascbob-eye', 'Face print'],
+	['--mascbob-cheek', 'Blush'],
+	['--mascbob-accent', 'Accent plate and gear'],
+	['--mascbob-sprout', 'Sprout accessory']
 ] as const;
 
 /** Code shown on the docs page; kept out of the .svelte file because it contains <script> tags. */
 export const EXAMPLES = {
 	QUICK_START: `<script>
-  import { Mascot } from 'mascott';
+  import { Mascot } from 'mascbob';
   let mood = $state('idle');
 </script>
 
@@ -175,7 +175,7 @@ export const EXAMPLES = {
 />`,
 
 	VOICE_CODE: `<script>
-  import { Mascot } from 'mascott';
+  import { Mascot } from 'mascbob';
   let level = $state(0);
 
   async function listen() {
@@ -209,7 +209,7 @@ ${CSS_VARS.map(([v]) => `  ${v}: …;`).join('\n')}
   {/snippet}
 </Mascot>`,
 
-	LISTS_CODE: `import { MOODS, SHAPES, EYE_STYLES, ACCESSORIES, OUTFITS, SHOES, THEMES, REACTIONS } from 'mascott';`
+	LISTS_CODE: `import { MOODS, SHAPES, EYE_STYLES, ACCESSORIES, OUTFITS, SHOES, THEMES, REACTIONS } from 'mascbob';`
 };
 
 const PATTERN =

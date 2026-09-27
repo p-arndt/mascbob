@@ -63,7 +63,7 @@ export interface MascotContext {
 	readonly reaction: Reaction | null;
 }
 
-const KEY = Symbol('mascott');
+const KEY = Symbol('mascbob');
 
 export function setMascot(ctx: MascotContext): void {
 	setContext(KEY, ctx);
