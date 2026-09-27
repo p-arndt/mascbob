@@ -51,6 +51,32 @@ export const SHAPE_DEFS: Record<Shape, ShapeDef> = {
 		top: 36,
 		bottom: 168,
 		halfWidth: 66
+	},
+	// The ears poke above `top` on purpose: hats sit on the crown between them, not on the tips.
+	cat: {
+		d: 'M36 110C36 84 40 64 46 54L48 30Q50 20 58 26L80 44Q100 40 120 44L142 26Q150 20 152 30L154 54C160 64 164 84 164 110C164 150 138 170 100 170C62 170 36 150 36 110Z',
+		top: 44,
+		bottom: 170,
+		halfWidth: 64
+	},
+	egg: {
+		d: 'M100 28C136 28 160 76 160 116C160 150 134 172 100 172C66 172 40 150 40 116C40 76 64 28 100 28Z',
+		top: 28,
+		bottom: 172,
+		halfWidth: 58
+	},
+	// Slightly bulging sides so it reads as an old CRT set rather than a squircle.
+	tv: {
+		d: 'M48 46L152 46Q172 46 172 66Q175 105 172 144Q172 164 152 164L48 164Q28 164 28 144Q25 105 28 66Q28 46 48 46Z',
+		top: 46,
+		bottom: 164,
+		halfWidth: 72
+	},
+	cloud: {
+		d: 'M60 168C40 168 30 154 38 140C26 134 26 108 42 104C34 80 52 62 72 68C72 38 128 38 128 68C148 62 166 80 158 104C174 108 174 134 162 140C170 154 160 168 140 168Z',
+		top: 46,
+		bottom: 168,
+		halfWidth: 62
 	}
 };
 
