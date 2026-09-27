@@ -1,7 +1,17 @@
 <script lang="ts">
 	import { getMascot, svgRef } from '../context.js';
 	import { SPARKLE_PATH } from '../geometry.js';
-	import { AUDIO_MOODS, BLOOM_MOODS, starPath, type Accessory } from './accessories.js';
+	import {
+		AUDIO_MOODS,
+		BLOOM_MOODS,
+		DROP_MOODS,
+		HOT_MOODS,
+		WILT_MOODS,
+		propellerSpin,
+		starPath,
+		type Accessory
+	} from './accessories.js';
+	import { MISPRINT } from './face.js';
 
 	/** `back` draws behind the head shell, `front` on top of the face. */
 	let { layer }: { layer: 'back' | 'front' } = $props();
@@ -25,6 +35,22 @@
 
 	const beanieW = $derived(hw * 0.8 + 6);
 	const STAR = starPath(8);
+	const HAT_DOTS = [
+		[-7, -6, 2.2],
+		[6, -12, 2.2],
+		[-2, -20, 2],
+		[8.5, -2.5, 1.8],
+		[0.5, -29, 1.6]
+	];
+
+	const hot = $derived(HOT_MOODS.includes(m.mood));
+	const dropped = $derived(DROP_MOODS.includes(m.mood));
+	const wilt = $derived(WILT_MOODS.includes(m.mood));
+	const spin = $derived(propellerSpin(m.mood));
+	const capW = $derived(hw * 0.5 + 8);
+	// Handlebar mustache around the origin; the ends curl up past the lip line.
+	const MUSTACHE =
+		'M0 -1.5C-4 -5 -10 -5 -14 -1C-17 2 -20 2 -22 -1C-21 4 -16 6 -11 4C-6 2 -2 1 0 2C2 1 6 2 11 4C16 6 21 4 22 -1C20 2 17 2 14 -1C10 -5 4 -5 0 -1.5Z';
 </script>
 
 {#if layer === 'back'}
@@ -126,7 +152,33 @@
 			</g>
 		</g>
 	{/if}
+	{#if has('horns')}
+		{#each [-1, 1] as s (s)}
+			<g transform="translate(100 0) scale({s} 1) translate(-100 0)">
+				<g transform="translate({100 - hw * 0.42} {t + 12}) rotate(-14)" class:hot>
+					<path
+						class="horn-glow"
+						d="M-8 6C-10 -6 -12 -14 -10 -22C-4 -16 6 -8 8 6Z"
+						filter={ref('soft')}
+					/>
+					<path class="horn" d="M-8 6C-10 -6 -12 -14 -10 -22C-4 -16 6 -8 8 6Z" />
+					<path class="horn-ring" d="M-9 -3Q-1 -1 5 -4M-10 -10Q-5 -9 -1 -12" />
+					<path class="horn-shine" d="M-6 0C-7.5 -7 -8.5 -12 -8.8 -17" />
+				</g>
+			</g>
+		{/each}
+	{/if}
 {:else}
+	{#if has('mustache')}
+		<g transform="translate({100 + m.gazeX * 6} {107.5 + m.gazeY * 5 - m.talk * 2}) scale(0.82)">
+			<path
+				class="stache stache-accent"
+				d={MUSTACHE}
+				transform="translate({MISPRINT.x} {MISPRINT.y})"
+			/>
+			<path class="stache" d={MUSTACHE} />
+		</g>
+	{/if}
 	{#if has('headphones')}
 		{#each [-1, 1] as s (s)}
 			<g transform="translate(100 0) scale({s} 1) translate(-100 0)">
@@ -206,6 +258,56 @@
 			</g>
 		</g>
 	{/if}
+	{#if has('propeller')}
+		{@const w = capW}
+		<g class="propeller">
+			<path
+				class="cap"
+				d="M{100 - w} {t + 16}C{100 - w} {t - 10} {100 + w} {t - 10} {100 + w} {t + 16}Q100 {t +
+					11} {100 - w} {t + 16}Z"
+			/>
+			<path
+				class="cap-gore"
+				d="M{100 - w * 0.34} {t + 12.4}Q{100 - w * 0.3} {t - 1} 100 {t - 3.5}Q{100 + w * 0.3} {t -
+					1} {100 + w * 0.34} {t + 12.4}Q100 {t + 11.2} {100 - w * 0.34} {t + 12.4}Z"
+			/>
+			<path
+				class="cap-band"
+				d="M{100 - w + 0.5} {t + 14.5}Q100 {t + 9.5} {100 + w - 0.5} {t + 14.5}"
+			/>
+			<path
+				class="knit-shine"
+				d="M{100 - w * 0.72} {t + 8}C{100 - w * 0.7} {t + 1} {100 - w * 0.55} {t - 2.5} {100 -
+					w * 0.4} {t - 3}"
+			/>
+			<path class="prop-stem" d="M100 {t - 3}V{t - 12}" />
+			<g transform="translate(100 {t - 13})">
+				<g class="prop" class:spinning={spin > 0} style:animation-duration="{spin || 1}s">
+					<ellipse class="blade blade-a" cx="-9" cy="0" rx="9" ry="2.6" />
+					<ellipse class="blade blade-b" cx="9" cy="0" rx="9" ry="2.6" />
+				</g>
+				<circle class="prop-hub" r="2.6" />
+			</g>
+		</g>
+	{/if}
+	{#if has('party-hat')}
+		<g transform="translate({100 - hw * 0.22} {t + 8}) rotate(-14)">
+			<g class="hat-bob">
+				<path class="hat" d="M-17 0L-1.2 -37.5Q0 -39.5 1.2 -37.5L17 0Q0 6 -17 0Z" />
+				{#each HAT_DOTS as [x, y, r] (`${x},${y}`)}
+					<circle class="hat-dot" cx={x} cy={y} {r} />
+				{/each}
+				<path class="hat-shine" d="M-11 -6L-3 -28" />
+				<path class="hat-trim" d="M-18 -0.5Q0 5.5 18 -0.5" />
+				<g transform="translate(0 -39)">
+					<circle class="hat-pom" r="3.6" />
+					<circle class="hat-pom" cx="-3" cy="-1.5" r="2.4" />
+					<circle class="hat-pom" cx="3" cy="-1.5" r="2.4" />
+					<circle class="pom-shine" cx="-1" cy="-1.8" r="1.1" />
+				</g>
+			</g>
+		</g>
+	{/if}
 	{#if has('crown')}
 		<g transform="translate({100 + hw * 0.12} {t + 4}) rotate(-9) scale(1.15)">
 			<g class="crown-bounce">
@@ -248,6 +350,29 @@
 			</g>
 		</g>
 	{/if}
+	{#if has('flower')}
+		<g transform="translate({100 - hw * 0.86} {t + 38})">
+			<g class="blossom-sway">
+				<g class="blossom" class:bloom class:wilt>
+					<path class="blossom-leaf" d="M2 4C8 6 14 12 15 17C9 17 3 12 2 4Z" />
+					{#each [0, 60, 120, 180, 240, 300] as a (a)}
+						<ellipse
+							class="blossom-petal"
+							cx="0"
+							cy="-6"
+							rx="4.2"
+							ry="6.4"
+							transform="rotate({a})"
+						/>
+					{/each}
+					<circle class="blossom-heart" r="3.6" />
+					{#each [0, 120, 240] as a (a)}
+						<circle class="blossom-seed" cx="0" cy="-1.5" r="0.7" transform="rotate({a})" />
+					{/each}
+				</g>
+			</g>
+		</g>
+	{/if}
 	{#if has('glasses')}
 		<g transform="translate({gx} {gy})">
 			{#each [80, 120] as cx (cx)}
@@ -258,6 +383,16 @@
 			<path class="rim" d="M96 93Q100 89.5 104 93" />
 			<path class="rim temple" d="M63.5 94L{100 - visorHalf - 1} 91" />
 			<path class="rim temple" d="M136.5 94L{100 + visorHalf + 1} 91" />
+		</g>
+	{/if}
+	{#if has('monocle')}
+		<g transform="translate({gx} {gy})">
+			<g class="monocle" class:dropped style:transform-origin="120px 96px">
+				<path class="chain" d="M131 107Q137 134 {100 + hw * 0.78} 152" />
+				<circle class="lens" cx="120" cy="96" r="15" />
+				<path class="lens-glint" d="M111 90L117 84M110 96L119 87" />
+				<circle class="monocle-rim" cx="120" cy="96" r="15" stroke={ref('gold')} />
+			</g>
 		</g>
 	{/if}
 {/if}
@@ -627,6 +762,186 @@
 		opacity: 0.8;
 	}
 
+	/* horns */
+	.horn {
+		fill: color-mix(in oklab, var(--c-accent), #000 8%);
+		stroke: color-mix(in oklab, var(--c-accent), #000 25%);
+		stroke-width: 0.8;
+		stroke-linejoin: round;
+		transition: fill 0.4s;
+	}
+	.hot .horn {
+		fill: color-mix(in oklab, var(--c-accent), #ff3b1f 60%);
+	}
+	.horn-glow {
+		fill: #ff5a2a;
+		opacity: 0;
+		transition: opacity 0.4s;
+	}
+	.hot .horn-glow {
+		opacity: 0.7;
+		animation: breathe-glow 0.9s ease-in-out infinite alternate;
+	}
+	.horn-ring {
+		fill: none;
+		stroke: color-mix(in oklab, var(--c-accent), #000 30%);
+		stroke-width: 1;
+		stroke-linecap: round;
+		opacity: 0.45;
+	}
+	.horn-shine {
+		fill: none;
+		stroke: #fff;
+		stroke-width: 1.4;
+		stroke-linecap: round;
+		opacity: 0.55;
+	}
+
+	/* mustache: inked twice like the face, with the accent plate slightly off register */
+	.stache {
+		fill: var(--c-eye);
+		stroke: var(--c-eye);
+		stroke-width: 0.6;
+		stroke-linejoin: round;
+	}
+	.stache-accent {
+		fill: var(--c-accent);
+		stroke: var(--c-accent);
+		opacity: 0.9;
+	}
+
+	/* propeller cap */
+	.cap {
+		fill: var(--c-accent);
+	}
+	.cap-gore {
+		fill: var(--c-cheek);
+	}
+	.cap-band {
+		fill: none;
+		stroke: color-mix(in oklab, var(--c-accent), #000 20%);
+		stroke-width: 2.4;
+		stroke-linecap: round;
+	}
+	.prop-stem {
+		stroke: var(--c-body-dark);
+		stroke-width: 2.2;
+		stroke-linecap: round;
+	}
+	.blade {
+		stroke: color-mix(in oklab, var(--c-body-dark), transparent 40%);
+		stroke-width: 0.6;
+	}
+	.blade-a {
+		fill: var(--c-accent);
+	}
+	.blade-b {
+		fill: var(--c-cheek);
+	}
+	.prop-hub {
+		fill: #ffd66b;
+		stroke: #e9a92f;
+		stroke-width: 0.8;
+	}
+	/* Seen from the front, a turning propeller only changes its apparent width. */
+	.prop.spinning {
+		animation: prop-spin 1s ease-in-out infinite alternate;
+	}
+
+	/* party hat */
+	.hat {
+		fill: var(--c-accent);
+		stroke: color-mix(in oklab, var(--c-accent), #000 18%);
+		stroke-width: 0.8;
+		stroke-linejoin: round;
+	}
+	.hat-dot {
+		fill: var(--c-body-light);
+		opacity: 0.9;
+	}
+	.hat-shine {
+		fill: none;
+		stroke: #fff;
+		stroke-width: 1.6;
+		stroke-linecap: round;
+		opacity: 0.4;
+	}
+	.hat-trim {
+		fill: none;
+		stroke: var(--c-body-light);
+		stroke-width: 3.2;
+		stroke-linecap: round;
+		stroke-dasharray: 0.1 3.6;
+	}
+	.hat-pom {
+		fill: var(--c-cheek);
+	}
+	.hat-bob {
+		animation: bob 2s ease-in-out 0.3s infinite alternate;
+	}
+
+	/* hair flower */
+	.blossom-sway {
+		animation: sway 3.6s ease-in-out infinite alternate;
+	}
+	.blossom {
+		transition:
+			transform 0.6s cubic-bezier(0.34, 1.6, 0.5, 1),
+			filter 0.6s;
+	}
+	.blossom.bloom {
+		transform: scale(1.18) rotate(20deg);
+	}
+	.blossom.wilt {
+		transform: translateY(2px) scale(0.86) rotate(-28deg);
+		filter: saturate(0.45);
+	}
+	.blossom-leaf {
+		fill: var(--c-sprout);
+	}
+	.blossom-petal {
+		fill: var(--c-cheek);
+		stroke: #fff;
+		stroke-width: 0.7;
+		stroke-opacity: 0.7;
+	}
+	.blossom-heart {
+		fill: #ffd66b;
+		stroke: #f2a93a;
+		stroke-width: 0.6;
+	}
+	.blossom-seed {
+		fill: #f2a93a;
+	}
+
+	/* monocle */
+	.monocle {
+		transform-box: view-box;
+		transition: transform 0.55s cubic-bezier(0.34, 1.5, 0.5, 1);
+	}
+	.monocle.dropped {
+		transform: translate(4px, 18px) rotate(24deg);
+	}
+	.monocle-rim {
+		fill: none;
+		stroke-width: 2.8;
+	}
+	.chain {
+		fill: none;
+		stroke: #f2a93a;
+		stroke-width: 1.6;
+		stroke-linecap: round;
+		stroke-dasharray: 0.1 3.2;
+	}
+
+	@keyframes prop-spin {
+		from {
+			transform: scaleX(1);
+		}
+		to {
+			transform: scaleX(-1);
+		}
+	}
 	@keyframes glint {
 		0%,
 		55%,
