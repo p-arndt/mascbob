@@ -50,7 +50,7 @@ import { MOODS, SHAPES, EYE_STYLES, ACCESSORIES, OUTFITS, SHOES, THEMES } from '
 | ------------- | ------------------------------------------------------------------------------------------------------ | --------- |
 | `mood`        | one of `MOODS`                                                                                         | `idle`    |
 | `theme`       | a key of `THEMES`, or `{ base?, bodyLight, bodyMid, bodyDark, visor, eye, cheek, accent }`             | `og`      |
-| `shape`       | one of `SHAPES` (head silhouette)                                                                      | `pebble`  |
+| `shape`       | one of `SHAPES` (head silhouette)                                                                      | `capsule` |
 | `eyes`        | one of `EYE_STYLES`                                                                                    | `round`   |
 | `accessories` | array of `ACCESSORIES`                                                                                 | `[]`      |
 | `body`        | full figure with arms and legs, 2:3 (`size` is the width); `false` shows just the head                 | `true`    |
