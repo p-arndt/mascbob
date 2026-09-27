@@ -31,10 +31,10 @@ describe('share links', () => {
 
 	it('ignores invalid values', () => {
 		const c = fromQuery(
-			new URLSearchParams('mood=evil&acc=ring,bogus&size=9999&accent=zzz&shoes=heels')
+			new URLSearchParams('mood=evil&acc=halo,ring&size=9999&accent=zzz&shoes=heels')
 		);
 		expect(c.mood).toBe('idle');
-		expect(c.accessories).toEqual(['ring']);
+		expect(c.accessories).toEqual(['halo']);
 		expect(c.size).toBe(160);
 		expect(c.colors).toEqual({});
 		expect(c.shoes).toBe('none');

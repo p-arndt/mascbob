@@ -154,7 +154,6 @@
 				body
 				outfit="puffer"
 				shoes="sneakers"
-				accessories={['ring']}
 				size="min(330px, 58vw)"
 				label="mascott, boop me"
 				onboop={boop}

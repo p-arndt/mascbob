@@ -1,5 +1,4 @@
 export const ACCESSORIES = [
-	'ring',
 	'halo',
 	'antenna',
 	'ears',

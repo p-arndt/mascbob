@@ -7,7 +7,15 @@ import { ACCESSORIES } from './accessories.js';
 describe('accessories and effects', () => {
 	it('renders every accessory without errors', async () => {
 		const { container } = render(Mascot, { accessories: [...ACCESSORIES] });
-		for (const cls of ['.crown', '.bow-knot', '.rim', '.star', '.cuff', '.antenna-tip', '.ring']) {
+		for (const cls of [
+			'.crown',
+			'.bow-knot',
+			'.rim',
+			'.star',
+			'.cuff',
+			'.antenna-tip',
+			'.halo-core'
+		]) {
 			expect(container.querySelector(cls), cls).not.toBeNull();
 		}
 	});

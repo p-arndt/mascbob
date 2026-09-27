@@ -32,7 +32,7 @@ describe('Mascot', () => {
 	it('draws only the requested accessories', async () => {
 		const { container } = render(Mascot, { accessories: ['antenna'] });
 		expect(container.querySelector('.antenna-tip')).not.toBeNull();
-		expect(container.querySelector('.ring')).toBeNull();
+		expect(container.querySelector('.halo-core')).toBeNull();
 	});
 
 	it('applies the theme as overridable custom properties', async () => {

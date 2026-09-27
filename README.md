@@ -18,7 +18,7 @@ pnpm add mascott
 	let mood = $state('idle');
 </script>
 
-<Mascot {mood} theme="og" accessories={['ring']} onboop={() => (mood = 'love')} />
+<Mascot {mood} theme="og" onboop={() => (mood = 'love')} />
 ```
 
 It reacts to the pointer: its head tilts toward the cursor, stroke over its head to pet it, circle around it to make it dizzy,

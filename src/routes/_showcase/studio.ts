@@ -65,7 +65,7 @@ export const LIBRARY_DEFAULTS: StudioConfig = {
 export const STUDIO_START: StudioConfig = {
 	...LIBRARY_DEFAULTS,
 	mood: 'happy',
-	accessories: ['ring'],
+	accessories: [],
 	outfit: 'puffer',
 	shoes: 'sneakers',
 	size: 240

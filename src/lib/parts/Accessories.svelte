@@ -18,10 +18,6 @@
 	const audio = $derived(AUDIO_MOODS.includes(m.mood));
 	const talkBars = $derived([0.65, 1, 0.8].map((k) => 3 + m.talk * 10 * k));
 
-	// Points on the front half of the ring (angle in radians, 0 = right tip).
-	const RING_GLINTS = [0.35, 1.15, 1.95, 2.75];
-	const ringPoint = (a: number) => [100 + 96 * Math.cos(a), 134 + 16 * Math.sin(a)];
-
 	// Glasses follow the gaze a bit less than the eyes so the eyes can roam inside the rims.
 	const gx = $derived(m.gazeX * 4.5);
 	const gy = $derived(m.gazeY * 3.5);
@@ -31,29 +27,8 @@
 	const STAR = starPath(8);
 </script>
 
-{#snippet moon()}
-	<g class="moon-x">
-		<g class="moon-y">
-			<circle class="moon-glow" r="7" filter={ref('soft')} />
-			<circle r="4.6" fill={ref('moon')} />
-			<circle class="crater" cx="-1.4" cy="0.8" r="1.1" />
-			<circle class="crater" cx="1.6" cy="-1" r="0.7" />
-		</g>
-	</g>
-{/snippet}
-
 {#if layer === 'back'}
 	<defs>
-		<clipPath id="{m.uid}-ring-back" clipPathUnits="userSpaceOnUse">
-			<rect x="-20" y="-20" width="240" height="154" />
-		</clipPath>
-		<clipPath id="{m.uid}-ring-front" clipPathUnits="userSpaceOnUse">
-			<rect x="-20" y="134" width="240" height="86" />
-		</clipPath>
-		<radialGradient id="{m.uid}-moon" cx="0.35" cy="0.3" r="0.8">
-			<stop offset="0" stop-color="#fff" />
-			<stop offset="1" class="stop-mid" />
-		</radialGradient>
 		<radialGradient id="{m.uid}-ear-inner" cx="0.5" cy="0.75" r="0.8">
 			<stop offset="0" class="stop-cheek" stop-opacity="0.95" />
 			<stop offset="0.7" class="stop-cheek" stop-opacity="0.45" />
@@ -70,13 +45,6 @@
 			<stop offset="1" class="stop-accent" />
 		</radialGradient>
 	</defs>
-	{#if has('ring')}
-		<g transform="rotate(-8 100 134)" clip-path={ref('ring-back')}>
-			<ellipse class="ring-band" cx="100" cy="134" rx="96" ry="16" />
-			<ellipse class="ring" cx="100" cy="134" rx="96" ry="16" />
-			<g transform="translate(100 134)">{@render moon()}</g>
-		</g>
-	{/if}
 	{#if has('ears')}
 		{#each [-1, 1] as s (s)}
 			<g
@@ -159,24 +127,6 @@
 		</g>
 	{/if}
 {:else}
-	{#if has('ring')}
-		<g transform="rotate(-8 100 134)" clip-path={ref('ring-front')}>
-			<ellipse class="ring-band" cx="100" cy="134" rx="96" ry="16" />
-			<ellipse class="ring" cx="100" cy="134" rx="96" ry="16" />
-			<ellipse class="ring-dash" cx="100" cy="134" rx="96" ry="16" />
-			{#each RING_GLINTS as a, i (i)}
-				{@const [x, y] = ringPoint(a)}
-				<g transform="translate({x} {y}) scale(3.4)">
-					<path
-						class="ring-glint"
-						d={SPARKLE_PATH}
-						style:animation-delay="{i * 0.55 - (i % 2) * 0.3}s"
-					/>
-				</g>
-			{/each}
-			<g transform="translate(100 134)">{@render moon()}</g>
-		</g>
-	{/if}
 	{#if has('headphones')}
 		{#each [-1, 1] as s (s)}
 			<g transform="translate(100 0) scale({s} 1) translate(-100 0)">
@@ -313,9 +263,6 @@
 {/if}
 
 <style>
-	.stop-mid {
-		stop-color: var(--c-body-mid);
-	}
 	.stop-cheek {
 		stop-color: var(--c-cheek);
 	}
@@ -323,57 +270,6 @@
 		stop-color: var(--c-accent);
 	}
 
-	/* ring */
-	.ring {
-		fill: none;
-		stroke: var(--c-accent);
-		stroke-width: 2.6;
-		stroke-opacity: 0.9;
-	}
-	.ring-band {
-		fill: none;
-		stroke: var(--c-accent);
-		stroke-width: 8;
-		stroke-opacity: 0.18;
-	}
-	.ring-dash {
-		fill: none;
-		stroke: #fff;
-		stroke-width: 2.6;
-		stroke-linecap: round;
-		stroke-dasharray: 0.5 26;
-		opacity: 0.9;
-		animation: orbit 6s linear infinite;
-	}
-	.ring-glint {
-		fill: #fff;
-		transform-box: fill-box;
-		transform-origin: center;
-		animation: glint 2.2s ease-in-out infinite;
-	}
-	.moon-x {
-		animation: moon-x 3.2s cubic-bezier(0.37, 0, 0.63, 1) infinite alternate;
-	}
-	.moon-y {
-		animation: moon-y 3.2s cubic-bezier(0.37, 0, 0.63, 1) -1.6s infinite alternate;
-	}
-	.moon-glow {
-		fill: var(--c-accent);
-		opacity: 0.55;
-	}
-	.crater {
-		fill: var(--c-body-dark);
-		opacity: 0.45;
-	}
-	/* Parked in front of the face when motion is reduced. */
-	:global(.still) .moon-x {
-		transform: translateX(-62px);
-	}
-	:global(.still) .moon-y {
-		transform: translateY(12px);
-	}
-
-	/* halo */
 	.halo-bob {
 		animation: bob 2.4s ease-in-out infinite alternate;
 	}
@@ -731,11 +627,6 @@
 		opacity: 0.8;
 	}
 
-	@keyframes orbit {
-		to {
-			stroke-dashoffset: -106;
-		}
-	}
 	@keyframes glint {
 		0%,
 		55%,
@@ -746,22 +637,6 @@
 		75% {
 			transform: scale(1) rotate(45deg);
 			opacity: 1;
-		}
-	}
-	@keyframes moon-x {
-		from {
-			transform: translateX(-96px);
-		}
-		to {
-			transform: translateX(96px);
-		}
-	}
-	@keyframes moon-y {
-		from {
-			transform: translateY(-16px);
-		}
-		to {
-			transform: translateY(16px);
 		}
 	}
 	@keyframes bob {
