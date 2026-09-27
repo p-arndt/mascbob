@@ -93,20 +93,25 @@
 	const sq = $derived(clamp(squeeze.current, 0, 1));
 	const pop = $derived(1 + Math.max(0, -squeeze.current) * 0.6);
 	const grow = $derived(1 + curious.current * 0.1);
-	const eyeY = $derived(96 + m.gazeY * 6 + saccade.current.y);
+	const eyeY = $derived(96 + m.gazeY * 9 + saccade.current.y);
 	// Syllables knock the accent plate around a little, like a speaker cone.
 	const offset = $derived({ x: plate.current.x + talk * 1.6, y: plate.current.y - talk * 1.1 });
 
 	function eye(p: EyeParams, baseX: number, side: Side) {
 		const base = EYE_SIZES[m.eyes] ?? EYE_SIZES.round;
-		const cx = baseX + m.gazeX * 8 + saccade.current.x;
+		const outward = side === 'left' ? -1 : 1;
+		// A close pointer pulls both eyes toward it (vergence); eyes travel furthest of all
+		// features, which is what makes the flat face read as a turning head.
+		const cx = baseX + m.gazeX * 9 + saccade.current.x - outward * m.focus * 2.6;
 		const heart = clamp(p.heart, 0, 1);
-		const size = p.scale * grow * pop * (1 - heart);
+		const size = p.scale * grow * pop * (1 - heart) * (1 + m.focus * 0.08);
 		const fullH = base.h * size;
+		// The eye on the side we look toward rolls onto the edge of the head and foreshortens.
+		const turn = 1 - Math.max(0, outward * m.gazeX) * 0.16;
 		const shape: EyeShape = {
 			cx,
 			cy: eyeY,
-			w: base.w * size,
+			w: base.w * size * turn,
 			h: fullH * Math.max(0, p.open) * (1 - m.blink) * (1 - sq),
 			round: base.round,
 			lift: p.lift,
@@ -181,7 +186,7 @@
 
 <!-- Halftone cheeks: blush grows the dots rather than fading them, like more ink on the screen. -->
 {#each [-1, 1] as side (side)}
-	<g class="cheek" transform="translate({100 + side * cheekX} 112)">
+	<g class="cheek" transform="translate({100 + side * cheekX + m.gazeX * 4} {112 + m.gazeY * 2.5})">
 		{#each DOTS as d, i (i)}
 			<circle cx={d.x} cy={d.y} r={d.r * blush} />
 		{/each}
@@ -254,8 +259,8 @@
 			<g clip-path={ref(`eye-clip-${i}`)} opacity={e.shine}>
 				<ellipse
 					class="shine"
-					cx={e.shape.cx + e.shape.w * 0.2}
-					cy={e.shape.cy - e.shape.h * 0.2}
+					cx={e.shape.cx + e.shape.w * (0.2 - m.gazeX * 0.14)}
+					cy={e.shape.cy - e.shape.h * (0.2 + m.gazeY * 0.1)}
 					rx={e.shape.w * 0.17}
 					ry={e.shape.h * 0.14}
 				/>

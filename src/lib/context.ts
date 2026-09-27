@@ -20,6 +20,8 @@ export interface MascotContext {
 	/** Where the eyes look, -1..1 on both axes (pointer/wander plus the mood's own gaze). */
 	readonly gazeX: number;
 	readonly gazeY: number;
+	/** 0..1, how close the pointer is to the face. */
+	readonly focus: number;
 	/** Extra mouth opening 0..1 from speech. */
 	readonly talk: number;
 	readonly shape: ShapeDef;

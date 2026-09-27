@@ -14,6 +14,7 @@
 	import Shell from './parts/Shell.svelte';
 	import { moodConfig } from './moods.js';
 	import { createBabble } from './speech.js';
+	import { aimAt, saccade } from './gaze.js';
 	import {
 		ReactionController,
 		resolveReactions,
@@ -115,7 +116,12 @@
 		easing: cubicOut
 	});
 	const blink = new Tween(0, { duration: 70 });
-	const gaze = new Spring({ x: 0, y: 0 }, { stiffness: 0.07, damping: 0.45 });
+	/** Face center in head coordinates, where the eyes aim from. */
+	const FACE_Y = 100;
+	// Stiff and well damped: eyes snap to a new target and hold it, like real saccades.
+	const gaze = new Spring({ x: 0, y: 0 }, { stiffness: 0.24, damping: 0.74 });
+	/** 0..1, how close the pointer is to the face; the eyes converge and widen on it. */
+	const focus = new Spring(0, { stiffness: 0.1, damping: 0.6 });
 	const squish = new Spring({ x: 1, y: 1 }, { stiffness: 0.16, damping: 0.18 });
 	/** Degrees; the head tilts toward the pointer on its neck while the body stays planted. */
 	const headTurn = new Spring(0, { stiffness: 0.07, damping: 0.42 });
@@ -288,18 +294,28 @@
 			idleTimer = setTimeout(glanceAround, 4000);
 		};
 		armIdle();
+		let fixed = { x: 0, y: 0 };
 		const move = (e: PointerEvent) => {
 			armIdle();
 			if (!root || reactor.holdsGaze) return;
 			const rect = root.getBoundingClientRect();
-			// Normalize by a reach larger than the mascot so the eyes keep following far-away pointers.
-			const reach = Math.max(rect.width * 2, 240);
-			gaze.target = {
-				x: clamp((e.clientX - (rect.left + rect.width / 2)) / reach, -1, 1),
-				y: clamp((e.clientY - (rect.top + rect.height * 0.45)) / reach, -1, 1)
-			};
+			// Aim from the face, not the middle of the figure.
+			const faceY = rect.top + rect.height * (FACE_Y / viewH);
+			const aim = aimAt(e.clientX - (rect.left + rect.width / 2), e.clientY - faceY, rect.width);
+			focus.target = reduced ? 0 : aim.focus;
+			const next = { x: clamp(aim.x, -1, 1), y: clamp(aim.y, -1, 1) };
+			const s = saccade(fixed, next);
+			if (!s.jump) return;
+			fixed = next;
+			gaze.target = next;
+			if (s.blink && !reduced && blink.current === 0 && activeMood !== 'sleepy') {
+				blink.set(1).then(() => blink.set(0));
+			}
 		};
-		const reset = () => (gaze.target = { x: 0, y: 0 });
+		const reset = () => {
+			gaze.target = { x: 0, y: 0 };
+			focus.target = 0;
+		};
 		window.addEventListener('pointermove', move);
 		document.documentElement.addEventListener('pointerleave', reset);
 		return () => {
@@ -446,6 +462,9 @@
 		},
 		get gazeX() {
 			return gx;
+		},
+		get focus() {
+			return focus.current;
 		},
 		get gazeY() {
 			return gy;
