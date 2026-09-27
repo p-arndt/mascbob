@@ -3,53 +3,74 @@
 
 	/**
 	 * Matte soft-touch shell, like a vinyl toy: one broad diffuse light from the
-	 * top left, a soft occlusion at the bottom and a faint edge. No gloss or
-	 * iridescence, which read as generic.
+	 * top left, a soft occlusion at the bottom, a rim light on the opposite edge and
+	 * a printed key line. No gloss or iridescence, which read as generic.
 	 */
 	const m = getMascot();
 	const ref = (name: string) => svgRef(m.uid, name);
 	const t = $derived(m.shape.top);
-	// The light stays put while the face turns, so the sheen drifts against the gaze.
-	const sx = $derived(-m.gazeX * 4);
-	const sy = $derived(-m.gazeY * 3);
+	const cy = $derived((m.shape.top + m.shape.bottom) / 2);
+	// The light stays put while the head rocks, so the sheen turns back against the lean.
+	// Only half way: a matte shell's highlight is broad and partly rides with the surface.
+	const sheenTurn = $derived(-m.lean * 0.5);
+	// Rim width along the bottom-right diagonal.
+	const RIM = 1.8;
 </script>
 
 <defs>
 	<clipPath id="{m.uid}-shell-clip">
 		<path d={m.shape.d} />
 	</clipPath>
+	<!-- The shell minus itself shifted toward the key light leaves a crescent on the far edge. -->
+	<mask id="{m.uid}-rim-mask">
+		<path d={m.shape.d} fill="#fff" />
+		<path d={m.shape.d} fill="#000" transform="translate({-RIM} {-RIM})" />
+	</mask>
 	<linearGradient id="{m.uid}-ao" x1="0" y1="0" x2="0" y2="1">
 		<stop offset="0.55" class="stop-ink" stop-opacity="0" />
 		<stop offset="1" class="stop-ink" stop-opacity="0.12" />
 	</linearGradient>
 	<radialGradient id="{m.uid}-sheen" cx="0.5" cy="0.5" r="0.5">
-		<stop offset="0" stop-color="#fff" stop-opacity="0.55" />
-		<stop offset="1" stop-color="#fff" stop-opacity="0" />
+		<stop offset="0" class="stop-sheen" stop-opacity="0.55" />
+		<stop offset="1" class="stop-sheen" stop-opacity="0" />
 	</radialGradient>
 </defs>
 
 <path d={m.shape.d} fill={ref('body')} />
-<g clip-path={ref('shell-clip')}>
+<g class="shell-light" clip-path={ref('shell-clip')}>
 	<path d={m.shape.d} fill={ref('ao')} />
-	<ellipse
-		cx={80 + sx}
-		cy={t + 26 + sy}
-		rx="34"
-		ry="20"
-		fill={ref('sheen')}
-		transform="rotate(-24 {80 + sx} {t + 26 + sy})"
-	/>
+	<g transform="rotate({sheenTurn} 100 {cy})">
+		<ellipse
+			cx="80"
+			cy={t + 26}
+			rx="34"
+			ry="20"
+			fill={ref('sheen')}
+			transform="rotate(-24 80 {t + 26})"
+		/>
+	</g>
+	<path class="rim" d={m.shape.d} mask={ref('rim-mask')} />
 </g>
-<path class="edge" d={m.shape.d} />
+<path class="key-line" d={m.shape.d} />
 
 <style>
 	.stop-ink {
 		stop-color: var(--c-visor);
 	}
-	.edge {
+	/* Tinted by the body so dark colorways get a dim highlight instead of a milky smear. */
+	.stop-sheen {
+		stop-color: color-mix(in oklab, var(--c-body-light) 70%, #fff);
+	}
+	/* Pulled toward the accent so the edge still separates a dark shell from a dark page. */
+	.rim {
+		fill: color-mix(in oklab, var(--c-body-light) 50%, var(--c-accent));
+		opacity: 0.9;
+	}
+	.key-line {
 		fill: none;
 		stroke: var(--c-visor);
-		stroke-width: 1.2;
-		opacity: 0.14;
+		stroke-width: 1.6;
+		stroke-linejoin: round;
+		opacity: 0.5;
 	}
 </style>
