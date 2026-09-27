@@ -115,7 +115,7 @@
 	<rect class="ankle-stub" x="-7.4" y={-y - 10} width="14.8" height="15" rx="3.5" />
 {/snippet}
 
-{#snippet sneaker(high: boolean)}
+{#snippet sneaker(high: boolean, side: number)}
 	{@const c = high ? FOOT_COLLAR.hightops : FOOT_COLLAR.sneakers}
 	<!-- Short, round toe box: toy sneakers read cute; long ones read as flippers from the front. -->
 	{@const upper = `M-11 -9C-13 ${-c * 0.6} -12.5 ${-c} -8.6 ${-c}Q0 ${-c + 3.8} 8.6 ${-c}C${high ? 9.5 : 10} ${-c * 0.6} 11 -19 16 -17.5C21.5 -16 23 -12 22.5 -9Z`}
@@ -127,9 +127,15 @@
 			<!-- Padded ankle collar. -->
 			<path class="pad" d="M-9 {-c}Q0 {-c + 4.4} 9 {-c}" />
 		{/if}
-		<path class="swoosh" d="M-7 -13.5C1 -13 9 -15 19 -17.5C11 -13 4 -10.4 -7 -10.6Z" />
-		<path class="laces" d="M5.5 {-c + 5}L10 {-c + 6}M7.5 {-c + 9}L12.5 {-c + 10}" />
-		<ellipse class="toe-light" cx="15" cy="-15" rx="4" ry="1.6" />
+		<clipPath id={id(`upper-${side}`)}>
+			<path d={upper} />
+		</clipPath>
+		<!-- Details are clipped to the upper so nothing pokes past the shoe's outline. -->
+		<g clip-path={ref(`upper-${side}`)}>
+			<path class="swoosh" d="M-7 -13.5C1 -13 9 -15 19 -17.5C11 -13 4 -10.4 -7 -10.6Z" />
+			<path class="laces" d="M4 -19L8.5 -18M6 -15.5L11 -14.5" />
+			<ellipse class="toe-light" cx="15" cy="-15" rx="4" ry="1.6" />
+		</g>
 		<!-- Chunky light midsole on a thin dark outsole. -->
 		<path
 			class="midsole"
@@ -192,11 +198,11 @@
 		<g
 			class="foot"
 			class:tap={side === 1 && tapping}
-			style:transform-origin="{x - side * 12 * FOOT_SCALE}px {BODY_GROUND_Y - 2}px"
+			style:transform-origin="{x - side * 6 * FOOT_SCALE}px {BODY_GROUND_Y}px"
 		>
 			<g transform="translate({x} {BODY_GROUND_Y}) scale({side * FOOT_SCALE} {FOOT_SCALE})">
 				{#if shoes === 'sneakers' || shoes === 'hightops'}
-					{@render sneaker(shoes === 'hightops')}
+					{@render sneaker(shoes === 'hightops', side)}
 				{:else if shoes === 'boots'}
 					{@render boot()}
 				{:else}
@@ -442,7 +448,7 @@
 		stroke-width: 2.2;
 		opacity: 0.35;
 	}
-	/* The foot pivots on its heel, so a tap lifts the toe. */
+	/* The foot pivots just behind the ankle, so a tap lifts the toe without pulling the shoe off the leg. */
 	.foot {
 		transform-box: view-box;
 	}
@@ -611,13 +617,13 @@
 			transform: rotate(0);
 		}
 		81% {
-			transform: rotate(-13deg);
+			transform: rotate(-7deg);
 		}
 		86% {
 			transform: rotate(0);
 		}
 		91% {
-			transform: rotate(-9deg);
+			transform: rotate(-5deg);
 		}
 		96% {
 			transform: rotate(0);

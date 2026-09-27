@@ -93,8 +93,8 @@
 	const sq = $derived(clamp(squeeze.current, 0, 1));
 	const pop = $derived(1 + Math.max(0, -squeeze.current) * 0.6);
 	const grow = $derived(1 + curious.current * 0.1);
-	// More travel upward than downward: looking up is the expressive direction, down has the lids.
-	const eyeY = $derived(96 + m.gazeY * (m.gazeY < 0 ? 12 : 8) + saccade.current.y);
+	// Eyes travel further up than down; the face sits high on the head.
+	const eyeY = $derived(96 + m.gazeY * (m.gazeY < 0 ? 12 : 10) + saccade.current.y);
 	// Syllables knock the accent plate around a little, like a speaker cone.
 	const offset = $derived({ x: plate.current.x + talk * 1.6, y: plate.current.y - talk * 1.1 });
 
@@ -107,19 +107,19 @@
 		const heart = clamp(p.heart, 0, 1);
 		const size = p.scale * grow * pop * (1 - heart) * (1 + m.focus * 0.08);
 		const fullH = base.h * size;
-		// Lids do the vertical acting: looking up opens the eyes wide, looking down lowers
-		// both upper lids. Both eyes always stay the same shape, so neither one bulges.
+		// Looking up opens the eyes wide; looking down flattens them a little. No straight lid
+		// cut: it made the eyes look flat and sleepy. Both eyes always share one shape.
 		const up = Math.max(0, -m.gazeY);
 		const down = Math.max(0, m.gazeY);
 		const shape: EyeShape = {
 			cx,
 			cy: eyeY,
 			w: base.w * size,
-			h: fullH * Math.max(0, p.open) * (1 + up * 0.12) * (1 - m.blink) * (1 - sq),
+			h: fullH * Math.max(0, p.open) * (1 + up * 0.12 - down * 0.16) * (1 - m.blink) * (1 - sq),
 			round: base.round,
 			lift: p.lift,
-			lidLeft: (side === 'left' ? p.lidOuter : p.lidInner) + down * 0.28,
-			lidRight: (side === 'left' ? p.lidInner : p.lidOuter) + down * 0.28
+			lidLeft: side === 'left' ? p.lidOuter : p.lidInner,
+			lidRight: side === 'left' ? p.lidInner : p.lidOuter
 		};
 		const len = clamp(base.w * p.scale * 0.85, 9, 15);
 		// Brows bounce with the voice: talking faces are mostly eyebrows.
