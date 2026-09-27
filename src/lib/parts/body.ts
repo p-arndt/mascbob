@@ -28,17 +28,20 @@ export const SNEAKER_H = 36;
 /** Feet are drawn in local units and scaled up by this much. */
 export const FOOT_SCALE = 1.22;
 
-/** Height of each foot variant from the ground to its top edge, in viewBox units. */
-const FOOT_HEIGHT: Record<Shoes, number> = {
-	none: 18 * FOOT_SCALE,
-	sneakers: 29 * FOOT_SCALE,
-	hightops: 42 * FOOT_SCALE,
-	boots: 38 * FOOT_SCALE
+/**
+ * Height of each foot's collar (the opening the leg steps into) above the ground, in local
+ * foot units. Plain feet have no collar; the leg simply merges into the foot.
+ */
+export const FOOT_COLLAR: Record<Shoes, number> = {
+	none: 12,
+	sneakers: 24,
+	hightops: 36,
+	boots: 33
 };
 
-/** Where the leg ends: a few units inside the foot so no gap shows between them. */
+/** Where the fixed part of the leg ends: at the collar, where the foot's ankle stub takes over. */
 export function legBottomY(shoes: Shoes): number {
-	return BODY_GROUND_Y - (FOOT_HEIGHT[shoes] ?? FOOT_HEIGHT.none) + 5;
+	return BODY_GROUND_Y - (FOOT_COLLAR[shoes] ?? FOOT_COLLAR.none) * FOOT_SCALE;
 }
 
 /** The torso stays compact under wide heads, otherwise it'd read as a barrel. */
@@ -162,6 +165,14 @@ const MOOD_POSES: Partial<Record<Mood, BodyPose>> = {
 		swingArm: 'both',
 		drop: 2
 	},
+	// Hands fidgeting together low in front.
+	shy: {
+		left: { a1: -8, a2: -58 },
+		right: { a1: -8, a2: -58 },
+		swing: 'none',
+		swingArm: 'both',
+		drop: 1.5
+	},
 	grumpy: {
 		left: { a1: -20, a2: -84 },
 		right: { a1: -14, a2: -96 },
@@ -201,6 +212,7 @@ export function coreBeat(mood: Mood): { period: number; mode: CoreMode } {
 		case 'happy':
 			return { period: 0.72, mode: 'beat' };
 		case 'wink':
+		case 'shy':
 		case 'talking':
 			return { period: 0.9, mode: 'beat' };
 		case 'sleepy':
@@ -248,6 +260,8 @@ export function floatingHands(
 			return { left: rest, right: at(8, 110, 150) };
 		case 'grumpy':
 			return { left: at(-18, 158, -60), right: at(-22, 164, -80) };
+		case 'shy':
+			return { left: at(-20, 166, -60), right: at(-20, 166, -60) };
 	}
 	switch (hands) {
 		case 'up':

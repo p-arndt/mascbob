@@ -13,6 +13,7 @@
 		UPPER_ARM,
 		bodyPose,
 		coreBeat,
+		FOOT_COLLAR,
 		legBottomY,
 		shoulderX,
 		torsoHalfWidth,
@@ -104,55 +105,79 @@
 	</g>
 {/snippet}
 
+<!--
+	Shoes share one construction: the dark back rim of the collar, then the ankle (in leg
+	color, so it reads as the leg going in), then the upper whose top edge is the front lip.
+-->
+{#snippet collar(y: number, rx: number)}
+	<ellipse class="opening" cx="0" cy={-y} {rx} ry="3" />
+	<rect class="ankle-stub" x="-7" y={-y - 7} width="14" height="12" rx="3" />
+{/snippet}
+
 {#snippet sneaker(high: boolean)}
+	{@const c = high ? FOOT_COLLAR.hightops : FOOT_COLLAR.sneakers}
+	<!-- Short, round toe box: toy sneakers read cute; long ones read as flippers from the front. -->
+	{@const upper = `M-11 -9C-13 ${-c * 0.6} -12.5 ${-c} -8.6 ${-c}Q0 ${-c + 3.8} 8.6 ${-c}C${high ? 9.5 : 10} ${-c * 0.6} 11 -19 16 -17.5C21.5 -16 23 -12 22.5 -9Z`}
 	<g class={high ? 'shoe-hightops' : 'shoe-sneakers'}>
-		<rect class="sole" x="-16" y="-11" width="46" height="11" rx="5.5" />
-		<rect class="midsole" x="-12" y="-8" width="38" height="2" rx="1" />
+		{@render collar(c, 8.6)}
+		<path class="upper" d={upper} fill={ref('shoe')} />
+		<path d={upper} fill={ref('shoe-ao')} />
 		{#if high}
-			<path
-				class="upper"
-				d="M-14 -11C-15 -26 -14 -38 -6 -38L7 -38C8 -28 12 -21 25 -17C30 -15 31 -12 30 -11Z"
-			/>
-			<rect class="ankle" x="-15.5" y="-42" width="24" height="7" rx="3.5" />
-			<path class="toe-cap" d="M17 -11C21 -14 27 -15 30 -11" />
-			<path class="stripe" d="M-7 -17C3 -15 13 -15 23 -13" />
-			<path class="laces" d="M2 -33H7M3 -29.5H8M3 -26H10M4 -22.5H12" />
-			<rect class="heel-tab" x="-16" y="-34" width="5" height="12" rx="2" />
-			<ellipse class="opening" cx="-3.5" cy="-42" rx="9" ry="2" />
-		{:else}
-			<path
-				class="upper"
-				d="M-14 -11C-15 -22 -11 -29 -3 -29L8 -29C11 -22 18 -20 25 -17C30 -15 31 -12 30 -11Z"
-			/>
-			<path class="toe-cap" d="M17 -11C21 -14 27 -15 30 -11" />
-			<path class="stripe" d="M-7 -17C3 -15 13 -15 23 -13" />
-			<path class="laces" d="M3 -26H8M4 -23H10M5 -20H12" />
-			<rect class="heel-tab" x="-16" y="-27" width="5" height="10" rx="2" />
-			<ellipse class="opening" cx="2" cy="-29" rx="8" ry="2.2" />
+			<!-- Padded ankle collar. -->
+			<path class="pad" d="M-9 {-c}Q0 {-c + 4.4} 9 {-c}" />
 		{/if}
+		<path class="swoosh" d="M-7 -13.5C1 -13 9 -15 19 -17.5C11 -13 4 -10.4 -7 -10.6Z" />
+		<path class="laces" d="M5.5 {-c + 5}L10 {-c + 6}M7.5 {-c + 9}L12.5 {-c + 10}" />
+		<ellipse class="toe-light" cx="15" cy="-15" rx="4" ry="1.6" />
+		<!-- Chunky light midsole on a thin dark outsole. -->
+		<path
+			class="midsole"
+			d="M-12.5 -10.5H22C24.8 -10.5 25.6 -6 24.4 -3.5L-13 -3.5C-14 -6 -14 -10.5 -12.5 -10.5Z"
+			fill={ref('midsole')}
+		/>
+		<path
+			class="outsole"
+			d="M-13 -3.5H24.4C23.6 -1 22.2 0 19.8 0H-9.6C-11.9 0 -12.8 -1.4 -13 -3.5Z"
+		/>
 	</g>
 {/snippet}
 
 <!-- Chunky boot: dark rounded upper on a thick lug sole, with an accent pull tab at the heel. -->
 {#snippet boot()}
+	{@const c = FOOT_COLLAR.boots}
+	{@const upper = `M-13 -11C-14.5 ${-c * 0.6} -13.5 ${-c} -9 ${-c}Q0 ${-c + 3.6} 9 ${-c}C10 ${-c * 0.6} 13 -21 20 -19.5C28 -18 31.5 -15 31 -11Z`}
 	<g class="shoe-boots">
-		<rect class="boot-sole" x="-17" y="-13" width="49" height="13" rx="6" />
+		<rect class="pull-tab" x="-12.5" y={-c - 6} width="5" height="9" rx="2.2" />
+		{@render collar(c, 9)}
+		<path class="boot-upper" d={upper} />
+		<path d={upper} fill={ref('shoe-ao')} />
+		<path class="cuff" d="M-9.5 {-c}Q0 {-c + 4.2} 9.5 {-c}" />
+		<path class="welt" d="M-12 -12.5H29" />
+		<ellipse class="boot-shine" cx="21" cy="-17" rx="5" ry="1.6" />
 		<path
-			class="lugs"
-			d="M-10 -1.2V-3.6M-3 -1.2V-3.6M4 -1.2V-3.6M11 -1.2V-3.6M18 -1.2V-3.6M25 -1.2V-3.6"
+			class="boot-sole"
+			d="M-14.5 -11.5H31C33 -11.5 33.5 -7 32.5 -3C31.8 -0.8 30.5 0 28 0H-11C-13.8 0 -15 -1.6 -15.2 -4.5C-15.4 -8 -15.4 -11.5 -14.5 -11.5Z"
 		/>
-		<path
-			class="boot-upper"
-			d="M-15 -12C-16 -24 -14 -34 -6 -34L8 -34C9 -26 11 -22 18 -20C28 -18 32 -15 31 -12Z"
-		/>
-		<path class="welt" d="M-13 -13.5H29" />
-		<path class="boot-shine" d="M17 -18.5C22 -18.5 26 -17 28 -15" />
-		<rect class="pull-tab" x="-15.5" y="-42" width="6" height="9" rx="2.5" />
-		<rect class="cuff" x="-16" y="-37" width="26" height="6" rx="3" />
+		<path class="lugs" d="M-10 0V-2.6M-3 0V-2.6M4 0V-2.6M11 0V-2.6M18 0V-2.6M25 0V-2.6" />
 	</g>
 {/snippet}
 
 {#if layer === 'feet'}
+	<defs>
+		<linearGradient id={id('shoe')} x1="0" y1="0" x2="0" y2="1">
+			<stop offset="0" class="stop-light" />
+			<stop offset="1" class="stop-mid" />
+		</linearGradient>
+		<linearGradient id={id('shoe-ao')} x1="0" y1="0" x2="0" y2="1">
+			<stop offset="0.5" class="stop-ink" stop-opacity="0" />
+			<stop offset="1" class="stop-ink" stop-opacity="0.18" />
+		</linearGradient>
+		<linearGradient id={id('midsole')} x1="0" y1="0" x2="0" y2="1">
+			<stop offset="0" class="stop-light" />
+			<stop offset="1" class="stop-dark" />
+		</linearGradient>
+	</defs>
+
 	{#each [-1, 1] as side (side)}
 		<g transform="translate({100 + side * LEG_X} 0)">
 			<rect class="leg" x="-8.5" y={legTop} width="17" height={legBottom - legTop} rx="8.5" />
@@ -160,12 +185,13 @@
 		</g>
 	{/each}
 
+	<!-- Each foot is centered on its leg: the leg steps into the collar instead of standing on the shoe. -->
 	{#each [-1, 1] as side (side)}
-		{@const x = 100 + side * (LEG_X + 9)}
+		{@const x = 100 + side * LEG_X}
 		<g
 			class="foot"
 			class:tap={side === 1 && tapping}
-			style:transform-origin="{x - side * 20}px {BODY_GROUND_Y - 2}px"
+			style:transform-origin="{x - side * 12 * FOOT_SCALE}px {BODY_GROUND_Y - 2}px"
 		>
 			<g transform="translate({x} {BODY_GROUND_Y}) scale({side * FOOT_SCALE} {FOOT_SCALE})">
 				{#if shoes === 'sneakers' || shoes === 'hightops'}
@@ -357,73 +383,11 @@
 		opacity: 0.35;
 	}
 
-	.sole {
-		fill: var(--c-visor);
-	}
-	.ankle {
-		fill: var(--c-accent);
-		stroke: var(--c-visor);
-		stroke-width: 1.4;
-	}
-
-	.boot-sole {
-		fill: var(--c-body-dark);
-		stroke: var(--c-visor);
-		stroke-width: 1.4;
-	}
-	.lugs {
-		fill: none;
-		stroke: var(--c-visor);
-		stroke-width: 2;
-		stroke-linecap: round;
-		opacity: 0.5;
-	}
-	.boot-upper {
-		fill: var(--c-visor);
-		stroke: var(--c-visor);
-		stroke-width: 1.6;
-		stroke-linejoin: round;
-	}
-	.welt {
-		fill: none;
-		stroke: var(--c-body-light);
-		stroke-width: 1;
-		stroke-dasharray: 2 2.4;
-		opacity: 0.45;
-	}
-	.boot-shine {
-		fill: none;
-		stroke: #fff;
-		stroke-width: 1.8;
-		stroke-linecap: round;
-		opacity: 0.22;
-	}
-	.cuff {
-		fill: var(--c-body-mid);
-		stroke: var(--c-visor);
-		stroke-width: 1.4;
-	}
+	.heel-tab,
+	.swoosh,
 	.pull-tab {
 		fill: var(--c-accent);
 	}
-	.midsole,
-	.stripe,
-	.heel-tab {
-		fill: var(--c-accent);
-	}
-	.stripe {
-		fill: none;
-		stroke: var(--c-accent);
-		stroke-width: 3.4;
-		stroke-linecap: round;
-	}
-	.upper {
-		fill: var(--c-body-light);
-		stroke: var(--c-visor);
-		stroke-width: 1.6;
-		stroke-linejoin: round;
-	}
-	.toe-cap,
 	.laces {
 		fill: none;
 		stroke: var(--c-visor);
@@ -433,7 +397,63 @@
 	}
 	.opening {
 		fill: var(--c-visor);
-		opacity: 0.8;
+		opacity: 0.7;
+	}
+	.ankle-stub {
+		fill: var(--c-body-dark);
+	}
+	.upper {
+		stroke: var(--c-visor);
+		stroke-width: 0.8;
+		stroke-opacity: 0.14;
+	}
+	.pad {
+		fill: none;
+		stroke: var(--c-accent);
+		stroke-width: 3.2;
+		stroke-linecap: round;
+	}
+	.toe-light,
+	.boot-shine {
+		fill: #fff;
+		opacity: 0.45;
+	}
+	.outsole {
+		fill: var(--c-visor);
+	}
+	.stop-light {
+		stop-color: var(--c-body-light);
+	}
+	.stop-mid {
+		stop-color: var(--c-body-mid);
+	}
+	.stop-dark {
+		stop-color: var(--c-body-dark);
+	}
+	.boot-upper {
+		fill: var(--c-visor);
+	}
+	.cuff {
+		fill: none;
+		stroke: var(--c-body-mid);
+		stroke-width: 3.4;
+		stroke-linecap: round;
+	}
+	.welt {
+		fill: none;
+		stroke: var(--c-body-light);
+		stroke-width: 0.9;
+		stroke-dasharray: 2 2.4;
+		opacity: 0.5;
+	}
+	.boot-sole {
+		fill: var(--c-body-dark);
+	}
+	.lugs {
+		fill: none;
+		stroke: var(--c-visor);
+		stroke-width: 2.2;
+		opacity: 0.35;
 	}
 	/* The foot pivots on its heel, so a tap lifts the toe. */
 	.foot {

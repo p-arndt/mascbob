@@ -10,7 +10,7 @@ describe('Body', () => {
 		expect(svg?.getAttribute('viewBox')).toBe(`0 0 200 ${BODY_VIEWBOX_HEIGHT}`);
 		expect(container.querySelectorAll('.leg')).toHaveLength(2);
 		expect(container.querySelectorAll('.foot-plain')).toHaveLength(2);
-		expect(container.querySelector('.sole')).toBeNull();
+		expect(container.querySelector('.outsole')).toBeNull();
 		expect(container.querySelectorAll('.hand')).toHaveLength(2);
 		expect(container.querySelector('.stand')).not.toBeNull();
 		expect(container.querySelector('.float')).toBeNull();
