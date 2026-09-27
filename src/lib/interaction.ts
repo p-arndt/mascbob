@@ -9,8 +9,8 @@ import type { Mood } from './types.js';
  * - `dizzy`: circling the pointer around it twice makes its eyes roll and it wobble.
  * - `shy`: when the pointer gets very close it gets coy and leans away (until petted).
  * - `tickle`: rapid boops make it giggle; too many make it grumpy.
- * - `bored`: with the pointer resting for a long while it dozes off (only while `mood` is `idle`)
- *   and wakes up when the pointer moves again.
+ * - `bored`: left alone for a long while it yawns, droops and dozes off (only while `mood` is
+ *   `idle`) and wakes up on the next interaction.
  */
 /** Degrees the head tilts toward a far-away pointer with `follow`. */
 export const FOLLOW_TILT = 7;
@@ -273,8 +273,12 @@ export interface ReactionHost {
 	jump(height: number, up?: number): void;
 	wobble(deg: number): void;
 	emit(event: ReactionEvent): void;
+	/** Idle ladder cues; the host is expected to skip what doesn't fit its current state. */
+	idle?(cue: IdleCue): void;
 	/** Milliseconds on the same clock as `PointerSample.t`. */
 	now?(): number;
+	/** 0..1; injectable so tests can pin the idle ladder's choices. */
+	random?(): number;
 }
 
 /** Figure geometry in viewBox units. */
@@ -309,6 +313,70 @@ export const REACTION_TIMING = {
 	wake: 650
 } as const;
 
+/** Small idle motions, picked per mood by `pickFidget`. */
+export const FIDGETS = ['shift', 'shrug', 'feet', 'blink', 'sigh', 'hop'] as const;
+export type Fidget = (typeof FIDGETS)[number];
+
+/**
+ * What the idle ladder asks the host to do. `rouse` undoes everything the ladder
+ * left in place (droop, a turned head) because an interaction ended the idle spell.
+ */
+export type IdleCue =
+	| { type: 'glance'; x: number; y: number }
+	| { type: 'fidget'; fidget: Fidget }
+	| { type: 'yawn' }
+	| { type: 'droop' }
+	| { type: 'rouse' };
+
+export type IdleStage = 'attentive' | 'glancing' | 'fidgeting' | 'yawning' | 'drooping' | 'dozing';
+
+/**
+ * Milliseconds since the last interaction at which the idle ladder climbs a rung; dozing
+ * happens at `REACTION_TIMING.boredAfter`. Yawning and drooping only lead up to a doze.
+ */
+export const IDLE_TIMING = {
+	glanceAfter: 2500,
+	fidgetAfter: 6000,
+	yawnAt: 13000,
+	droopAt: 16500
+} as const;
+
+type FidgetWeights = Partial<Record<Fidget, number>>;
+const DEFAULT_FIDGETS: FidgetWeights = { shift: 3, shrug: 2, feet: 2, blink: 2, sigh: 1, hop: 1 };
+// Keyed by plain strings so moods this table doesn't know yet fall back to the default.
+const MOOD_FIDGETS: Partial<Record<string, FidgetWeights>> = {
+	happy: { hop: 3, shift: 2, shrug: 1, blink: 1 },
+	love: { hop: 2, shift: 2, blink: 2 },
+	laughing: { hop: 3, shift: 2 },
+	sad: { feet: 3, sigh: 3, shift: 1, blink: 1 },
+	sleepy: { sigh: 2, shift: 1 },
+	grumpy: { sigh: 2, shift: 2, feet: 1 },
+	thinking: { shift: 1, blink: 1, feet: 1 },
+	focused: { shift: 1, blink: 2 },
+	nervous: { shift: 3, blink: 3, feet: 2 },
+	shy: { feet: 3, shift: 2, blink: 1 },
+	surprised: { blink: 2, shift: 1, hop: 1 },
+	curious: { blink: 2, shift: 1, hop: 1 }
+};
+
+/** Weighted pick of an idle fidget that suits the mood: sad and sleepy figures don't hop. */
+export function pickFidget(mood: string, r = Math.random()): Fidget {
+	const weights = MOOD_FIDGETS[mood] ?? DEFAULT_FIDGETS;
+	const entries = FIDGETS.filter((f) => (weights[f] ?? 0) > 0);
+	const total = entries.reduce((sum, f) => sum + weights[f]!, 0);
+	let left = Math.min(Math.max(r, 0), 0.999999) * total;
+	for (const f of entries) {
+		left -= weights[f]!;
+		if (left < 0) return f;
+	}
+	return entries.at(-1) ?? 'blink';
+}
+
+/** Gaps between glances grow with idle time, so a long-ignored figure settles down. */
+export function glanceInterval(idle: number, r = Math.random()): number {
+	return (1400 + Math.min(idle, 30000) * 0.1) * (0.7 + r * 0.8);
+}
+
 /**
  * Turns pointer samples and boops into reactions. Transient reactions (hearts,
  * startle, dizzy, tickle, wake) run on a timer and win over lasting ones
@@ -338,9 +406,12 @@ export class ReactionController {
 	private shy = false;
 	private shySide = 0;
 	private bored = false;
-	private boredTimer: ReturnType<typeof setTimeout> | undefined;
+	private idleTimer: ReturnType<typeof setTimeout> | undefined;
+	private running = false;
+	private stage: IdleStage = 'attentive';
 	private lastMove = 0;
-	private seenHover = false;
+	private nextMove = 0;
+	private nextFidget = 0;
 	private rollTimer: ReturnType<typeof setInterval> | undefined;
 	private shimmyTimer: ReturnType<typeof setInterval> | undefined;
 	private shown: ReactionState | null = null;
@@ -350,6 +421,15 @@ export class ReactionController {
 
 	private now() {
 		return this.host.now?.() ?? performance.now();
+	}
+
+	private random() {
+		return this.host.random?.() ?? Math.random();
+	}
+
+	/** Where the idle ladder currently is. */
+	get idleStage(): IdleStage {
+		return this.stage;
 	}
 
 	configure(flags: ReactionFlags, reduced: boolean, baseMood: Mood, frame: ReactionFrame): void {
@@ -363,21 +443,44 @@ export class ReactionController {
 			return;
 		}
 		if (this.bored && baseMood !== 'idle') this.bored = false;
+		const late = this.stage === 'yawning' || this.stage === 'drooping' || this.stage === 'dozing';
+		if (late && !this.canDoze()) {
+			this.rouse();
+			if (this.running && !this.idleTimer) this.armIdle();
+		}
 		this.refresh();
 	}
 
-	pointer(s: PointerSample): void {
-		const f = this.flags;
-		const { head, viewHeight } = this.frame;
-		this.lastMove = s.t;
-		if (s.hovering) this.seenHover = true;
+	/** Starts or stops the idle ladder and every timer, e.g. while offscreen. */
+	setRunning(on: boolean): void {
+		if (on === this.running) return;
+		this.running = on;
+		if (on) this.restartIdle();
+		else this.reset();
+	}
+
+	/**
+	 * Any interaction (pointer, press, boop) sends the idle ladder back to its first rung
+	 * and wakes a dozing figure. Cheap enough to call on every pointer move.
+	 */
+	activity(t = this.now()): void {
+		this.lastMove = t;
+		this.nextMove = t + IDLE_TIMING.glanceAfter;
 		if (this.bored) {
 			this.bored = false;
 			this.show({ name: 'bored', mood: 'surprised' }, REACTION_TIMING.wake);
 			this.host.jump(8, 130);
 			this.host.emit({ type: 'wake' });
 		}
-		if (f.bored) this.armBored();
+		if (this.stage !== 'attentive') this.rouse();
+		// Thresholds only ever move later, so a pending tick just fires early and re-arms.
+		if (this.running && !this.idleTimer) this.armIdle();
+	}
+
+	pointer(s: PointerSample): void {
+		const f = this.flags;
+		const { head, viewHeight } = this.frame;
+		this.activity(s.t);
 
 		const cx = 100;
 		const cy = viewHeight / 2;
@@ -441,6 +544,7 @@ export class ReactionController {
 	}
 
 	boop(t = this.now()): void {
+		this.activity(t);
 		if (!this.flags.tickle) return;
 		const hit = this.tickle.boop(t);
 		if (!hit) {
@@ -458,14 +562,14 @@ export class ReactionController {
 		this.host.emit({ type: 'tickle', ...hit });
 	}
 
-	/** Drops every running reaction and timer, e.g. when going offscreen. */
+	/** Drops every running reaction and timer; the idle ladder starts over if it is running. */
 	reset(): void {
 		clearTimeout(this.transientTimer);
 		clearTimeout(this.petTimer);
-		clearTimeout(this.boredTimer);
+		clearTimeout(this.idleTimer);
 		clearInterval(this.rollTimer);
 		clearInterval(this.shimmyTimer);
-		this.transientTimer = this.petTimer = this.boredTimer = this.rollTimer = undefined;
+		this.transientTimer = this.petTimer = this.idleTimer = this.rollTimer = undefined;
 		this.transient = null;
 		this.petting = this.shy = this.bored = this.holdsGaze = false;
 		this.pet.reset();
@@ -473,10 +577,13 @@ export class ReactionController {
 		this.flick.reset();
 		this.tickle.reset();
 		this.setLean(0);
+		if (this.stage !== 'attentive') this.rouse();
 		this.refresh();
+		if (this.running) this.restartIdle();
 	}
 
 	destroy(): void {
+		this.running = false;
 		this.reset();
 	}
 
@@ -537,22 +644,95 @@ export class ReactionController {
 		}, 150);
 	}
 
-	private armBored() {
-		if (this.boredTimer || !this.seenHover) return;
-		const check = () => {
-			const idle = this.now() - this.lastMove;
-			const left = REACTION_TIMING.boredAfter - idle;
-			if (left > 0) {
-				this.boredTimer = setTimeout(check, left);
+	private canDoze() {
+		return this.flags.bored && this.baseMood === 'idle' && !this.petting && !this.shy;
+	}
+
+	private rouse() {
+		this.stage = 'attentive';
+		this.host.idle?.({ type: 'rouse' });
+	}
+
+	private restartIdle() {
+		clearTimeout(this.idleTimer);
+		this.idleTimer = undefined;
+		this.activity();
+	}
+
+	private armIdle() {
+		const t = this.now();
+		const dozeAt = this.lastMove + REACTION_TIMING.boredAfter;
+		const due: number[] = [];
+		if (this.canDoze()) {
+			due.push(dozeAt);
+			if (!this.reduced) {
+				if (this.stage !== 'yawning' && this.stage !== 'drooping') {
+					due.push(this.lastMove + IDLE_TIMING.yawnAt);
+				}
+				if (this.stage !== 'drooping') due.push(this.lastMove + IDLE_TIMING.droopAt);
+			}
+		}
+		// Under reduced motion only the doze remains: it is a mood, not a motion.
+		if (!this.reduced) due.push(this.nextMove);
+		if (!due.length) return;
+		const next = Math.min(...due.filter((d) => d > t), Infinity);
+		const wait = Number.isFinite(next) ? next - t : 16;
+		this.idleTimer = setTimeout(() => this.tick(), Math.max(wait, 16));
+	}
+
+	private tick() {
+		this.idleTimer = undefined;
+		if (!this.running || this.bored) return;
+		const t = this.now();
+		const idle = t - this.lastMove;
+		const cue = (c: IdleCue) => this.host.idle?.(c);
+		if (this.canDoze()) {
+			if (idle >= REACTION_TIMING.boredAfter) {
+				this.stage = 'dozing';
+				this.bored = true;
+				this.host.emit({ type: 'bored' });
+				this.refresh();
 				return;
 			}
-			this.boredTimer = undefined;
-			if (this.baseMood !== 'idle' || this.petting || this.shy) return;
-			this.bored = true;
-			this.host.emit({ type: 'bored' });
-			this.refresh();
-		};
-		this.boredTimer = setTimeout(check, REACTION_TIMING.boredAfter);
+			if (!this.reduced && idle >= IDLE_TIMING.droopAt && this.stage !== 'drooping') {
+				this.stage = 'drooping';
+				cue({ type: 'droop' });
+				this.armIdle();
+				return;
+			}
+			if (
+				!this.reduced &&
+				idle >= IDLE_TIMING.yawnAt &&
+				this.stage !== 'yawning' &&
+				this.stage !== 'drooping'
+			) {
+				this.stage = 'yawning';
+				cue({ type: 'yawn' });
+				this.nextMove = t + 2500;
+				this.armIdle();
+				return;
+			}
+		}
+		if (!this.reduced && t >= this.nextMove) {
+			const late = this.stage === 'yawning' || this.stage === 'drooping';
+			if (idle >= IDLE_TIMING.fidgetAfter && t >= this.nextFidget && !late) {
+				this.stage = 'fidgeting';
+				const mood = this.shown?.mood ?? this.baseMood;
+				cue({ type: 'fidget', fidget: pickFidget(mood, this.random()) });
+				this.nextFidget = t + 5000 + this.random() * 7000;
+			} else {
+				if (!late) this.stage = 'glancing';
+				const r = this.random();
+				const center = r < 0.3;
+				cue({
+					type: 'glance',
+					x: center ? 0 : this.random() * 1.6 - 0.8,
+					y: center ? 0 : this.random() - 0.5
+				});
+			}
+			this.nextMove = t + glanceInterval(idle, this.random());
+		}
+		this.armIdle();
 	}
 
 	private show(state: ReactionState, ms: number) {

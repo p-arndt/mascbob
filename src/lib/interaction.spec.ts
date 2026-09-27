@@ -4,12 +4,16 @@ import {
 	DEFAULT_REACTIONS,
 	FOLLOW_TILT,
 	FlickDetector,
+	IDLE_TIMING,
 	PetDetector,
 	REACTIONS,
 	REACTION_TIMING,
 	ReactionController,
 	TickleCounter,
+	glanceInterval,
+	pickFidget,
 	resolveReactions,
+	type IdleCue,
 	type PointerSample,
 	type ReactionEvent,
 	type ReactionHost,
@@ -192,9 +196,14 @@ describe('ReactionController', () => {
 	beforeEach(() => vi.useFakeTimers());
 	afterEach(() => vi.useRealTimers());
 
-	function setup(input: Parameters<typeof resolveReactions>[0] = true, mood = 'idle' as const) {
+	function setup(
+		input: Parameters<typeof resolveReactions>[0] = true,
+		mood = 'idle' as const,
+		reduced = false
+	) {
 		const shown: (ReactionState | null)[] = [];
 		const events: ReactionEvent[] = [];
+		const cues: IdleCue[] = [];
 		const host: ReactionHost = {
 			show: (s) => shown.push(s),
 			lean: vi.fn(),
@@ -202,13 +211,16 @@ describe('ReactionController', () => {
 			jump: vi.fn(),
 			wobble: vi.fn(),
 			emit: (e) => events.push(e),
-			now: () => Date.now()
+			idle: (c) => cues.push(c),
+			now: () => Date.now(),
+			random: () => 0.5
 		};
 		const controller = new ReactionController(host);
-		controller.configure(resolveReactions(input), false, mood, {
+		controller.configure(resolveReactions(input), reduced, mood, {
 			viewHeight: 300,
 			head: { top: 36, bottom: 172, halfWidth: 48 }
 		});
+		controller.setRunning(true);
 		const sample: PointerSample = { x: 0, y: 0, scale: 0.8, t: 0, hovering: true, pressed: false };
 		const at = (x: number, y: number) => {
 			sample.x = x;
@@ -217,7 +229,7 @@ describe('ReactionController', () => {
 			controller.pointer(sample);
 			vi.advanceTimersByTime(16);
 		};
-		return { controller, host, shown, events, at };
+		return { controller, host, shown, events, cues, at };
 	}
 
 	const pet = (at: (x: number, y: number) => void, sweeps: number) => {
@@ -305,11 +317,133 @@ describe('ReactionController', () => {
 		expect(events.map((e) => e.type)).toEqual(['tickle', 'tickle']);
 	});
 
-	it('drops everything on reset', () => {
+	it('drops everything on destroy', () => {
 		const { controller, shown, at } = setup();
 		pet(at, 4);
-		controller.reset();
+		controller.destroy();
 		expect(shown.at(-1)).toBeNull();
 		expect(vi.getTimerCount()).toBe(0);
+	});
+
+	it('climbs the idle ladder from glances to fidgets, a yawn, a droop and a doze', () => {
+		const { controller, cues, shown, events } = setup();
+		const types = () => cues.map((c) => c.type);
+		expect(controller.idleStage).toBe('attentive');
+		vi.advanceTimersByTime(IDLE_TIMING.glanceAfter - 100);
+		expect(cues).toEqual([]);
+		vi.advanceTimersByTime(200);
+		expect(types()).toEqual(['glance']);
+		expect(controller.idleStage).toBe('glancing');
+		vi.advanceTimersByTime(IDLE_TIMING.fidgetAfter);
+		expect(types()).toContain('fidget');
+		expect(types()).not.toContain('yawn');
+		vi.advanceTimersByTime(IDLE_TIMING.yawnAt - IDLE_TIMING.fidgetAfter - IDLE_TIMING.glanceAfter);
+		expect(types().at(-1)).toBe('yawn');
+		expect(controller.idleStage).toBe('yawning');
+		vi.advanceTimersByTime(IDLE_TIMING.droopAt - IDLE_TIMING.yawnAt);
+		expect(types()).toContain('droop');
+		vi.advanceTimersByTime(REACTION_TIMING.boredAfter - IDLE_TIMING.droopAt);
+		expect(controller.idleStage).toBe('dozing');
+		expect(shown.at(-1)).toEqual({ name: 'bored', mood: 'sleepy' });
+		const before = cues.length;
+		vi.advanceTimersByTime(60000);
+		expect(cues.length).toBe(before);
+		expect(events).toEqual([{ type: 'bored' }]);
+	});
+
+	it('starts the ladder over on any interaction', () => {
+		const { controller, cues, events, shown } = setup();
+		vi.advanceTimersByTime(REACTION_TIMING.boredAfter + 100);
+		controller.activity();
+		expect(cues.at(-1)).toEqual({ type: 'rouse' });
+		expect(controller.idleStage).toBe('attentive');
+		expect(events.at(-1)).toEqual({ type: 'wake' });
+		expect(shown.at(-1)).toEqual({ name: 'bored', mood: 'surprised' });
+		const count = cues.length;
+		vi.advanceTimersByTime(IDLE_TIMING.glanceAfter - 100);
+		expect(cues.length).toBe(count);
+		vi.advanceTimersByTime(IDLE_TIMING.yawnAt);
+		controller.boop();
+		expect(cues.at(-1)).toEqual({ type: 'rouse' });
+		expect(controller.idleStage).toBe('attentive');
+	});
+
+	it('keeps glancing and fidgeting but never dozes when the mood is not idle', () => {
+		const { controller, cues } = setup(true, 'talking' as 'idle');
+		vi.advanceTimersByTime(REACTION_TIMING.boredAfter * 3);
+		const types = new Set(cues.map((c) => c.type));
+		expect(types).toEqual(new Set(['glance', 'fidget']));
+		expect(controller.idleStage).not.toBe('dozing');
+	});
+
+	it('undoes a droop when the mood changes away from idle', () => {
+		const { controller, cues } = setup();
+		vi.advanceTimersByTime(IDLE_TIMING.droopAt + 100);
+		expect(controller.idleStage).toBe('drooping');
+		controller.configure(resolveReactions(true), false, 'happy', {
+			viewHeight: 300,
+			head: { top: 36, bottom: 172, halfWidth: 48 }
+		});
+		expect(cues.at(-1)).toEqual({ type: 'rouse' });
+		const from = cues.length;
+		vi.advanceTimersByTime(REACTION_TIMING.boredAfter * 2);
+		const after = cues.slice(from).map((c) => c.type);
+		expect(after).toContain('glance');
+		expect(after).not.toContain('yawn');
+		expect(after).not.toContain('droop');
+		expect(controller.idleStage).not.toBe('dozing');
+	});
+
+	it('schedules nothing under reduced motion', () => {
+		const { cues } = setup({ bored: false }, 'idle', true);
+		expect(vi.getTimerCount()).toBe(0);
+		vi.advanceTimersByTime(60000);
+		expect(cues).toEqual([]);
+	});
+
+	it('still dozes under reduced motion, without the motion rungs', () => {
+		const { cues, shown } = setup(true, 'idle', true);
+		vi.advanceTimersByTime(REACTION_TIMING.boredAfter + 100);
+		expect(cues).toEqual([]);
+		expect(shown.at(-1)).toEqual({ name: 'bored', mood: 'sleepy' });
+	});
+
+	it('stops the ladder while not running', () => {
+		const { controller, cues } = setup(false);
+		controller.setRunning(false);
+		expect(vi.getTimerCount()).toBe(0);
+		vi.advanceTimersByTime(30000);
+		expect(cues).toEqual([]);
+		controller.setRunning(true);
+		vi.advanceTimersByTime(IDLE_TIMING.glanceAfter + 10);
+		expect(cues.map((c) => c.type)).toEqual(['glance']);
+	});
+});
+
+describe('pickFidget', () => {
+	const sweep = (mood: string) =>
+		new Set(Array.from({ length: 100 }, (_, i) => pickFidget(mood, i / 100)));
+
+	it('keeps sad and sleepy figures on the ground', () => {
+		expect(sweep('sad').has('hop')).toBe(false);
+		expect(sweep('sleepy').has('hop')).toBe(false);
+		expect(sweep('happy').has('hop')).toBe(true);
+	});
+
+	it('falls back to the default mix for moods it does not know', () => {
+		expect(sweep('no-such-mood')).toEqual(sweep('idle'));
+		expect(sweep('idle').size).toBe(6);
+	});
+
+	it('handles the ends of the random range', () => {
+		expect(pickFidget('idle', 0)).toBe('shift');
+		expect(pickFidget('idle', 1)).toBe('hop');
+	});
+});
+
+describe('glanceInterval', () => {
+	it('grows with idle time and levels off', () => {
+		expect(glanceInterval(20000, 0.5)).toBeGreaterThan(glanceInterval(3000, 0.5));
+		expect(glanceInterval(60000, 0.5)).toBe(glanceInterval(30000, 0.5));
 	});
 });

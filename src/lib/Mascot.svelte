@@ -18,6 +18,8 @@
 	import {
 		ReactionController,
 		resolveReactions,
+		type Fidget,
+		type IdleCue,
 		type PointerSample,
 		type ReactionEvent,
 		type ReactionState,
@@ -142,8 +144,29 @@
 	const headTurn = new Spring(0, { stiffness: 0.07, damping: 0.42 });
 	/** Degrees; a loose spring so kicks ring out as a wobble. */
 	const wobble = new Spring(0, { stiffness: 0.12, damping: 0.14 });
+	// A standing figure regains its balance; a lone head may keep rocking like a toy.
+	$effect(() => {
+		wobble.damping = body ? 0.28 : 0.14;
+	});
 	/** ViewBox units, negative is up. */
 	const hop = new Tween(0);
+	// Follow-through: the head trails the body's rock and hop and settles a beat after it.
+	const headLag = new Spring(0, { stiffness: 0.08, damping: 0.32 });
+	const headBob = new Spring(0, { stiffness: 0.12, damping: 0.4 });
+	// Softer than `squish`, so the head's jelly lands after the body's.
+	const headSquish = new Spring({ x: 1, y: 1 }, { stiffness: 0.11, damping: 0.26 });
+	$effect(() => {
+		const opts = { instant: reduced };
+		headLag.set(wobble.current, opts);
+		headBob.set(hop.current, opts);
+		headSquish.set(squish.current, opts);
+	});
+	/** 0..1; heavy lids on top of blinks while drooping or yawning. */
+	const lids = new Tween(0);
+	/** 0..1; the head nods down while drooping or looking at the feet. */
+	const sag = new Tween(0);
+	/** 0..1; mouth opening of a yawn. */
+	const yawnMouth = new Tween(0);
 
 	let root = $state<HTMLElement>();
 	// Offscreen mascots pause their timers, pointer tracking and CSS loops: a page full of them stays smooth.
@@ -197,75 +220,150 @@
 
 	// Pressing squashes and holds (well damped, so it doesn't jiggle while held); releasing
 	// springs back loosely, which overshoots into a jelly bounce.
+	const loosenSquish = () => {
+		squish.damping = pressed ? 0.6 : 0.18;
+		squish.stiffness = pressed ? 0.25 : 0.16;
+	};
 	$effect(() => {
 		if (reduced) {
 			squish.set({ x: 1, y: 1 }, { instant: true });
 			return;
 		}
-		squish.damping = pressed ? 0.6 : 0.18;
-		squish.stiffness = pressed ? 0.25 : 0.16;
+		loosenSquish();
 		squish.target = restSquish();
 	});
 
-	let reactionLean = $state(0);
+	// One-shot steps of gestures; all dropped on unmount and under reduced motion.
+	let pending: ReturnType<typeof setTimeout>[] = [];
+	function later(fn: () => void, ms: number) {
+		const id = setTimeout(() => {
+			pending = pending.filter((p) => p !== id);
+			fn();
+		}, ms);
+		pending.push(id);
+	}
+	const cancelLater = () => {
+		pending.forEach(clearTimeout);
+		pending = [];
+	};
+	$effect(() => cancelLater);
 	$effect(() => {
-		headTurn.target = reduced ? 0 : (hovered ? pointerX * 5 : 0) + reactionLean;
+		if (reduced) untrack(cancelLater);
+	});
+	const flip = () => (Math.random() < 0.5 ? -1 : 1);
+
+	let reactionLean = $state(0);
+	/** Degrees the head turns after an idle glance. */
+	let idleTurn = $state(0);
+	/** Degrees of a mood entry's head tilt. */
+	let gestureTurn = $state(0);
+	$effect(() => {
+		headTurn.target = reduced
+			? 0
+			: (hovered ? pointerX * 5 : 0) + reactionLean + idleTurn + gestureTurn;
 	});
 
 	let hopId = 0;
-	/** Jump up by `height` viewBox units and land with a little squash. */
-	async function jump(height: number, up = 150) {
-		if (instant) return;
+	/**
+	 * Crouch (unless `crouch` is false), jump up by `height` viewBox units and land with a
+	 * little squash. Resolves true if it landed without a newer jump cutting it short.
+	 */
+	async function jump(height: number, up = 150, crouch = true): Promise<boolean> {
+		if (instant) return false;
 		const id = ++hopId;
+		const k = clamp(height / 12, 0.35, 1);
+		if (crouch) {
+			squish.target = { x: 1 + 0.08 * k, y: 1 - 0.1 * k };
+			await new Promise<void>((r) => later(r, 80));
+			if (id !== hopId) return false;
+		}
+		squish.set({ x: 1 - 0.08 * k, y: 1 + 0.1 * k }, { instant: true });
+		squish.target = restSquish();
 		await hop.set(-height, { duration: up, easing: cubicOut });
-		if (id !== hopId) return;
+		if (id !== hopId) return false;
 		await hop.set(0, { duration: up * 1.1, easing: cubicIn });
-		if (id !== hopId) return;
+		if (id !== hopId) return false;
 		const impact = Math.min(height / 90, 0.14);
 		squish.set({ x: 1 + impact, y: 1 - impact }, { instant: true });
 		squish.target = restSquish();
+		return true;
 	}
 
 	let wobbleTimer: ReturnType<typeof setTimeout> | undefined;
-	function kickWobble(deg: number) {
+	function kickWobble(deg: number, hold = 110) {
 		if (instant) return;
 		wobble.target = deg;
 		clearTimeout(wobbleTimer);
-		wobbleTimer = setTimeout(() => (wobble.target = 0), 110);
+		wobbleTimer = setTimeout(() => (wobble.target = 0), hold);
 	}
 	$effect(() => () => clearTimeout(wobbleTimer));
 
-	// Mood changes get a small anticipation hop and a wobble; the boop's own `happy` doesn't count.
+	/** Eases the squash toward `to` on a slow, well damped spring, holds it, and eases back. */
+	function settle(to: { x: number; y: number }, hold: number, stiffness = 0.05, damping = 0.9) {
+		if (instant) return;
+		squish.stiffness = stiffness;
+		squish.damping = damping;
+		squish.target = to;
+		later(() => (squish.target = restSquish()), hold);
+		// Back on the loose spring only once it has eased home, or the return would jiggle.
+		later(loosenSquish, hold + 700);
+	}
+
+	function tiltHead(deg: number, hold: number) {
+		if (instant) return;
+		gestureTurn = deg;
+		later(() => (gestureTurn = 0), hold);
+	}
+
+	function stamp(depth: number) {
+		if (instant) return;
+		squish.set({ x: 1 + depth, y: 1 - depth * 1.15 }, { instant: true });
+		squish.target = restSquish();
+	}
+
+	const bounce = () => jump(8, 120).then((landed) => landed && jump(5, 110, false));
+	/**
+	 * How the figure enters a mood. Keyed by plain strings, so a mood without its own
+	 * gesture falls back to `enterMood`'s small hop and wobble.
+	 */
+	const ENTRY_GESTURES: Partial<Record<string, () => void>> = {
+		happy: bounce,
+		love: bounce,
+		laughing: bounce,
+		sad: () => settle({ x: 1.05, y: 0.93 }, 900, 0.03, 0.95),
+		sleepy: () => {
+			settle({ x: 1.03, y: 0.95 }, 1100, 0.03, 0.95);
+			kickWobble(2 * flip(), 500);
+		},
+		surprised: () => jump(16, 120),
+		grumpy: () => {
+			stamp(0.1);
+			later(() => stamp(0.06), 220);
+		},
+		thinking: () => tiltHead(7 * flip(), 1400),
+		curious: () => {
+			jump(5, 120);
+			tiltHead(6 * flip(), 1100);
+		},
+		nervous: () => {
+			kickWobble(2);
+			later(() => kickWobble(-2), 130);
+			later(() => kickWobble(1.5), 260);
+		}
+	};
+	function enterMood(next: string) {
+		const gesture = ENTRY_GESTURES[next];
+		if (gesture) return gesture();
+		jump(6, 130);
+		kickWobble(4 * flip());
+	}
+
+	// Mood changes get an entry gesture; the boop's own `happy` doesn't count.
 	let lastMood: Mood | undefined;
 	$effect(() => {
 		const next = mood;
-		if (lastMood !== undefined && lastMood !== next) {
-			untrack(() => {
-				jump(6, 130);
-				kickWobble(Math.random() < 0.5 ? -4 : 4);
-			});
-		}
+		if (lastMood !== undefined && lastMood !== next) untrack(() => enterMood(next));
 		lastMood = next;
-	});
-
-	// Rare idle fidgets keep it alive without being busy.
-	$effect(() => {
-		if (reduced || !onscreen) return;
-		let timer: ReturnType<typeof setTimeout>;
-		const schedule = () => {
-			timer = setTimeout(
-				() => {
-					if (!hovered && !pressed && !booping) {
-						if (Math.random() < 0.5) kickWobble(Math.random() < 0.5 ? -3 : 3);
-						else jump(4, 140);
-					}
-					schedule();
-				},
-				7000 + Math.random() * 9000
-			);
-		};
-		schedule();
-		return () => clearTimeout(timer);
 	});
 
 	const asleep = $derived(activeMood === 'sleepy');
@@ -316,6 +414,78 @@
 		blinkMood = next;
 	});
 
+	// Bumped whenever the idle ladder is interrupted, so its delayed steps don't land afterwards.
+	let idleEpoch = 0;
+	/** The idle ladder in interaction.ts decides when; this decides how. */
+	function idleCue(cue: IdleCue) {
+		if (cue.type === 'rouse') {
+			idleEpoch++;
+			idleTurn = 0;
+			const quick = { duration: instant ? 0 : 180, easing: cubicOut };
+			lids.set(0, quick);
+			sag.set(0, quick);
+			yawnMouth.set(0, quick);
+			return;
+		}
+		if (instant) return;
+		if (cue.type === 'glance') glance(cue.x, cue.y);
+		else if (cue.type === 'fidget') fidget(cue.fidget);
+		else if (cue.type === 'yawn') yawn();
+		else if (cue.type === 'droop') {
+			lids.set(0.45, { duration: 1400, easing: cubicOut });
+			sag.set(1, { duration: 1600, easing: cubicOut });
+		}
+	}
+
+	let glanced = false;
+	/** Eyes first, the head follows a moment later; a long glance hides behind a blink. */
+	function glance(x: number, y: number) {
+		if (lookAt !== 'pointer' || reactor.holdsGaze || pressed) return;
+		const from = gaze.target;
+		gaze.target = { x, y };
+		glanced = true;
+		if (Math.hypot(x - from.x, y - from.y) > 0.9 && blink.current === 0 && !asleep) blinkEyes();
+		const epoch = idleEpoch;
+		later(() => {
+			if (epoch === idleEpoch) idleTurn = x * 4;
+		}, 100);
+	}
+
+	function fidget(kind: Fidget) {
+		if (hovered || pressed || booping) return;
+		const epoch = idleEpoch;
+		if (kind === 'shift') kickWobble(2.5 * flip(), 650);
+		else if (kind === 'shrug') {
+			squish.target = { x: 1.05, y: 0.93 };
+			later(() => (squish.target = { x: 0.97, y: 1.05 }), 170);
+			later(() => (squish.target = restSquish()), 380);
+		} else if (kind === 'feet') {
+			const free = lookAt === 'pointer' && !reactor.holdsGaze;
+			if (free) gaze.target = { x: 0.15 * flip(), y: 0.95 };
+			sag.set(0.5, { duration: 320, easing: cubicOut });
+			later(() => {
+				if (epoch !== idleEpoch) return;
+				if (free) gaze.target = { x: 0, y: 0 };
+				sag.set(0, { duration: 420, easing: cubicOut });
+			}, 1200);
+		} else if (kind === 'blink') {
+			if (!asleep) blinkEyes(2);
+		} else if (kind === 'sigh') settle({ x: 1.03, y: 0.955 }, 450, 0.06, 0.85);
+		else jump(4, 140);
+	}
+
+	function yawn() {
+		const epoch = idleEpoch;
+		settle({ x: 0.94, y: 1.1 }, 1100, 0.04, 0.85);
+		yawnMouth.set(0.85, { duration: 700, easing: cubicOut });
+		lids.set(0.8, { duration: 600, easing: cubicOut });
+		later(() => {
+			if (epoch !== idleEpoch) return;
+			yawnMouth.set(0, { duration: 500, easing: cubicIn });
+			lids.set(0.2, { duration: 700, easing: cubicOut });
+		}, 1400);
+	}
+
 	$effect(() => {
 		const target = lookAt;
 		if (typeof target === 'object') {
@@ -339,23 +509,10 @@
 			glance();
 			return () => clearTimeout(timer);
 		}
-		// After a while without pointer movement it glances around on its own.
-		let idleTimer: ReturnType<typeof setTimeout>;
-		const glanceAround = () => {
-			gaze.target =
-				Math.random() < 0.3
-					? { x: 0, y: 0 }
-					: { x: Math.random() * 1.6 - 0.8, y: Math.random() * 1 - 0.5 };
-			idleTimer = setTimeout(glanceAround, 1400 + Math.random() * 2200);
-		};
-		const armIdle = () => {
-			clearTimeout(idleTimer);
-			idleTimer = setTimeout(glanceAround, 4000);
-		};
-		armIdle();
+		// Resting pointers hand the eyes over to the idle ladder's glances.
 		let fixed = { x: 0, y: 0 };
 		const move = (e: PointerEvent) => {
-			armIdle();
+			reactor.activity();
 			if (!root || reactor.holdsGaze) return;
 			const rect = root.getBoundingClientRect();
 			// Aim from the face, not the middle of the figure.
@@ -364,7 +521,8 @@
 			focus.target = reduced ? 0 : aim.focus;
 			const next = { x: clamp(aim.x, -1, 1), y: clamp(aim.y, -1, 1) };
 			const s = saccade(fixed, next);
-			if (!s.jump) return;
+			if (!s.jump && !glanced) return;
+			glanced = false;
 			fixed = next;
 			gaze.target = next;
 			if (s.blink && !reduced && blink.current === 0 && !asleep) blinkEyes();
@@ -376,7 +534,6 @@
 		window.addEventListener('pointermove', move);
 		document.documentElement.addEventListener('pointerleave', reset);
 		return () => {
-			clearTimeout(idleTimer);
 			window.removeEventListener('pointermove', move);
 			document.documentElement.removeEventListener('pointerleave', reset);
 		};
@@ -404,9 +561,10 @@
 	function boop() {
 		if (!reduced) {
 			// Stretch on take-off; `jump` squashes again on landing.
+			// Pressing was the crouch, so it takes off right away.
+			jump(11, 150, false);
 			squish.set({ x: 0.86, y: 1.16 }, { instant: true });
 			squish.target = restSquish();
-			jump(11);
 			kickWobble(pointerX < 0 ? -3 : 3);
 		}
 		booping = true;
@@ -424,15 +582,22 @@
 		look: (x, y) => (gaze.target = { x, y }),
 		jump: (height, up) => jump(height, up),
 		wobble: (deg) => kickWobble(deg),
-		emit: (event) => onreaction?.(event)
+		emit: (event) => onreaction?.(event),
+		idle: idleCue
 	});
 	const reactionFlags = $derived(resolveReactions(reactions));
+	// Reactions need `interactive`; without it nothing could wake a dozing figure.
+	const NO_REACTIONS = resolveReactions(false);
 	$effect(() => {
-		reactor.configure(reactionFlags, reduced, mood, {
+		reactor.configure(interactive ? reactionFlags : NO_REACTIONS, reduced, mood, {
 			viewHeight: body ? BODY_VIEWBOX_HEIGHT : 200,
 			head
 		});
 	});
+	$effect(() => {
+		reactor.setRunning(onscreen);
+	});
+	$effect(() => () => reactor.destroy());
 	$effect(() => {
 		const el = root;
 		if (!el || !interactive || !onscreen || !Object.values(reactionFlags).some(Boolean)) return;
@@ -470,7 +635,7 @@
 	const gx = $derived(clamp(gaze.current.x + f.gazeX, -1, 1));
 	const gy = $derived(clamp(gaze.current.y + f.gazeY, -1, 1));
 	const mouthLevel = $derived(
-		activeMood !== 'talking' ? 0 : level !== undefined ? clamp(level, 0, 1) : talk
+		activeMood !== 'talking' ? yawnMouth.current : level !== undefined ? clamp(level, 0, 1) : talk
 	);
 	const sx = $derived(squish.current.x * (1 - f.stretch * 0.6));
 	const sy = $derived(squish.current.y * (1 + f.stretch));
@@ -484,6 +649,11 @@
 	// Lean and wobble rock from the base (the soles with a body), like something standing.
 	const rockPivot = $derived(body ? `100 ${BODY_GROUND_Y}` : `100 ${head.bottom}`);
 	const rock = $derived(wobble.current);
+	// With a body the head trails the figure; a lone head is the whole figure.
+	const headDrag = $derived(body ? clamp(headLag.current - rock, -6, 6) : 0);
+	const headDrop = $derived(
+		(body ? clamp(headBob.current - hop.current, -5, 5) * 0.5 : 0) + sag.current * 2.5
+	);
 	const neckY = $derived(head.bottom - 6);
 	// The ground reacts to the hop and the squash: smaller and fainter while airborne.
 	const air = $derived(clamp(-hop.current / 24, 0, 1));
@@ -499,8 +669,10 @@
 	// Feet squash with the figure (see figureSquash) and lift off entirely on a hop.
 	const footContactScale = $derived(1 + (sx - 1) * 0.35);
 	// With a body the neck pivot gets a bit less, since the whole figure squashes too.
-	const headSx = $derived(body ? 1 + (sx - 1) * 0.7 : sx);
-	const headSy = $derived(body ? 1 + (sy - 1) * 0.7 : sy);
+	const hsx = $derived(headSquish.current.x * (1 - f.stretch * 0.6));
+	const hsy = $derived(headSquish.current.y * (1 + f.stretch));
+	const headSx = $derived(body ? 1 + (hsx - 1) * 0.7 : hsx);
+	const headSy = $derived(body ? 1 + (hsy - 1) * 0.7 : hsy);
 	// In full-body mode the legs take some of the squash so the head doesn't sink into the torso.
 	const figureSquash = $derived(
 		body
@@ -525,7 +697,7 @@
 			return f;
 		},
 		get blink() {
-			return blink.current;
+			return Math.max(blink.current, lids.current);
 		},
 		get gazeX() {
 			return gx;
@@ -570,7 +742,7 @@
 			return shoes;
 		},
 		get lean() {
-			return rock + headTurn.current;
+			return rock + headTurn.current + headDrag;
 		},
 		get hop() {
 			return hop.current;
@@ -667,12 +839,15 @@
 									<Body layer="back" />
 								</g>
 							{/if}
-							<g transform="rotate({headTurn.current} 100 {neckY})">
+							<g
+								transform="rotate({headTurn.current +
+									headDrag} 100 {neckY}) translate(0 {headDrop})"
+							>
 								<g
 									class="head"
 									transform="translate(100 {head.bottom}) scale({headSx} {headSy}) translate(-100 {-head.bottom})"
 								>
-									<g class="breathe">
+									<g class="breathe" class:lift={body}>
 										<Accessories layer="back" />
 										<Shell />
 										<Face />
@@ -715,6 +890,7 @@
 		onclick={boop}
 		onpointerenter={(e) => {
 			hovered = true;
+			reactor.activity();
 			trackPointer(e);
 		}}
 		onpointermove={trackPointer}
@@ -722,7 +898,10 @@
 			hovered = pressed = false;
 			pointerX = 0;
 		}}
-		onpointerdown={() => (pressed = true)}
+		onpointerdown={() => {
+			pressed = true;
+			reactor.activity();
+		}}
 		onpointerup={() => (pressed = false)}
 		onpointercancel={() => (pressed = false)}
 	>
@@ -824,10 +1003,14 @@
 	.ground-glow {
 		animation: shadow var(--float-speed) ease-in-out infinite alternate;
 	}
-	/* A slightly off-beat, uneven cycle so breathing never syncs with the float and feels organic. */
+	/* Off-beat with the float so the two never sync. A standing figure's head rides up on the
+	   breath; a lone head swells a little instead. */
 	.breathe {
 		transform-origin: 50% 100%;
 		animation: breathe calc(var(--float-speed) * 1.37) ease-in-out infinite;
+	}
+	.breathe.lift {
+		animation-name: breathe-lift;
 	}
 	.no-float .float,
 	.no-float .shadow,
@@ -871,19 +1054,33 @@
 			opacity: 0.55;
 		}
 	}
+	/* Quick inhale, long exhale, then a pause before the next breath. */
 	@keyframes breathe {
-		0%,
+		0% {
+			transform: scale(1, 1);
+			animation-timing-function: cubic-bezier(0.3, 0, 0.4, 1);
+		}
+		28% {
+			transform: scale(1.01, 1.018);
+			animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1);
+		}
+		78%,
 		100% {
 			transform: scale(1, 1);
 		}
-		38% {
-			transform: scale(1.008, 0.99);
+	}
+	@keyframes breathe-lift {
+		0% {
+			transform: translateY(0);
+			animation-timing-function: cubic-bezier(0.3, 0, 0.4, 1);
 		}
-		52% {
-			transform: scale(1.009, 0.988);
+		28% {
+			transform: translateY(-1.5px);
+			animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1);
 		}
-		78% {
-			transform: scale(0.998, 1.003);
+		78%,
+		100% {
+			transform: translateY(0);
 		}
 	}
 </style>
