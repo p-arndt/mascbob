@@ -41,8 +41,15 @@ describe('THEMES', () => {
 	// The face ink plate is painted in `eye` straight onto the body, so it must read on both
 	// light and dark bodies.
 	it.each(Object.entries(THEMES))('%s keeps the face readable on the body', (_, theme) => {
-		expect(contrast(theme.eye, theme.bodyMid)).toBeGreaterThanOrEqual(3);
+		expect(contrast(theme.eye, theme.bodyMid)).toBeGreaterThanOrEqual(4.5);
 		expect(contrast(theme.eye, theme.bodyLight)).toBeGreaterThanOrEqual(3);
+	});
+
+	// The accent plate is the offset misprint behind the ink plate; if it melts into the ink or
+	// the body, the screen-print look disappears.
+	it.each(Object.entries(THEMES))('%s keeps the misprint visible', (_, theme) => {
+		expect(contrast(theme.accent, theme.eye)).toBeGreaterThanOrEqual(2);
+		expect(contrast(theme.accent, theme.bodyMid)).toBeGreaterThanOrEqual(1.8);
 	});
 
 	it('gives every colorway its own body and accent', () => {

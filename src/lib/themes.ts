@@ -21,16 +21,16 @@ export const THEMES = {
 		visor: '#17181a',
 		eye: '#17181a',
 		cheek: '#ff8a80',
-		accent: '#c6f432'
+		accent: '#86bc00'
 	},
 	ice: {
 		bodyLight: '#f8fbff',
 		bodyMid: '#e5edf7',
 		bodyDark: '#c7d5e6',
 		visor: '#0f1b2d',
-		eye: '#1f6fff',
+		eye: '#1b5ed6',
 		cheek: '#ff8fb1',
-		accent: '#4cc3ff'
+		accent: '#2eb0f5'
 	},
 	lilac: {
 		bodyLight: '#faf7ff',
@@ -55,9 +55,9 @@ export const THEMES = {
 		bodyMid: '#26262b',
 		bodyDark: '#141417',
 		visor: '#08080a',
-		eye: '#ff453a',
+		eye: '#ff5a4e',
 		cheek: '#ff6b6b',
-		accent: '#e10600'
+		accent: '#c00600'
 	},
 	noir: {
 		bodyLight: '#3b3d45',
@@ -66,7 +66,7 @@ export const THEMES = {
 		visor: '#050506',
 		eye: '#7dffd4',
 		cheek: '#ff6fa5',
-		accent: '#7dffd4'
+		accent: '#ff3d8b'
 	},
 	mint: {
 		bodyLight: '#f4fcf8',
@@ -93,7 +93,7 @@ export const THEMES = {
 		visor: '#1e1650',
 		eye: '#2b1f7a',
 		cheek: '#ff5c9a',
-		accent: '#1fc8ff'
+		accent: '#009fdb'
 	},
 	forest: {
 		bodyLight: '#415c4a',
@@ -102,7 +102,7 @@ export const THEMES = {
 		visor: '#0a120d',
 		eye: '#f4ecd0',
 		cheek: '#ff8a65',
-		accent: '#ffb000'
+		accent: '#f58200'
 	},
 	midnight: {
 		bodyLight: '#34406e',
@@ -111,7 +111,7 @@ export const THEMES = {
 		visor: '#060816',
 		eye: '#ffe066',
 		cheek: '#ff8fb1',
-		accent: '#7c9cff'
+		accent: '#7a98ff'
 	},
 	shadow: {
 		bodyLight: '#2b2b2e',
