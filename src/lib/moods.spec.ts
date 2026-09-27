@@ -71,9 +71,56 @@ describe('moods', () => {
 		expect(moodConfig('wink').face.tongue).toBe(1);
 	});
 
-	it('only draws brows and blush marks where a mood asks for them', () => {
-		const { face } = moodConfig('idle');
-		expect(face.left.brow + face.right.brow + face.blushLines).toBe(0);
+	it('keeps faint resting brows so mood changes move them instead of fading them in', () => {
+		for (const mood of ['idle', 'happy', 'love'] as const) {
+			const { face } = moodConfig(mood);
+			expect(face.left.brow, mood).toBeGreaterThan(0);
+			expect(face.left.brow, mood).toBeLessThan(0.5);
+		}
+		expect(moodConfig('wink').face.left.brow).toBeGreaterThan(0);
+		expect(moodConfig('idle').face.blushLines).toBe(0);
+	});
+
+	it('pulls the mouth to one side with skew', () => {
+		expect(moodConfig('thinking').face.mouthSkew).toBe(-1.5);
+		expect(moodConfig('wink').face.mouthSkew).toBe(1.5);
+		expect(moodConfig('grumpy').face.mouthSkew).not.toBe(0);
+		expect(moodConfig('idle').face.mouthSkew).toBe(0);
+	});
+
+	it('laughs with squeezed crescents and a wide open grin', () => {
+		const { face, effect } = moodConfig('laughing');
+		expect(face.left.lift).toBeGreaterThanOrEqual(0.8);
+		expect(face.left.open).toBeLessThan(1);
+		expect(face.mouthOpen).toBeGreaterThan(moodConfig('happy').face.mouthOpen);
+		expect(face.mouthCurve).toBeGreaterThan(4);
+		expect(effect).toBe('sparkles');
+	});
+
+	it('narrows the eyes and lowers the brows when focused', () => {
+		const { face } = moodConfig('focused');
+		expect(face.left.open).toBeLessThan(1);
+		expect(face.left.browLift).toBeLessThan(0);
+		expect(face.gazeY).toBeGreaterThan(0);
+		expect(face.mouthOpen).toBe(0);
+		expect(face.mouthX).not.toBe(0);
+	});
+
+	it('raises one brow and tilts the head when curious', () => {
+		const { face, effect } = moodConfig('curious');
+		expect(face.left.browLift - face.right.browLift).toBeGreaterThan(2);
+		expect(Math.abs(face.tilt)).toBeGreaterThanOrEqual(8);
+		expect(face.mouthRound).toBeGreaterThan(0.5);
+		expect(effect).toBe('question');
+	});
+
+	it('widens small eyes under worried brows and sweats when nervous', () => {
+		const { face, effect } = moodConfig('nervous');
+		expect(face.left.open).toBeGreaterThan(1);
+		expect(face.left.scale).toBeLessThan(1);
+		expect(face.left.browTilt).toBeGreaterThan(0);
+		expect(face.mouthCurve).toBeLessThan(0);
+		expect(effect).toBe('sweat');
 	});
 
 	it('falls back to idle for unknown moods', () => {

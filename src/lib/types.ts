@@ -11,7 +11,11 @@ export const MOODS = [
 	'wink',
 	'grumpy',
 	'shy',
-	'waving'
+	'waving',
+	'laughing',
+	'focused',
+	'curious',
+	'nervous'
 ] as const;
 export type Mood = (typeof MOODS)[number];
 
@@ -45,7 +49,8 @@ export type EyeStyle = (typeof EYE_STYLES)[number];
 export { ACCESSORIES, type Accessory } from './parts/accessories.js';
 export { OUTFITS, SHOES, type Outfit, type Shoes } from './parts/body.js';
 
-export type Effect = 'sparkles' | 'waves' | 'dots' | 'zzz' | 'tear' | 'hearts';
+export type Effect =
+	'sparkles' | 'waves' | 'dots' | 'zzz' | 'tear' | 'hearts' | 'question' | 'sweat';
 export type HandPose = 'rest' | 'up' | 'wave' | 'think';
 
 /** Gaze target: follow the pointer, glance around on its own, stay still, or a fixed direction in -1..1. */
@@ -81,6 +86,8 @@ export interface FaceParams {
 	mouthCurve: number;
 	mouthOpen: number;
 	mouthX: number;
+	/** Lopsided mouth: positive raises the right corner and lowers the left, negative the reverse. */
+	mouthSkew: number;
 	/** Crossfade from the regular mouth to a cat mouth ("ω"), 0..1. */
 	mouthCat: number;
 	/** Crossfade from the regular mouth to a round "o", 0..1. */

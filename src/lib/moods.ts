@@ -31,6 +31,7 @@ const face = (p: FaceInput = {}): FaceParams => {
 		mouthCurve: 3,
 		mouthOpen: 0,
 		mouthX: 0,
+		mouthSkew: 0,
 		mouthCat: 0,
 		mouthRound: 0,
 		tongue: 0,
@@ -43,12 +44,14 @@ const face = (p: FaceInput = {}): FaceParams => {
 };
 
 const crescent = { lift: 0.8 };
+// Resting brows stay faintly printed, so a mood change moves them instead of fading them in.
+const faintBrow = { brow: 0.3 };
 
 export const MOOD_CONFIGS: Record<Mood, MoodConfig> = {
-	idle: { face: face(), effect: null, hands: 'rest', floatSpeed: 3.2 },
+	idle: { face: face({ eyes: faintBrow }), effect: null, hands: 'rest', floatSpeed: 3.2 },
 	happy: {
 		face: face({
-			eyes: { ...crescent, scale: 1.08 },
+			eyes: { ...crescent, ...faintBrow, scale: 1.08, browLift: 1.5 },
 			mouthWidth: 18,
 			mouthCurve: 5,
 			mouthOpen: 4.5,
@@ -85,6 +88,7 @@ export const MOOD_CONFIGS: Record<Mood, MoodConfig> = {
 			mouthWidth: 9,
 			mouthCurve: -1.5,
 			mouthX: 5,
+			mouthSkew: -1.5,
 			tilt: 6
 		}),
 		effect: 'dots',
@@ -152,7 +156,7 @@ export const MOOD_CONFIGS: Record<Mood, MoodConfig> = {
 	},
 	love: {
 		face: face({
-			eyes: { heart: 1, scale: 1.05 },
+			eyes: { heart: 1, scale: 1.05, ...faintBrow, browLift: 1.5 },
 			mouthWidth: 14,
 			mouthCurve: 5,
 			mouthOpen: 3,
@@ -168,12 +172,13 @@ export const MOOD_CONFIGS: Record<Mood, MoodConfig> = {
 	wink: {
 		face: face({
 			// A thin closed arch, not a squint: no brow pressing down on it.
-			left: { scale: 1.08 },
+			left: { scale: 1.08, ...faintBrow, browLift: 1 },
 			right: { open: 0.5, lift: 0.8 },
 			mouthWidth: 15,
 			mouthCurve: 4,
 			mouthOpen: 2.5,
 			mouthX: 2,
+			mouthSkew: 1.5,
 			tongue: 1,
 			cheeks: 0.9,
 			tilt: 5
@@ -222,12 +227,86 @@ export const MOOD_CONFIGS: Record<Mood, MoodConfig> = {
 			mouthWidth: 11,
 			mouthCurve: -3,
 			mouthX: -2,
+			mouthSkew: -1,
 			cheeks: 0.15,
 			stretch: -0.03
 		}),
 		effect: null,
 		hands: 'rest',
 		floatSpeed: 4
+	},
+	laughing: {
+		face: face({
+			// Squeezed shut by the cheeks; the ha-ha pulses come from the face on top of this grin.
+			eyes: { ...crescent, open: 0.75, scale: 1.04, brow: 0.6, browLift: 2, browTilt: 0.25 },
+			mouthWidth: 20,
+			mouthCurve: 6,
+			mouthOpen: 6,
+			tongue: 0.8,
+			cheeks: 1,
+			blushLines: 0.5,
+			tilt: -6,
+			stretch: 0.05
+		}),
+		effect: 'sparkles',
+		hands: 'up',
+		floatSpeed: 1.3
+	},
+	focused: {
+		face: face({
+			eyes: {
+				open: 0.72,
+				lidInner: 0.2,
+				lidOuter: 0.15,
+				brow: 0.9,
+				browLift: -1.5,
+				browTilt: -0.3
+			},
+			gazeY: 0.35,
+			mouthWidth: 8,
+			mouthCurve: -0.4,
+			mouthX: 3,
+			cheeks: 0.3,
+			tilt: 2,
+			stretch: -0.01
+		}),
+		effect: null,
+		hands: 'rest',
+		floatSpeed: 3.8
+	},
+	curious: {
+		face: face({
+			eyes: { open: 1.1, scale: 1.1 },
+			left: { brow: 1, browLift: 4.5, browTilt: 0.15 },
+			right: { brow: 0.7, browLift: 0.5, browTilt: -0.1 },
+			gazeX: 0.25,
+			gazeY: -0.2,
+			mouthWidth: 6,
+			mouthCurve: 0.5,
+			mouthOpen: 3,
+			mouthRound: 0.8,
+			cheeks: 0.45,
+			tilt: 10
+		}),
+		effect: 'question',
+		hands: 'think',
+		floatSpeed: 2.8
+	},
+	nervous: {
+		face: face({
+			// Wide open but small: pinned pupils under worried brows.
+			eyes: { open: 1.15, scale: 0.85, brow: 1, browTilt: 0.5, browLift: 2.5 },
+			mouthWidth: 16,
+			mouthCurve: -1.2,
+			mouthOpen: 2,
+			mouthSkew: 0.8,
+			cheeks: 0.2,
+			tilt: -3,
+			stretch: -0.03
+		}),
+		effect: 'sweat',
+		hands: 'rest',
+		floatSpeed: 1.8
 	}
 };
 

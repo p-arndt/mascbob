@@ -136,3 +136,48 @@ export function mulberry32(seed: number): () => number {
 		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 	};
 }
+
+/** Seconds; `delay` is negative so every loop starts mid-cycle. */
+export interface Loop {
+	period: number;
+	delay: number;
+}
+
+/**
+ * Per-particle loop timings for the ambient mood effects. Periods are pairwise
+ * incommensurate (no small whole-number ratios), so the particles drift in and out of
+ * step instead of replaying one visible pattern.
+ */
+export const LOOPS = {
+	sparkles: [
+		{ period: 1.5, delay: -0.2 },
+		{ period: 1.87, delay: -1.13 },
+		{ period: 1.33, delay: -0.61 },
+		{ period: 2.41, delay: -1.72 }
+	],
+	glitter: [
+		{ period: 1.8, delay: -0.3 },
+		{ period: 2.51, delay: -1.49 },
+		{ period: 2.03, delay: -0.87 }
+	],
+	hearts: [
+		{ period: 2.4, delay: 0 },
+		{ period: 2.91, delay: -1.31 },
+		{ period: 3.37, delay: -2.23 }
+	],
+	heartSway: [
+		{ period: 1.2, delay: -0.1 },
+		{ period: 1.43, delay: -0.77 },
+		{ period: 1.01, delay: -0.39 }
+	],
+	zzz: [
+		{ period: 3, delay: 0 },
+		{ period: 3.31, delay: -1.17 },
+		{ period: 2.83, delay: -2.09 }
+	]
+} satisfies Record<string, Loop[]>;
+
+/** Sound waves run 1.5 s; the far side trails by half of that so the two sides alternate. */
+export const WAVE_PERIOD = 1.5;
+export const waveDelay = (i: number, side: number) =>
+	-i * (WAVE_PERIOD / 3) - (side < 0 ? WAVE_PERIOD / 2 : 0);

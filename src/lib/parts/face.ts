@@ -161,6 +161,8 @@ export interface MouthShape {
 	open: number;
 	/** 0..1 pulls the mouth into a round "o". */
 	round: number;
+	/** Raises the right corner and lowers the left by this much (negative: the reverse). */
+	skew?: number;
 }
 
 /**
@@ -178,7 +180,28 @@ export function mouthPath(m: MouthShape): string {
 	const bend = curve * 1.5;
 	const upper = corner + bend * (1 - clamp(open / 8, 0, 0.75)) - open * round * 0.9;
 	const lower = corner + bend + open * 1.8 - open * round * 0.8;
-	return `M${fmt(m.cx - hw)} ${fmt(corner)}Q${fmt(m.cx)} ${fmt(upper)} ${fmt(m.cx + hw)} ${fmt(corner)}Q${fmt(m.cx)} ${fmt(lower)} ${fmt(m.cx - hw)} ${fmt(corner)}Z`;
+	// A round "o" has no corners to tip.
+	const skew = (m.skew ?? 0) * (1 - round);
+	const cl = corner + skew;
+	const cr = corner - skew;
+	return `M${fmt(m.cx - hw)} ${fmt(cl)}Q${fmt(m.cx)} ${fmt(upper)} ${fmt(m.cx + hw)} ${fmt(cr)}Q${fmt(m.cx)} ${fmt(lower)} ${fmt(m.cx - hw)} ${fmt(cl)}Z`;
+}
+
+/**
+ * How far a smile reaches the eyes, 0..1: a real (Duchenne) smile pushes the cheeks up
+ * and the lower lids with them; a polite one only moves the mouth.
+ */
+export function duchenne(curve: number, round = 0): number {
+	return clamp((curve * (1 - clamp(round, 0, 1)) - 3) / 2.5, 0, 1);
+}
+
+/**
+ * A brow as one quadratic stroke with a slight arch. Slanted brows flatten, since a
+ * cross or worried brow reads as a straight dash.
+ */
+export function browPath(x0: number, y0: number, x1: number, y1: number, tilt: number): string {
+	const arch = Math.hypot(x1 - x0, y1 - y0) * 0.14 * (1 - clamp(Math.abs(tilt) * 1.6, 0, 0.8));
+	return `M${fmt(x0)} ${fmt(y0)}Q${fmt((x0 + x1) / 2)} ${fmt((y0 + y1) / 2 - arch * 2)} ${fmt(x1)} ${fmt(y1)}`;
 }
 
 /** "ω": two little arcs meeting in the middle. */

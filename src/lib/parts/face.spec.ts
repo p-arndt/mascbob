@@ -3,7 +3,9 @@ import { MOOD_CONFIGS } from '../moods.js';
 import { EYE_STYLES } from '../types.js';
 import {
 	EYE_SIZES,
+	browPath,
 	catMouthPath,
+	duchenne,
 	eyeClosure,
 	eyeLids,
 	eyeOutline,
@@ -270,8 +272,57 @@ describe('mouthPath', () => {
 		);
 	});
 
+	it('tips the corners with skew but keeps the command structure for tweening', () => {
+		const commands = (d: string) => d.replace(/[^A-Za-z]/g, '');
+		const numbers = (d: string) => d.match(/-?[\d.]+/g)?.length;
+		const flat = mouthPath(mouth({ open: 3 }));
+		const skewed = mouthPath(mouth({ open: 3, skew: 1.5 }));
+		expect(commands(skewed)).toBe(commands(flat));
+		expect(numbers(skewed)).toBe(numbers(flat));
+		const [left, upper, right, lower] = ys(skewed);
+		const [flatLeft, flatUpper, flatRight, flatLower] = ys(flat);
+		// Positive skew raises the right corner (smaller y) and lowers the left.
+		expect(right).toBeCloseTo(flatRight - 1.5);
+		expect(left).toBeCloseTo(flatLeft + 1.5);
+		expect(upper).toBeCloseTo(flatUpper);
+		expect(lower).toBeCloseTo(flatLower);
+	});
+
+	it('does not tip a round mouth', () => {
+		expect(mouthPath(mouth({ open: 6, round: 1, skew: 2 }))).toBe(
+			mouthPath(mouth({ open: 6, round: 1 }))
+		);
+	});
+
 	it('draws a cat mouth as two arcs', () => {
 		expect(catMouthPath(100, 118, 12).match(/Q/g)).toHaveLength(2);
+	});
+});
+
+describe('duchenne', () => {
+	it('only lets a big smile reach the eyes', () => {
+		expect(duchenne(MOOD_CONFIGS.idle.face.mouthCurve)).toBe(0);
+		expect(duchenne(-4)).toBe(0);
+		expect(duchenne(5)).toBeGreaterThan(0.5);
+		expect(duchenne(20)).toBe(1);
+	});
+
+	it('ignores the curve of a round mouth', () => {
+		expect(duchenne(6, 1)).toBe(0);
+	});
+});
+
+describe('browPath', () => {
+	const peak = (d: string) => Number(d.match(/Q[\d.]+ (-?[\d.]+)/)![1]);
+
+	it('arches a level brow up in the middle', () => {
+		expect(peak(browPath(70, 80, 84, 80, 0))).toBeLessThan(80);
+	});
+
+	it('flattens slanted brows', () => {
+		const level = 80 - peak(browPath(70, 80, 84, 80, 0));
+		const cross = 80 - peak(browPath(70, 80, 84, 80, -0.55));
+		expect(cross).toBeLessThan(level / 2);
 	});
 });
 

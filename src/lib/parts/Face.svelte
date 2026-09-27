@@ -1,12 +1,16 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { Spring } from 'svelte/motion';
 	import { getMascot, svgRef } from '../context.js';
 	import { clamp, HEART_PATH } from '../geometry.js';
+	import { createLaugh, createVisemes, VOWELS } from '../speech.js';
 	import type { EyeParams } from '../types.js';
 	import {
 		EYE_SIZES,
 		MISPRINT,
+		browPath,
 		catMouthPath,
+		duchenne,
 		eyeClosure,
 		eyeLids,
 		eyeOutline,
@@ -71,30 +75,59 @@
 		return () => clearTimeout(timer);
 	});
 
-	// Each syllable picks a vowel, so the mouth cycles through shapes instead of just flapping.
-	const VOWELS = [
-		{ wide: 0.35, round: 0 },
-		{ wide: 0, round: 0.15 },
-		{ wide: -0.25, round: 0.85 },
-		{ wide: 0.15, round: 0.4 }
-	];
+	// Each syllable picks a vowel, so the mouth cycles through shapes instead of just flapping;
+	// some start with the lips pressed shut, like an M, B or P, before they pop open.
+	const visemes = createVisemes();
 	const vowel = new Spring(VOWELS[1], { stiffness: 0.35, damping: 0.7 });
 	let voiced = false;
+	let leadTimer: ReturnType<typeof setTimeout> | undefined;
 	$effect(() => {
 		const level = m.talk;
 		if (!voiced && level > 0.15) {
 			voiced = true;
-			vowel.target = VOWELS[Math.floor(Math.random() * VOWELS.length)];
+			const { lead, vowel: next } = visemes.onset();
+			clearTimeout(leadTimer);
+			if (lead) {
+				vowel.target = lead;
+				leadTimer = setTimeout(() => (vowel.target = next), 70);
+			} else {
+				vowel.target = next;
+			}
 		} else if (voiced && level < 0.08) {
 			voiced = false;
 		}
 	});
+	$effect(() => () => clearTimeout(leadTimer));
+
+	// Laughing pulses the jaw on its own: `talk` is speech only, and a laugh is not a word.
+	let laugh = $state(0);
+	const laughing = $derived(m.mood === 'laughing');
+	$effect(() => {
+		if (!laughing || m.reduced || !m.onscreen) {
+			laugh = 0;
+			return;
+		}
+		untrack(() => {
+			clearTimeout(leadTimer);
+			vowel.target = VOWELS[0];
+		});
+		const ha = createLaugh();
+		let raf = 0;
+		const tick = (t: number) => {
+			laugh = ha.level(t);
+			raf = requestAnimationFrame(tick);
+		};
+		raf = requestAnimationFrame(tick);
+		return () => cancelAnimationFrame(raf);
+	});
 
 	const f = $derived(m.face);
-	const talk = $derived(m.talk);
+	const talk = $derived(Math.max(m.talk, laugh * 0.6));
 	const sq = $derived(clamp(squeeze.current, 0, 1));
 	const pop = $derived(1 + Math.max(0, -squeeze.current) * 0.6);
 	const grow = $derived(1 + curious.current * 0.1);
+	// A big grin pushes the cheeks and lower lids up with it.
+	const smile = $derived(duchenne(f.mouthCurve, f.mouthRound));
 	// Eyes travel further up than down; the face sits high on the head.
 	const eyeY = $derived(96 + m.gazeY * (m.gazeY < 0 ? 12 : 10) + saccade.current.y);
 	// Syllables knock the accent plate around a little, like a speaker cone.
@@ -113,7 +146,8 @@
 		// following its gaze. Both eyes always share one shape.
 		const up = Math.max(0, -m.gazeY);
 		const down = Math.max(0, m.gazeY);
-		const lids = eyeLids(base, p);
+		const lift = p.lift + smile * 0.22;
+		const lids = eyeLids(base, { ...p, lift });
 		const closure = eyeClosure(m.blink, down);
 		const shape: EyeShape = {
 			cx,
@@ -121,7 +155,7 @@
 			w: base.w * size,
 			h: fullH * Math.max(0, p.open) * (1 + up * 0.12) * closure.hScale * (1 - sq),
 			round: base.round,
-			lift: p.lift,
+			lift,
 			lidLeft: side === 'left' ? lids.outer : lids.inner,
 			lidRight: side === 'left' ? lids.inner : lids.outer,
 			lidDrop: closure.lidDrop
@@ -147,14 +181,11 @@
 			glint: base.glint ?? 1,
 			shine:
 				clamp(((shape.h / base.h) * (1 - closure.lidDrop) - 0.3) * 2.5, 0, 1) *
-				clamp(1.6 - p.lift * 2, 0, 1) *
+				clamp(1.6 - lift * 2, 0, 1) *
 				(1 - heart) *
 				(1 - sq),
 			brow: {
-				x0: cx - len / 2,
-				y0: browY + rise,
-				x1: cx + len / 2,
-				y1: browY - rise,
+				d: browPath(cx - len / 2, browY + rise, cx + len / 2, browY - rise, p.browTilt),
 				alpha: clamp(p.brow, 0, 1) * (1 - sq)
 			}
 		};
@@ -165,8 +196,9 @@
 	const eyes = $derived([left, right]);
 
 	const mouth = $derived.by(() => {
-		const open = Math.max(0, f.mouthOpen + talk * 11);
 		const v = vowel.current;
+		const press = clamp(v.press, 0, 1);
+		const open = Math.max(0, f.mouthOpen * (1 - press * 0.8) + talk * 11 * (1 - press));
 		const shape = {
 			cx: 100 + f.mouthX + m.gazeX * 6,
 			// The jaw drops with the syllable.
@@ -174,7 +206,8 @@
 			width: f.mouthWidth * (1 + talk * v.wide) * (1 - sq * 0.3),
 			curve: f.mouthCurve,
 			open,
-			round: clamp(f.mouthRound + talk * v.round, 0, 1)
+			round: clamp(f.mouthRound + talk * v.round, 0, 1),
+			skew: f.mouthSkew
 		};
 		return {
 			...shape,
@@ -185,7 +218,7 @@
 	});
 
 	const cheekX = $derived(Math.min(m.shape.halfWidth, 62) - 16);
-	const blush = $derived(clamp(f.cheeks + curious.current * 0.3 + sq * 0.4, 0, 1));
+	const blush = $derived(clamp(f.cheeks + curious.current * 0.3 + sq * 0.4 + smile * 0.15, 0, 1));
 	const blushLines = $derived(clamp(Math.max(f.blushLines, sq * 0.9), 0, 1));
 	const DOTS = halftone(9.5, 6, 2.7);
 </script>
@@ -203,7 +236,10 @@
 
 <!-- Halftone cheeks: blush grows the dots rather than fading them, like more ink on the screen. -->
 {#each [-1, 1] as side (side)}
-	<g class="cheek" transform="translate({100 + side * cheekX + m.gazeX * 4} {112 + m.gazeY * 2.5})">
+	<g
+		class="cheek"
+		transform="translate({100 + side * cheekX + m.gazeX * 4} {112 - smile * 2 + m.gazeY * 2.5})"
+	>
 		{#each DOTS as d, i (i)}
 			<circle cx={d.x} cy={d.y} r={d.r * blush} />
 		{/each}
@@ -224,11 +260,7 @@
 			<path d={HEART_PATH} transform="translate({e.heart.cx} {e.heart.cy}) scale({e.heart.s})" />
 		{/if}
 		{#if e.brow.alpha > 0.01}
-			<path
-				class="line"
-				d="M{e.brow.x0} {e.brow.y0}L{e.brow.x1} {e.brow.y1}"
-				opacity={clamp(e.brow.alpha * 1.8, 0, 1)}
-			/>
+			<path class="line" d={e.brow.d} opacity={clamp(e.brow.alpha * 1.8, 0, 1)} />
 		{/if}
 	{/each}
 	{#if sq > 0.01}
@@ -272,19 +304,19 @@
 	{/if}
 	{#each eyes as e, i (i)}
 		{#if e.shine > 0.01}
-			<!-- Same glint on both eyes: one light source, like a sticker catching the lamp. -->
+			<!-- Same glint on both eyes, lit from the top left like the shell: one lamp for the whole sticker. -->
 			<g clip-path={ref(`eye-clip-${i}`)} opacity={e.shine}>
 				<!-- Hung below the lid, or a heavy-lidded eye would clip its glint away. -->
 				<ellipse
 					class="shine"
-					cx={e.shape.cx + e.shape.w * (0.2 - m.gazeX * 0.14)}
+					cx={e.shape.cx - e.shape.w * (0.2 + m.gazeX * 0.14)}
 					cy={e.shape.cy - e.shape.h * (0.5 - e.lid - (1 - e.lid) * 0.3 + m.gazeY * 0.1)}
 					rx={e.shape.w * 0.17 * e.glint}
 					ry={e.shape.h * 0.14 * e.glint * (1 - e.lid * 0.5)}
 				/>
 				<circle
 					class="shine"
-					cx={e.shape.cx - e.shape.w * 0.12 * e.glint}
+					cx={e.shape.cx + e.shape.w * 0.14 * e.glint}
 					cy={e.shape.cy + e.shape.h * 0.2}
 					r={e.shape.w * 0.07 * e.glint}
 				/>
@@ -296,6 +328,14 @@
 {#if m.config.effect === 'tear'}
 	<g transform="translate({left.shape.cx - left.shape.w * 0.35} {eyeY + 9})">
 		<path class="tear" d="M0 -4.5C1.8 -1.6 3 0 3 1.6A3 3 0 0 1 -3 1.6C-3 0 -1.8 -1.6 0 -4.5Z" />
+	</g>
+{:else if m.config.effect === 'sweat'}
+	<!-- Beads on the temple beside the right eye, turning with the face like the cheeks. -->
+	<g transform="translate({100 + cheekX + 4 + m.gazeX * 3} {80 + m.gazeY * 2})">
+		<g class="sweat">
+			<path class="sweat-drop" d="M0 -6C2.4 -2.2 4 0 4 2.2A4 4 0 0 1 -4 2.2C-4 0 -2.4 -2.2 0 -6Z" />
+			<ellipse class="shine" cx="-1.4" cy="2" rx="0.9" ry="1.5" />
+		</g>
 	</g>
 {/if}
 
@@ -350,6 +390,37 @@
 		animation: drip 1.8s ease-in infinite;
 	}
 
+	.sweat {
+		transform-box: fill-box;
+		transform-origin: center;
+		animation: sweat 2.7s ease-in infinite;
+	}
+	.sweat-drop {
+		fill: #fff;
+		fill-opacity: 0.85;
+		stroke: var(--c-eye);
+		stroke-width: 1.4;
+		stroke-linejoin: round;
+	}
+
+	@keyframes sweat {
+		0% {
+			transform: translateY(-2px) scale(0.5);
+			opacity: 0;
+		}
+		15% {
+			transform: translateY(0) scale(1);
+			opacity: 1;
+		}
+		70% {
+			transform: translateY(5px) scale(1);
+			opacity: 1;
+		}
+		100% {
+			transform: translateY(12px) scale(0.9);
+			opacity: 0;
+		}
+	}
 	@keyframes drip {
 		0% {
 			transform: translateY(0) scale(0.4);

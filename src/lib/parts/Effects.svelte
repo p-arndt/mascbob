@@ -2,8 +2,9 @@
 	import { getMascot, svgRef } from '../context.js';
 	import { HEART_PATH, SPARKLE_PATH } from '../geometry.js';
 	import Burst from './Burst.svelte';
+	import { LOOPS, WAVE_PERIOD, waveDelay } from './effects.js';
 
-	/** Mood effects around the head (sparkles, hearts, zzz, thought bubble, sound waves) and boop bursts. */
+	/** Mood effects around the head (sparkles, hearts, zzz, thought bubble, sound waves, "?") and boop bursts. */
 	const m = getMascot();
 	const ref = (name: string) => svgRef(m.uid, name);
 	const t = $derived(m.shape.top);
@@ -26,13 +27,19 @@
 		{ x: 100 + hw + 10, y: t + 32, s: 7 }
 	]);
 	const cloud = $derived({ x: 100 + hw - 2, y: t - 26 });
+	const question = $derived({ x: 100 + hw - 6, y: t - 12 });
+	const QUESTION_PATH = 'M-4.5 -5.5Q-4.5 -11 1 -11Q6.5 -11 6.5 -6Q6.5 -2.5 2 -1Q0 -0.3 0 2.5';
 </script>
 
 {#if m.config.effect === 'sparkles'}
 	<g filter={ref('glow')}>
 		{#each sparkles as p, i (i)}
 			<g transform="translate({p.x} {p.y})">
-				<g class="twinkle" style:animation-delay="{-i * 0.45}s">
+				<g
+					class="twinkle"
+					style:animation-duration="{LOOPS.sparkles[i].period}s"
+					style:animation-delay="{LOOPS.sparkles[i].delay}s"
+				>
 					<path class="tone-{p.tone}" d={SPARKLE_PATH} transform="scale({p.s})" />
 					<path class="glint" d={SPARKLE_PATH} transform="scale({p.s * 0.42}) rotate(45)" />
 				</g>
@@ -41,14 +48,27 @@
 	</g>
 	{#each glitter as [x, y], i (i)}
 		<g transform="translate({x} {y})">
-			<circle class="glitter" r="1.3" style:animation-delay="{-i * 0.6 - 0.3}s" />
+			<circle
+				class="glitter"
+				r="1.3"
+				style:animation-duration="{LOOPS.glitter[i].period}s"
+				style:animation-delay="{LOOPS.glitter[i].delay}s"
+			/>
 		</g>
 	{/each}
 {:else if m.config.effect === 'hearts'}
 	{#each hearts as p, i (i)}
 		<g transform="translate({p.x} {p.y})">
-			<g class="heart-rise" style:animation-delay="{-i * 0.8}s">
-				<g class="heart-sway" style:animation-delay="{-i * 0.5}s">
+			<g
+				class="heart-rise"
+				style:animation-duration="{LOOPS.hearts[i].period}s"
+				style:animation-delay="{LOOPS.hearts[i].delay}s"
+			>
+				<g
+					class="heart-sway"
+					style:animation-duration="{LOOPS.heartSway[i].period}s"
+					style:animation-delay="{LOOPS.heartSway[i].delay}s"
+				>
 					<g transform="scale({p.s})">
 						<path class="heart" d={HEART_PATH} />
 						<ellipse
@@ -67,7 +87,11 @@
 {:else if m.config.effect === 'zzz'}
 	<g transform="translate({100 + hw - 10} {t + 4})">
 		{#each [0, 1, 2] as i (i)}
-			<g class="zzz" style:animation-delay="{-i * 1}s">
+			<g
+				class="zzz"
+				style:animation-duration="{LOOPS.zzz[i].period}s"
+				style:animation-delay="{LOOPS.zzz[i].delay}s"
+			>
 				<circle class="zzz-bubble" r="7.5" />
 				<path class="zzz-z" d="M-3.2 -3.2H3.2L-3.2 3.2H3.2" />
 			</g>
@@ -111,11 +135,35 @@
 	{#each [1, -1] as side (side)}
 		<g transform="translate({100 + side * (hw + 6)} 102) scale({side} 1)">
 			{#each [0, 1, 2] as i (i)}
-				<path class="wave" d="M0 -9Q6 0 0 9" style:animation-delay="{-i * 0.5}s" />
+				<path
+					class="wave"
+					d="M0 -9Q6 0 0 9"
+					style:animation-duration="{WAVE_PERIOD}s"
+					style:animation-delay="{waveDelay(i, side)}s"
+				/>
 			{/each}
-			<circle class="wave-dot" cx="1" r="1.6" />
+			<circle
+				class="wave-dot"
+				cx="1"
+				r="1.6"
+				style:animation-delay="{side < 0 ? -WAVE_PERIOD / 2 : 0}s"
+			/>
 		</g>
 	{/each}
+{:else if m.config.effect === 'question'}
+	<!-- Screen-printed like the face: an accent plate slightly off the ink plate. -->
+	<g transform="translate({question.x} {question.y})">
+		<g class="question">
+			<g class="glyph accent" transform="translate(1.4 1)">
+				<path d={QUESTION_PATH} />
+				<circle cy="7" r="1.9" />
+			</g>
+			<g class="glyph ink">
+				<path d={QUESTION_PATH} />
+				<circle cy="7" r="1.9" />
+			</g>
+		</g>
+	</g>
 {/if}
 
 <Burst />
@@ -211,6 +259,37 @@
 		animation: beat 0.75s ease-in-out infinite alternate;
 	}
 
+	.question {
+		transform-box: fill-box;
+		transform-origin: 50% 100%;
+		animation: question-bob 2.3s ease-in-out infinite alternate;
+	}
+	.glyph path {
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 3.2;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+	}
+	.glyph circle {
+		fill: currentColor;
+	}
+	.glyph.ink {
+		color: var(--c-eye);
+	}
+	.glyph.accent {
+		color: var(--c-accent);
+		opacity: 0.9;
+	}
+
+	@keyframes question-bob {
+		from {
+			transform: translateY(0) rotate(-8deg);
+		}
+		to {
+			transform: translateY(-3px) rotate(6deg);
+		}
+	}
 	@keyframes twinkle {
 		0%,
 		100% {

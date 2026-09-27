@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { SHAPE_DEFS } from '../geometry.js';
-import { BURST_LIFETIME, boopBurst, burst, confettiPop, mulberry32 } from './effects.js';
+import {
+	BURST_LIFETIME,
+	LOOPS,
+	WAVE_PERIOD,
+	boopBurst,
+	burst,
+	confettiPop,
+	mulberry32,
+	waveDelay
+} from './effects.js';
 
 describe('burst', () => {
 	const base = {
@@ -61,5 +70,27 @@ describe('presets', () => {
 	it('uses the theme tones only', () => {
 		const tones = new Set(boopBurst(SHAPE_DEFS.orb, mulberry32(9)).map((p) => p.tone));
 		for (const tone of tones) expect(['accent', 'cheek', 'eye', 'light']).toContain(tone);
+	});
+});
+
+describe('ambient loops', () => {
+	/** True when a/b is close to a ratio of small whole numbers, i.e. the pair replays in step. */
+	const locked = (a: number, b: number) => {
+		for (let p = 1; p <= 4; p++)
+			for (let q = 1; q <= 4; q++) if (Math.abs(a / b - p / q) < 0.02) return true;
+		return false;
+	};
+
+	for (const [name, loops] of Object.entries(LOOPS)) {
+		it(`gives every ${name} particle its own incommensurate period`, () => {
+			for (let i = 0; i < loops.length; i++)
+				for (let j = i + 1; j < loops.length; j++) {
+					expect(locked(loops[i].period, loops[j].period), `${i} vs ${j}`).toBe(false);
+				}
+		});
+	}
+
+	it('offsets the two sides of the sound waves by half a period', () => {
+		for (const i of [0, 1, 2]) expect(waveDelay(i, 1) - waveDelay(i, -1)).toBe(WAVE_PERIOD / 2);
 	});
 });
