@@ -1,8 +1,8 @@
 # mascott
 
-A friendly, animated and highly customizable SVG mascot for Svelte 5: a floating,
-pearly companion whose face is a matrix of tiny LEDs under its shell. It blinks, breathes, follows the
-cursor, reacts to boops, switches moods and lip-syncs to your voice. Show just the head or the full body.
+A friendly, animated and highly customizable SVG mascot for Svelte 5: a matte,
+streetwear-styled capsule bot in a puffer collar and chunky sneakers, whose face is a matrix of tiny LEDs under its shell. It blinks, breathes, follows the
+cursor, reacts to boops, switches moods and lip-syncs to your voice. Show the full figure or just the head.
 
 ## Install
 
@@ -18,13 +18,14 @@ pnpm add mascott
 	let mood = $state('idle');
 </script>
 
-<Mascot {mood} theme="aurora" accessories={['ring']} onboop={() => (mood = 'love')} />
+<Mascot {mood} theme="og" accessories={['ring']} onboop={() => (mood = 'love')} />
 ```
 
-Add `body` for the full figure (it is then 2:3 instead of square) and dress it with `outfit`:
+The full figure is 2:3 (`size` is the width). Dress it with `outfit`, or use `body={false}` for a square head-only avatar:
 
 ```svelte
-<Mascot body outfit="scarf" mood="happy" size={220} />
+<Mascot outfit="hoodie" theme="bred" mood="happy" size={220} />
+<Mascot body={false} size={64} />
 ```
 
 ### Props
@@ -40,17 +41,17 @@ import { MOODS, SHAPES, EYE_STYLES, ACCESSORIES, OUTFITS, THEMES } from 'mascott
 | Prop          | Type                                                                                       | Default   |
 | ------------- | ------------------------------------------------------------------------------------------ | --------- |
 | `mood`        | one of `MOODS`                                                                             | `idle`    |
-| `theme`       | a key of `THEMES`, or `{ base?, bodyLight, bodyMid, bodyDark, visor, eye, cheek, accent }` | `aurora`  |
+| `theme`       | a key of `THEMES`, or `{ base?, bodyLight, bodyMid, bodyDark, visor, eye, cheek, accent }` | `og`      |
 | `shape`       | one of `SHAPES` (head silhouette)                                                          | `pebble`  |
 | `eyes`        | one of `EYE_STYLES`                                                                        | `round`   |
 | `accessories` | array of `ACCESSORIES`                                                                     | `[]`      |
-| `body`        | draw a full body below the head; the mascot becomes 2:3 (`size` is the width)              | `false`   |
-| `outfit`      | one of `OUTFITS`; only visible with `body`                                                 | `none`    |
-| `hands`       | floating hands that gesture with the mood                                                  | `true`    |
+| `body`        | full figure with legs and sneakers, 2:3 (`size` is the width); `false` shows just the head | `true`    |
+| `outfit`      | one of `OUTFITS`; only visible with `body`                                                 | `puffer`  |
+| `hands`       | floating hands that gesture with the mood (head-only mode)                                 | `true`    |
 | `lookAt`      | `pointer` `wander` `none` or `{ x, y }` in -1..1                                           | `pointer` |
 | `level`       | mouth opening 0..1 while `talking` (e.g. mic amplitude); omit for automatic lip movement   | –         |
 | `size`        | px number or any CSS length                                                                | `160`     |
-| `float`       | idle hover animation                                                                       | `true`    |
+| `float`       | idle hover animation (head-only mode; the full figure stands)                              | `true`    |
 | `motion`      | `auto` (respects `prefers-reduced-motion`), `full`, `reduced`                              | `auto`    |
 | `interactive` | render as a button that reacts to clicks                                                   | `true`    |
 | `label`       | accessible name                                                                            | `Mascott` |

@@ -80,7 +80,7 @@
 			['', ' '],
 			['t-attr', 'theme'],
 			['t-p', '='],
-			['t-str', '"aurora"'],
+			['t-str', '"og"'],
 			['', ' '],
 			['t-attr', 'onboop'],
 			['t-p', '={'],

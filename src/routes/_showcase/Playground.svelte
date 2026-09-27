@@ -23,7 +23,7 @@
 	const reduced = new MediaQuery('(prefers-reduced-motion: reduce)');
 
 	let mood = $state<Mood>('happy');
-	let theme = $state<ThemeName>('aurora');
+	let theme = $state<ThemeName>('og');
 	let shape = $state<Shape>('pebble');
 	let eyes = $state<EyeStyle>('round');
 	let accessories = $state<Accessory[]>(['ring']);

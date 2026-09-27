@@ -36,15 +36,15 @@ describe('Mascot', () => {
 	});
 
 	it('applies the theme as overridable custom properties', async () => {
-		const { container } = render(Mascot, { theme: { base: 'mint', eye: '#123456' } });
+		const { container } = render(Mascot, { theme: { base: 'ice', eye: '#123456' } });
 		const style = (container.querySelector('.mascott') as HTMLElement).getAttribute('style') ?? '';
 		expect(style).toContain('--_mascott-eye: #123456');
-		expect(style).toContain('--_mascott-visor: #0f2e2a');
+		expect(style).toContain('--_mascott-visor: #0f1b2d');
 	});
 
-	it('hides hands when disabled', async () => {
-		const { container } = render(Mascot, { hands: false });
-		expect(container.querySelector('.hand')).toBeNull();
+	it('hides the floating hands of a head-only mascot when disabled', async () => {
+		const { container } = render(Mascot, { body: false, hands: false });
+		expect(container.querySelector('.skin')).toBeNull();
 	});
 
 	it('sets the size', async () => {

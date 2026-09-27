@@ -15,6 +15,13 @@ export interface ShapeDef {
 }
 
 export const SHAPE_DEFS: Record<Shape, ShapeDef> = {
+	// Tall pill: with a body it reads as one capsule from head to hips (the collar hides the seam).
+	capsule: {
+		d: 'M52 88C52 58 72 36 100 36C128 36 148 58 148 88L148 146C148 162 136 172 100 172C64 172 52 162 52 146Z',
+		top: 36,
+		bottom: 172,
+		halfWidth: 48
+	},
 	pebble: {
 		d: 'M100 38C148 38 170 72 170 112C170 150 140 170 100 170C60 170 30 150 30 112C30 72 52 38 100 38Z',
 		top: 38,

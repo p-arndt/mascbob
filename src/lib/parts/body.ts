@@ -1,24 +1,47 @@
 import type { HandPose, Mood } from '../types.js';
 
-/** Outfits for the full-body figure (`body` prop). */
-export const OUTFITS = ['none', 'scarf', 'bowtie', 'hoodie', 'cape'] as const;
+/** Outfits for the full-body figure. The puffer collar is the signature look. */
+export const OUTFITS = ['puffer', 'hoodie', 'scarf', 'bowtie', 'none'] as const;
 export type Outfit = (typeof OUTFITS)[number];
 
 /** Full-body mode draws in a 200×300 viewBox: the head keeps its 200×200 coordinates on top. */
 export const BODY_VIEWBOX_HEIGHT = 300;
-/** Ground line for the shadow in full-body mode. */
-export const BODY_GROUND_Y = 290;
+/** Where the soles touch the ground; squash, rocking and the shadow all anchor here. */
+export const BODY_GROUND_Y = 274;
+/** Torso top (hidden under the head) and bottom (where the legs start). */
+export const TORSO_TOP = 136;
+export const HIP_Y = 214;
+/** Collar band that hides the seam between head and torso. */
+export const COLLAR_Y = 142;
+export const COLLAR_H = 30;
+export const SHOULDER_Y = 184;
+export const UPPER_ARM = 17;
+export const FOREARM = 15;
+/** Legs sit this far left/right of the center line. */
+export const LEG_X = 17;
+/** Sneaker height from sole bottom to the top of the upper. */
+export const SNEAKER_H = 36;
 
-/** Where the torso hangs from the head; body reactions pivot here so the neck never detaches. */
-export const NECK_Y = 170;
-/** Egg-shaped torso, widest at the belly and tapering into the hover pod. */
-export const TORSO_PATH =
-	'M100 164C123 164 135 180 136.5 201C138 226 122 247 100 248C78 247 62 226 63.5 201C65 180 77 164 100 164Z';
-export const SHOULDER_Y = 185;
-/** Left shoulder x; the right arm is drawn mirrored around x = 100. */
-export const SHOULDER_X = 70;
-export const UPPER_ARM = 16;
-export const FOREARM = 14;
+/** The torso stays compact under wide heads, otherwise it'd read as a barrel. */
+export function torsoHalfWidth(headHalfWidth: number): number {
+	return Math.min(headHalfWidth, 48);
+}
+
+/** Lower half of the capsule: straight sides, rounded hips. */
+export function torsoPath(hw: number): string {
+	const l = 100 - hw;
+	const r = 100 + hw;
+	return (
+		`M${l} ${TORSO_TOP}L${r} ${TORSO_TOP}L${r} ${HIP_Y - 26}` +
+		`C${r} ${HIP_Y - 8} ${100 + hw * 0.55} ${HIP_Y} 100 ${HIP_Y}` +
+		`C${100 - hw * 0.55} ${HIP_Y} ${l} ${HIP_Y - 8} ${l} ${HIP_Y - 26}Z`
+	);
+}
+
+/** Left shoulder x; the right arm mirrors around x = 100. */
+export function shoulderX(torsoHw: number): number {
+	return 100 - torsoHw + 3;
+}
 
 /**
  * Mitten with a tiny thumb. The wrist sits at the origin and the fingers point
@@ -140,8 +163,8 @@ export function limbEnd(x: number, y: number, deg: number, len: number) {
 }
 
 /** Joint positions of the left arm (mirror x around 100 for the right one). */
-export function armJoints(angles: ArmAngles, drop = 0) {
-	const shoulder = { x: SHOULDER_X, y: SHOULDER_Y + drop };
+export function armJoints(angles: ArmAngles, drop = 0, x = shoulderX(48)) {
+	const shoulder = { x, y: SHOULDER_Y + drop };
 	const elbow = limbEnd(shoulder.x, shoulder.y, angles.a1, UPPER_ARM);
 	const wrist = limbEnd(elbow.x, elbow.y, angles.a1 + angles.a2, FOREARM);
 	return { shoulder, elbow, wrist };

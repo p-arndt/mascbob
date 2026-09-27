@@ -25,7 +25,7 @@
 		accessories?: Accessory[];
 		/** Floating hands that gesture with the mood (head-only mode). */
 		hands?: boolean;
-		/** Draw a full body below the head. The mascot then is 2:3 instead of square. */
+		/** Full figure with legs (default). `false` shows just the head, square, e.g. for avatars. */
 		body?: boolean;
 		outfit?: Outfit;
 		lookAt?: LookAt;
@@ -46,13 +46,13 @@
 
 	let {
 		mood = 'idle',
-		theme = 'aurora',
-		shape = 'pebble',
+		theme = 'og',
+		shape = 'capsule',
 		eyes = 'round',
 		accessories = [],
 		hands = true,
-		body = false,
-		outfit = 'none',
+		body = true,
+		outfit = 'puffer',
 		lookAt = 'pointer',
 		level,
 		size = 160,
@@ -334,11 +334,11 @@
 	const hw = $derived(head.halfWidth);
 	const cssSize = $derived(typeof size === 'number' ? `${size}px` : size);
 	const viewH = $derived(body ? BODY_VIEWBOX_HEIGHT : 200);
-	const groundY = $derived(body ? BODY_GROUND_Y : head.bottom + 14);
+	const groundY = $derived(body ? BODY_GROUND_Y + 1 : head.bottom + 14);
 	// With a body, the whole figure leans around its hips instead of the head's center.
-	const tiltPivot = $derived(body ? '100 230' : '100 110');
-	// Lean and wobble rock from the base (hips with a body), like something standing.
-	const rockPivot = $derived(body ? '100 250' : `100 ${head.bottom}`);
+	const tiltPivot = $derived(body ? '100 214' : '100 110');
+	// Lean and wobble rock from the base (the soles with a body), like something standing.
+	const rockPivot = $derived(body ? `100 ${BODY_GROUND_Y}` : `100 ${head.bottom}`);
 	const rock = $derived(lean.current + wobble.current);
 	// The ground reacts to the hop and the squash: smaller and fainter while airborne.
 	const air = $derived(clamp(-hop.current / 24, 0, 1));
@@ -346,7 +346,7 @@
 	// With a body the neck pivot gets a bit less, since the whole figure squashes too.
 	const headSx = $derived(body ? 1 + (sx - 1) * 0.7 : sx);
 	const headSy = $derived(body ? 1 + (sy - 1) * 0.7 : sy);
-	// In full-body mode the hover pod takes some of the squash so the head doesn't sink into the torso.
+	// In full-body mode the legs take some of the squash so the head doesn't sink into the torso.
 	const figureSquash = $derived(
 		body
 			? `translate(100 ${BODY_GROUND_Y}) scale(${1 + (sx - 1) * 0.35} ${1 + (sy - 1) * 0.35}) translate(-100 ${-BODY_GROUND_Y})`
@@ -470,30 +470,37 @@
 		</g>
 
 		<g class="pop">
-			<g class="float">
+			<!-- Standing figures shift their weight instead of floating. -->
+			<g class={body ? 'stand' : 'float'}>
 				<g transform="translate(0 {hop.current}) rotate({rock} {rockPivot})">
-					<g transform="{figureSquash} rotate({f.tilt} {tiltPivot})">
+					<g transform={figureSquash}>
+						<!-- Feet stay planted while the upper body tilts with the mood. -->
 						{#if body}
-							<Body layer="back" />
+							<Body layer="feet" />
 						{/if}
-						<g
-							class="head"
-							transform="translate(100 {head.bottom}) scale({headSx} {headSy}) translate(-100 {-head.bottom})"
-						>
-							<g class="breathe">
-								<Accessories layer="back" />
-								<Shell />
-								<Face />
-								<Accessories layer="front" />
-								{@render accessory?.({ top: t, halfWidth: hw })}
+						<g transform="rotate({f.tilt} {tiltPivot})">
+							{#if body}
+								<Body layer="back" />
+							{/if}
+							<g
+								class="head"
+								transform="translate(100 {head.bottom}) scale({headSx} {headSy}) translate(-100 {-head.bottom})"
+							>
+								<g class="breathe">
+									<Accessories layer="back" />
+									<Shell />
+									<Face />
+									<Accessories layer="front" />
+									{@render accessory?.({ top: t, halfWidth: hw })}
+								</g>
 							</g>
+							{#if body}
+								<Body layer="front" />
+							{:else if hands}
+								<Hands />
+							{/if}
+							<Effects />
 						</g>
-						{#if body}
-							<Body layer="front" />
-						{:else if hands}
-							<Hands />
-						{/if}
-						<Effects />
 					</g>
 				</g>
 			</g>
@@ -508,7 +515,7 @@
 		class="mascott {className}"
 		class:still={reduced}
 		class:paused={!onscreen}
-		class:no-float={!float}
+		class:no-float={!float || body}
 		aria-label={label}
 		data-mood={activeMood}
 		style="{style}; --float-speed: {config.floatSpeed}s"
@@ -537,7 +544,7 @@
 		class="mascott {className}"
 		class:still={reduced}
 		class:paused={!onscreen}
-		class:no-float={!float}
+		class:no-float={!float || body}
 		aria-label={label}
 		data-mood={activeMood}
 		style="{style}; --float-speed: {config.floatSpeed}s"
@@ -614,6 +621,11 @@
 	.float {
 		animation: float var(--float-speed) ease-in-out infinite alternate;
 	}
+	.stand {
+		transform-box: view-box;
+		transform-origin: 100px 274px;
+		animation: shift calc(var(--float-speed) * 1.6) ease-in-out infinite alternate;
+	}
 	.shadow,
 	.contact,
 	.ground-glow {
@@ -645,6 +657,14 @@
 		}
 		40% {
 			opacity: 1;
+		}
+	}
+	@keyframes shift {
+		from {
+			transform: rotate(-0.8deg);
+		}
+		to {
+			transform: rotate(0.8deg);
 		}
 	}
 	@keyframes float {

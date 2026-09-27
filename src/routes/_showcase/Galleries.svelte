@@ -34,10 +34,10 @@
 	};
 	const family: Member[] = (
 		[
-			{ name: 'Pip', theme: 'peach', shape: 'orb', accessories: ['ears'], mood: 'happy' },
+			{ name: 'Pip', theme: 'mocha', shape: 'orb', accessories: ['ears'], mood: 'happy' },
 			{
 				name: 'Fern',
-				theme: 'mint',
+				theme: 'ice',
 				shape: 'bean',
 				eyes: 'pill',
 				accessories: ['sprout'],
@@ -47,7 +47,7 @@
 			},
 			{
 				name: 'Nova',
-				theme: 'midnight',
+				theme: 'noir',
 				shape: 'squircle',
 				eyes: 'wide',
 				accessories: ['headphones'],
@@ -55,7 +55,7 @@
 			},
 			{
 				name: 'Mochi',
-				theme: 'bubblegum',
+				theme: 'lilac',
 				shape: 'ghost',
 				accessories: ['halo'],
 				mood: 'love',
@@ -64,7 +64,7 @@
 			},
 			{
 				name: 'Sol',
-				theme: 'sunny',
+				theme: 'volt',
 				shape: 'pebble',
 				eyes: 'dot',
 				accessories: ['antenna'],

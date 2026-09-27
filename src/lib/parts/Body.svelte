@@ -2,24 +2,29 @@
 	import { Spring } from 'svelte/motion';
 	import { getMascot, svgRef } from '../context.js';
 	import {
+		BODY_GROUND_Y,
+		COLLAR_H,
+		COLLAR_Y,
 		FOREARM,
-		MITTEN_PATH,
-		NECK_Y,
-		SHOULDER_X,
+		HIP_Y,
+		LEG_X,
 		SHOULDER_Y,
-		TORSO_PATH,
+		SNEAKER_H,
 		UPPER_ARM,
 		bodyPose,
 		coreBeat,
+		shoulderX,
+		torsoHalfWidth,
+		torsoPath,
 		type ArmAngles
 	} from './body.js';
 
 	/**
-	 * Full-body figure below the head (y ≈ 160..290 in the 200×300 viewBox).
-	 * `back` draws the torso behind the head, `front` the arms over it. Both
-	 * layers run the same springs so the shoulders stay attached to the torso.
+	 * Standing figure below the head: capsule torso, piston legs and chunky
+	 * sneakers. `feet` (legs and shoes) stays planted while the rest tilts, `back`
+	 * sits behind the head (hood, torso), `front` over it (collar/outfit, arms).
 	 */
-	let { layer }: { layer: 'back' | 'front' } = $props();
+	let { layer }: { layer: 'feet' | 'back' | 'front' } = $props();
 
 	const m = getMascot();
 	const ref = (name: string) => svgRef(m.uid, name);
@@ -38,44 +43,36 @@
 		);
 	});
 
-	// Underdamped so one kick overshoots back and forth: that reads as a wiggle.
-	const bounce = new Spring(0, { stiffness: 0.1, damping: 0.16 });
+	// Underdamped so one kick overshoots back and forth: the arms flail on a boop.
+	const flail = new Spring(0, { stiffness: 0.1, damping: 0.16 });
 	let seenBoops = m.boops;
 	$effect(() => {
 		const boops = m.boops;
 		if (boops === seenBoops) return;
 		seenBoops = boops;
 		if (m.reduced) return;
-		bounce.set(1, { instant: true });
-		bounce.target = 0;
+		flail.set(1, { instant: true });
+		flail.target = 0;
 	});
-
-	const crouch = new Spring(0, { stiffness: 0.2, damping: 0.55 });
-	$effect(() => {
-		crouch.set(m.pressed ? 1 : 0, { instant: m.reduced });
-	});
-
-	const b = $derived(bounce.current);
-	const c = $derived(crouch.current);
-	// Anchored at the neck: crouching lifts the pod instead of pulling the torso off the head.
-	const bodyTransform = $derived(
-		`rotate(${(b * 6).toFixed(2)} 100 ${NECK_Y}) translate(100 ${NECK_Y}) scale(${(1 + c * 0.05 + b * 0.03).toFixed(3)} ${(1 - c * 0.08 - b * 0.04).toFixed(3)}) translate(-100 ${-NECK_Y})`
-	);
-	const lift = $derived(b * 34 + c * 14);
+	const lift = $derived(flail.current * 34 + (m.pressed ? 18 : 0));
 	const left = $derived({ a1: arms.current.la1 + lift, a2: arms.current.la2 });
 	const right = $derived({ a1: arms.current.ra1 + lift, a2: arms.current.ra2 });
 
-	const beat = $derived(coreBeat(m.mood));
-	const love = $derived(m.mood === 'love');
+	const hw = $derived(torsoHalfWidth(m.shape.halfWidth));
+	const collarHw = $derived(Math.min(m.shape.halfWidth, 56) + 7);
+	const shoulder = $derived(shoulderX(hw));
 	const outfit = $derived(m.outfit);
-	const neck = $derived(m.shape.bottom);
+	const beat = $derived(coreBeat(m.mood));
+	// Idle and chatty moods tap a foot; everything else stands still.
+	const tapping = $derived(m.mood === 'idle' || m.mood === 'talking' || m.mood === 'listening');
+	const legTop = HIP_Y - 10;
+	const legBottom = BODY_GROUND_Y - SNEAKER_H + 4;
 </script>
 
 {#snippet arm(p: ArmAngles, swing: boolean)}
-	<g transform="translate({SHOULDER_X} {SHOULDER_Y + arms.current.drop}) rotate({p.a1})">
+	<g transform="translate({shoulder} {SHOULDER_Y + arms.current.drop}) rotate({p.a1})">
 		<path class="tube-edge" d="M0 0V{UPPER_ARM}" />
 		<path class="tube" d="M0 0V{UPPER_ARM}" />
-		<path class="tube-shine" d="M-2 1V{UPPER_ARM - 1}" />
 		<g transform="translate(0 {UPPER_ARM}) rotate({p.a2})">
 			<g
 				class="fore"
@@ -86,487 +83,378 @@
 			>
 				<path class="tube-edge" d="M0 0V{FOREARM}" />
 				<path class="tube" d="M0 0V{FOREARM}" />
-				<path class="tube-shine" d="M-2 1V{FOREARM - 1}" />
-				<g transform="translate(0 {FOREARM - 1.5}) scale(1.3)">
-					<g class="mitten">
-						<ellipse class="cuff" cx="0" cy="0.6" rx="4.6" ry="1.9" />
-						<path d={MITTEN_PATH} fill={ref('hand')} class="mitten-skin" />
-						<path class="mitten-shine" d="M-3.4 3.5C-4 6-3.6 8.4-2.2 9.6" />
-					</g>
-				</g>
+				<circle class="hand" cy={FOREARM + 1} r="8" />
 			</g>
 		</g>
-		<circle class="joint" r="6" fill={ref('hand')} />
+		<circle class="joint" r="7.5" />
 	</g>
 {/snippet}
 
-{#if layer === 'back'}
+<!-- Chunky high-top, drawn for the right foot with its toe pointing outward (+x). -->
+{#snippet sneaker()}
+	<rect class="sole" x="-16" y="-11" width="46" height="11" rx="5.5" />
+	<rect class="midsole" x="-12" y="-8" width="38" height="2" rx="1" />
+	<path
+		class="upper"
+		d="M-14 -11C-15 -22 -11 -29 -3 -29L8 -29C11 -22 18 -20 25 -17C30 -15 31 -12 30 -11Z"
+	/>
+	<path class="toe-cap" d="M17 -11C21 -14 27 -15 30 -11" />
+	<path class="stripe" d="M-7 -17C3 -15 13 -15 23 -13" />
+	<path class="laces" d="M3 -26H8M4 -23H10M5 -20H12" />
+	<rect class="heel-tab" x="-16" y="-27" width="5" height="10" rx="2" />
+	<ellipse class="opening" cx="2" cy="-29" rx="8" ry="2.2" />
+{/snippet}
+
+{#if layer === 'feet'}
+	{#each [-1, 1] as side (side)}
+		<g transform="translate({100 + side * LEG_X} 0)">
+			<rect class="leg" x="-8.5" y={legTop} width="17" height={legBottom - legTop} rx="8.5" />
+			<rect class="knee" x="-9" y={(legTop + legBottom) / 2} width="18" height="2.6" rx="1.3" />
+		</g>
+	{/each}
+
+	{#each [-1, 1] as side (side)}
+		{@const x = 100 + side * (LEG_X + 9)}
+		<g
+			class="foot"
+			class:tap={side === 1 && tapping}
+			style:transform-origin="{x - side * 20}px {BODY_GROUND_Y - 2}px"
+		>
+			<g transform="translate({x} {BODY_GROUND_Y}) scale({side * 1.22} 1.22)">
+				{@render sneaker()}
+			</g>
+		</g>
+	{/each}
+{:else if layer === 'back'}
 	<defs>
-		<linearGradient id={id('bsheen')} x1="0" y1="0" x2="1" y2="1">
-			<stop offset="0.1" class="stop-eye" stop-opacity="0" />
-			<stop offset="0.45" class="stop-cheek" stop-opacity="0.26" />
-			<stop offset="0.72" class="stop-accent" stop-opacity="0.34" />
-			<stop offset="1" class="stop-eye" stop-opacity="0.05" />
+		<linearGradient id={id('torso-ao')} x1="0" y1="0" x2="0" y2="1">
+			<stop offset="0" class="stop-ink" stop-opacity="0.16" />
+			<stop offset="0.35" class="stop-ink" stop-opacity="0" />
+			<stop offset="0.8" class="stop-ink" stop-opacity="0" />
+			<stop offset="1" class="stop-ink" stop-opacity="0.14" />
 		</linearGradient>
-		<linearGradient id={id('fabric')} x1="0" y1="0" x2="0" y2="1">
-			<stop offset="0" stop-color="#fff" stop-opacity="0.28" />
-			<stop offset="0.55" stop-color="#fff" stop-opacity="0" />
-			<stop offset="1" class="stop-visor" stop-opacity="0.3" />
-		</linearGradient>
-		<linearGradient id={id('jet')} x1="0" y1="0" x2="0" y2="1">
-			<stop offset="0" class="stop-eye" stop-opacity="0.9" />
-			<stop offset="1" class="stop-eye" stop-opacity="0" />
-		</linearGradient>
-		<radialGradient id={id('core')}>
-			<stop offset="0" class={love ? 'stop-cheek' : 'stop-eye'} stop-opacity="0.75" />
-			<stop offset="1" class={love ? 'stop-cheek' : 'stop-eye'} stop-opacity="0" />
-		</radialGradient>
-		<clipPath id={id('torso')}>
-			<path d={TORSO_PATH} />
-		</clipPath>
 	</defs>
 
-	<g transform={bodyTransform}>
-		<g class="sway">
-			{#if outfit === 'cape'}
-				<g class="cape">
-					<path
-						class="fabric-cape"
-						d="M76 172C60 190 52 226 55 256Q66 262 78 256Q89 264 100 257Q111 264 122 256Q134 262 145 256C148 226 140 190 124 172Z"
-					/>
-					<path
-						d="M76 172C60 190 52 226 55 256Q66 262 78 256Q89 264 100 257Q111 264 122 256Q134 262 145 256C148 226 140 190 124 172Z"
-						fill={ref('fabric')}
-					/>
-				</g>
-			{/if}
+	{#if outfit === 'hoodie'}
+		<rect
+			class="hood"
+			x={100 - m.shape.halfWidth - 7}
+			y={m.shape.top + 34}
+			width={m.shape.halfWidth * 2 + 14}
+			height={COLLAR_Y + 8 - m.shape.top - 34}
+			rx={m.shape.halfWidth}
+		/>
+	{/if}
 
-			<g class="pod">
-				<ellipse class="jet-halo" cx="100" cy="258" rx="11" ry="7" filter={ref('soft')} />
-				<g transform="translate(100 249) scale({1 + b * 0.7} {1 + b * 0.9 + c * 0.3})">
-					<path
-						class="jet"
-						d="M-7 0Q0 3 7 0Q5 12 0 19Q-5 12-7 0Z"
-						fill={ref('jet')}
-						filter={ref('soft')}
-					/>
-					<path class="jet-core" d="M-3 0Q0 1.4 3 0Q2 6 0 9Q-2 6-3 0Z" />
-				</g>
-				<circle class="spark" cx="97" cy="256" r="1.1" />
-				<circle class="spark late" cx="103.5" cy="256" r="0.9" />
-				<ellipse class="thruster" cx="100" cy="246.4" rx="10.5" ry="3.6" />
-				<ellipse class="thruster-ring" cx="100" cy="247.4" rx="7" ry="2" filter={ref('glow')} />
-			</g>
+	<path d={torsoPath(hw)} fill={ref('body')} />
+	<path d={torsoPath(hw)} fill="url(#{id('torso-ao')})" />
+	{#if outfit === 'hoodie'}
+		<path class="hoodie" d={torsoPath(hw + 1.5)} />
+		<path
+			class="pocket"
+			d="M{100 - hw * 0.55} {HIP_Y - 8}L{100 - hw * 0.45} {HIP_Y - 26}H{100 + hw * 0.45}L{100 +
+				hw * 0.55} {HIP_Y - 8}"
+		/>
+		<rect class="hem" x={100 - hw * 0.8} y={HIP_Y - 7} width={hw * 1.6} height="3" rx="1.5" />
+	{/if}
+	<path class="edge" d={torsoPath(hw)} />
 
-			<path d={TORSO_PATH} fill={ref('body')} />
-			<path d={TORSO_PATH} fill={ref('bsheen')} />
-
-			<g clip-path={ref('torso')}>
-				<ellipse
-					class="occlusion"
-					cx="100"
-					cy={neck + 3}
-					rx={Math.min(m.shape.halfWidth * 0.62, 40)}
-					ry="9"
-					filter={ref('soft')}
-				/>
-				{#if outfit === 'hoodie'}
-					<g class="hoodie">
-						<rect class="fabric-accent" x="58" y="160" width="34.5" height="92" />
-						<rect class="fabric-accent" x="107.5" y="160" width="34.5" height="92" />
-						<rect x="58" y="160" width="34.5" height="92" fill={ref('fabric')} />
-						<rect x="107.5" y="160" width="34.5" height="92" fill={ref('fabric')} />
-						<path class="seam" d="M92.5 176V250M107.5 176V250" />
-						<path class="stitch" d="M66 224Q78 219 90 225M110 225Q122 219 134 224" />
-						<path class="hem" d="M60 238Q100 252 140 238" />
-					</g>
-				{/if}
-			</g>
-			<path class="rim" d={TORSO_PATH} />
-
-			{#if outfit !== 'hoodie'}
-				<path class="seam soft" d="M70 229Q100 241 130 229" />
-				<ellipse
-					class="belly-shine"
-					cx="83"
-					cy="195"
-					rx="6"
-					ry="11"
-					transform="rotate(24 83 195)"
-					filter={ref('soft')}
-				/>
-				<circle class="spec" cx="76.5" cy="189" r="1.5" />
-			{/if}
-
-			{#if outfit === 'hoodie'}
-				<ellipse class="fabric-accent" cx="100" cy={neck + 2} rx="31" ry="10" />
-				<ellipse cx="100" cy={neck + 2} rx="31" ry="10" fill={ref('fabric')} />
-				<path
-					class="string"
-					d="M94.5 {neck + 9}Q93.5 188 94.5 197M105.5 {neck + 9}Q106.5 188 105.5 197"
-				/>
-				<circle class="aglet" cx="94.5" cy="198" r="1.3" />
-				<circle class="aglet" cx="105.5" cy="198" r="1.3" />
-			{/if}
-
-			<ellipse class="collar" cx="100" cy={neck - 1} rx="19" ry="5.5" />
-			<ellipse class="collar-light" cx="100" cy={neck - 0.5} rx="18" ry="5.2" />
-
-			<g transform="translate(100 211)">
-				<g class="core {beat.mode}" style="--beat: {beat.period}s">
-					<circle class="core-bloom" r="14" fill={ref('core')} />
-					<circle class="core-ring" r="10.6" />
-					<circle class="core-plate" r="8.6" />
-					<path
-						class="core-heart"
-						class:love
-						d="M0 3.6C-5.2 .2-5 -4 -2.4 -4C-1.1 -4-.4 -3.2 0 -2.3C.4 -3.2 1.1 -4 2.4 -4C5 -4 5.2 .2 0 3.6Z"
-						filter={ref('glow')}
-					/>
-					<path class="core-glint" d="M-5.6 -3.4A6.6 6.6 0 0 1 -2.4 -6.2" />
-				</g>
-			</g>
-
-			{#if outfit === 'scarf'}
-				<g class="scarf">
-					<g transform="translate(115 186)">
-						<g class="tails">
-							<path class="fabric-cheek" d="M-3 0C-2 8-4 15-2 23L5 22C4 15 6 8 4 0Z" />
-							<path class="fabric-cheek" d="M1 0C4 7 5 12 10 18L15 14C10 9 8 5 6 -1Z" />
-							<path d="M-3 0C-2 8-4 15-2 23L5 22C4 15 6 8 4 0Z" fill={ref('fabric')} />
-							<path class="fringe" d="M-1.5 23.5V26M1 23.3V25.8M3.5 23V25.5" />
-							<path class="stripe" d="M-3 13.5L5 13M-2.7 17L5.2 16.5" />
-						</g>
-					</g>
-					<path
-						class="fabric-cheek"
-						d="M69 {neck + 1}Q100 {neck + 13} 131 {neck + 1}Q134.5 {neck + 6} 131 {neck +
-							11}Q100 {neck + 24} 69 {neck + 11}Q65.5 {neck + 6} 69 {neck + 1}Z"
-					/>
-					<path
-						d="M69 {neck + 1}Q100 {neck + 13} 131 {neck + 1}Q134.5 {neck + 6} 131 {neck +
-							11}Q100 {neck + 24} 69 {neck + 11}Q65.5 {neck + 6} 69 {neck + 1}Z"
-						fill={ref('fabric')}
-					/>
-					<path class="stripe" d="M78 {neck + 6}Q100 {neck + 16} 122 {neck + 6}" />
-					<rect class="fabric-cheek knot" x="109.5" y={neck + 9} width="11" height="9" rx="4" />
-				</g>
-			{:else if outfit === 'bowtie'}
-				<g transform="translate(100 {neck + 7})">
-					<g class="bowtie">
-						<path
-							class="fabric-cheek"
-							d="M0 0C-4 -6-12 -6.5-12 0C-12 6.5-4 6 0 0ZM0 0C4 -6 12 -6.5 12 0C12 6.5 4 6 0 0Z"
-						/>
-						<path
-							d="M0 0C-4 -6-12 -6.5-12 0C-12 6.5-4 6 0 0ZM0 0C4 -6 12 -6.5 12 0C12 6.5 4 6 0 0Z"
-							fill={ref('fabric')}
-						/>
-						<path class="fold" d="M-9 -1.5Q-6 0-9 1.5M9 -1.5Q6 0 9 1.5" />
-						<rect class="fabric-cheek knot" x="-3" y="-3.4" width="6" height="6.8" rx="2.2" />
-						<circle class="spec" cx="-1" cy="-1.6" r="0.8" />
-					</g>
-				</g>
-			{/if}
-		</g>
+	<!-- A tiny status light on the chest echoes the LED face; it beats with the mood. -->
+	<g class="status {beat.mode}" class:love={m.mood === 'love'} style:--beat="{beat.period}s">
+		{#each [-5, 0, 5] as dx, i (dx)}
+			<circle
+				cx={100 + dx}
+				cy={COLLAR_Y + COLLAR_H + 16}
+				r="1.7"
+				style:animation-delay="{i * 0.08}s"
+			/>
+		{/each}
 	</g>
 {:else}
-	<g transform={bodyTransform}>
-		<g class="sway arms" class:sleeve={outfit === 'hoodie'} class:fidget={m.hovered}>
-			<g class="arm">
-				{@render arm(left, pose.swingArm !== 'right')}
-			</g>
-			<g transform="translate(200 0) scale(-1 1)">
-				<g class="arm arm-r">
-					{@render arm(right, pose.swingArm !== 'left')}
-				</g>
+	{#if outfit === 'puffer'}
+		<ellipse class="collar-shadow" cx="100" cy={COLLAR_Y + COLLAR_H + 1} rx={collarHw - 6} ry="5" />
+		<rect
+			class="puffer"
+			x={100 - collarHw}
+			y={COLLAR_Y}
+			width={collarHw * 2}
+			height={COLLAR_H}
+			rx={COLLAR_H / 2}
+		/>
+		{#each [-3, -2, -1, 1, 2, 3] as k (k)}
+			<path
+				class="quilt"
+				d="M{100 + k * collarHw * 0.28} {COLLAR_Y + 3}V{COLLAR_Y + COLLAR_H - 3}"
+			/>
+		{/each}
+		<rect
+			class="puffer-light"
+			x={100 - collarHw + 10}
+			y={COLLAR_Y + 3}
+			width={collarHw * 2 - 20}
+			height="7"
+			rx="3.5"
+		/>
+		<!-- Zipper pull and a little brand tag: the kind of detail that makes it feel like a real product. -->
+		<rect class="zip" x="98.4" y={COLLAR_Y + COLLAR_H - 12} width="3.2" height="14" rx="1.6" />
+		<rect class="tag" x={100 + collarHw - 22} y={COLLAR_Y + 10} width="11" height="7" rx="2" />
+		{#each [-3, 0, 3] as dx (dx)}
+			<circle class="tag-dot" cx={100 + collarHw - 16.5 + dx} cy={COLLAR_Y + 13.5} r="0.9" />
+		{/each}
+	{:else if outfit === 'scarf'}
+		<rect
+			class="scarf"
+			x={100 - collarHw + 3}
+			y={COLLAR_Y + 4}
+			width={collarHw * 2 - 6}
+			height="20"
+			rx="10"
+		/>
+		{#each [-2, 0, 2] as k (k)}
+			<path class="scarf-stripe" d="M{100 + k * 12} {COLLAR_Y + 6}V{COLLAR_Y + 22}" />
+		{/each}
+		<g class="tail" style:transform-origin="{100 - 18}px {COLLAR_Y + 18}px">
+			<path
+				class="scarf"
+				d="M{100 - 26} {COLLAR_Y + 16}H{100 - 12}L{100 - 14} {COLLAR_Y + 62}H{100 - 28}Z"
+			/>
+			<path
+				class="scarf-stripe"
+				d="M{100 - 27} {COLLAR_Y + 40}H{100 - 13}M{100 - 27.5} {COLLAR_Y + 48}H{100 - 13.5}"
+			/>
+			<path
+				class="fringe"
+				d="M{100 - 26} {COLLAR_Y + 62}V{COLLAR_Y + 67}M{100 - 21} {COLLAR_Y + 62}V{COLLAR_Y +
+					67}M{100 - 16} {COLLAR_Y + 62}V{COLLAR_Y + 67}"
+			/>
+		</g>
+	{:else if outfit === 'bowtie'}
+		<g transform="translate(100 {COLLAR_Y + 22})">
+			<path class="bow" d="M0 0L-13 -8C-16 -9 -17 -7 -17 0C-17 7 -16 9 -13 8Z" />
+			<path class="bow" d="M0 0L13 -8C16 -9 17 -7 17 0C17 7 16 9 13 8Z" />
+			<rect class="bow-knot" x="-4" y="-5" width="8" height="10" rx="3" />
+		</g>
+	{:else if outfit === 'hoodie'}
+		<rect
+			class="rib"
+			x={100 - collarHw + 4}
+			y={COLLAR_Y + 8}
+			width={collarHw * 2 - 8}
+			height="16"
+			rx="8"
+		/>
+		<path
+			class="string"
+			d="M94 {COLLAR_Y + 22}V{COLLAR_Y + 44}M106 {COLLAR_Y + 22}V{COLLAR_Y + 40}"
+		/>
+		<rect class="aglet" x="92.8" y={COLLAR_Y + 43} width="2.4" height="5" rx="1.2" />
+		<rect class="aglet" x="104.8" y={COLLAR_Y + 39} width="2.4" height="5" rx="1.2" />
+	{/if}
+
+	<g class="arms" class:sleeve={outfit === 'hoodie'} class:fidget={m.hovered}>
+		<g class="arm">
+			{@render arm(left, pose.swingArm !== 'right')}
+		</g>
+		<g transform="translate(200 0) scale(-1 1)">
+			<g class="arm arm-r">
+				{@render arm(right, pose.swingArm !== 'left')}
 			</g>
 		</g>
 	</g>
 {/if}
 
 <style>
-	.stop-eye {
-		stop-color: var(--c-eye);
-	}
-	.stop-cheek {
-		stop-color: var(--c-cheek);
-	}
-	.stop-accent {
-		stop-color: var(--c-accent);
-	}
-	.stop-visor {
+	.stop-ink {
 		stop-color: var(--c-visor);
 	}
 
-	/* Body motion pivots at the neck (view-box coordinates) so the torso never leaves the head. */
-	.sway {
-		transform-box: view-box;
-		transform-origin: 100px 170px;
-		animation: sway calc(var(--float-speed) * 1.7) ease-in-out infinite alternate;
+	.edge {
+		fill: none;
+		stroke: var(--c-visor);
+		stroke-width: 1.2;
+		opacity: 0.14;
+	}
+	.leg {
+		fill: var(--c-body-dark);
+	}
+	.knee {
+		fill: var(--c-visor);
+		opacity: 0.16;
 	}
 
-	.rim {
-		fill: none;
-		stroke: #fff;
-		stroke-opacity: 0.55;
-		stroke-width: 1.3;
-	}
-	.occlusion {
+	.sole {
 		fill: var(--c-visor);
-		opacity: 0.32;
 	}
-	.belly-shine {
-		fill: #fff;
-		opacity: 0.55;
+	.midsole,
+	.stripe,
+	.heel-tab {
+		fill: var(--c-accent);
 	}
-	.spec {
-		fill: #fff;
-		opacity: 0.85;
-	}
-	.seam {
+	.stripe {
 		fill: none;
-		stroke: #fff;
-		stroke-opacity: 0.45;
-		stroke-width: 0.9;
+		stroke: var(--c-accent);
+		stroke-width: 3.4;
 		stroke-linecap: round;
 	}
-	.seam.soft {
-		stroke-opacity: 0.35;
+	.upper {
+		fill: var(--c-body-light);
+		stroke: var(--c-visor);
+		stroke-width: 1.6;
+		stroke-linejoin: round;
 	}
-	.collar {
-		fill: var(--c-visor);
-	}
-	.collar-light {
+	.toe-cap,
+	.laces {
 		fill: none;
-		stroke: var(--c-accent);
-		stroke-width: 1;
-		stroke-opacity: 0.8;
+		stroke: var(--c-visor);
+		stroke-width: 1.1;
+		stroke-linecap: round;
+		opacity: 0.45;
+	}
+	.opening {
+		fill: var(--c-visor);
+		opacity: 0.8;
+	}
+	/* The foot pivots on its heel, so a tap lifts the toe. */
+	.foot {
+		transform-box: view-box;
+	}
+	.foot.tap {
+		animation: tap 4.6s ease-in-out infinite;
 	}
 
-	/* Chest core */
-	.core {
-		transform-box: fill-box;
-		transform-origin: center;
-	}
-	.core-bloom {
-		opacity: 0.7;
-	}
-	.core-ring {
-		fill: none;
-		stroke: var(--c-accent);
-		stroke-width: 1;
-		stroke-opacity: 0.7;
-	}
-	.core-plate {
-		fill: var(--c-visor);
-		stroke: #fff;
-		stroke-opacity: 0.45;
-		stroke-width: 0.8;
-	}
-	.core-heart {
+	.status circle {
 		fill: var(--c-eye);
-		transform-box: fill-box;
-		transform-origin: center;
+		animation: beat var(--beat) ease-in-out infinite;
 	}
-	.core-heart.love {
+	.status.love circle {
 		fill: var(--c-cheek);
 	}
-	.core-glint {
-		fill: none;
-		stroke: #fff;
-		stroke-opacity: 0.55;
-		stroke-width: 1;
-		stroke-linecap: round;
+	.status.dim circle {
+		animation-name: dim;
 	}
-	.core.beat .core-heart,
-	.core.beat .core-bloom {
-		transform-box: fill-box;
-		transform-origin: center;
-		animation: heartbeat var(--beat) ease-out infinite;
-	}
-	.core.dim .core-heart,
-	.core.dim .core-bloom {
-		animation: dim var(--beat) ease-in-out infinite alternate;
-	}
-	.core.flicker .core-heart,
-	.core.flicker .core-bloom {
-		animation: flicker var(--beat) linear infinite;
+	.status.flicker circle {
+		animation-name: flicker;
 	}
 
-	/* Hover pod */
-	.thruster {
-		fill: var(--c-visor);
-		stroke: #fff;
-		stroke-opacity: 0.35;
-		stroke-width: 0.7;
+	.hood,
+	.hoodie {
+		fill: var(--c-accent);
 	}
-	.thruster-ring {
+	.hood {
+		filter: brightness(0.82);
+	}
+	.pocket {
 		fill: none;
-		stroke: var(--c-eye);
+		stroke: var(--c-visor);
 		stroke-width: 1.4;
+		stroke-linejoin: round;
+		opacity: 0.2;
 	}
-	.jet-halo {
-		fill: var(--c-eye);
-		opacity: 0.35;
-		transform-box: fill-box;
-		transform-origin: center top;
-		animation: halo calc(var(--float-speed) / 2) ease-in-out infinite alternate;
+	.hem,
+	.rib {
+		fill: var(--c-visor);
+		opacity: 0.14;
 	}
-	.jet {
-		opacity: 0.7;
-		transform-box: fill-box;
-		transform-origin: center top;
-		animation: jet 0.16s steps(2) infinite alternate;
-	}
-	.jet-core {
-		fill: #fff;
-		opacity: 0.75;
-	}
-	.spark {
-		fill: var(--c-eye);
-		opacity: 0;
-		transform-box: fill-box;
-		transform-origin: center;
-		animation: spark 1.4s ease-in infinite;
-	}
-	.spark.late {
-		animation-delay: -0.7s;
-	}
-	:global([data-mood='sleepy']) .jet,
-	:global([data-mood='sleepy']) .jet-halo {
-		opacity: 0.3;
-	}
-
-	/* Outfits */
-	.fabric-cape {
+	.rib {
 		fill: var(--c-accent);
-	}
-	.cape {
-		transform-box: view-box;
-		transform-origin: 100px 172px;
-		animation: cape calc(var(--float-speed) * 0.9) ease-in-out infinite alternate;
-	}
-	.fabric-accent {
-		fill: var(--c-accent);
-	}
-	.fabric-cheek {
-		fill: var(--c-cheek);
-	}
-	.stitch {
-		fill: none;
-		stroke: var(--c-visor);
-		stroke-opacity: 0.35;
-		stroke-width: 0.9;
-		stroke-dasharray: 1.6 1.4;
-		stroke-linecap: round;
-	}
-	.hem {
-		fill: none;
-		stroke: var(--c-visor);
-		stroke-opacity: 0.25;
-		stroke-width: 3;
+		opacity: 1;
+		filter: brightness(0.9);
 	}
 	.string {
 		fill: none;
-		stroke: #fff;
-		stroke-width: 1.1;
+		stroke: var(--c-body-light);
+		stroke-width: 1.6;
 		stroke-linecap: round;
-		opacity: 0.9;
 	}
 	.aglet {
-		fill: #fff;
+		fill: var(--c-visor);
 	}
-	.stripe,
-	.fold {
+
+	.collar-shadow {
+		fill: var(--c-visor);
+		opacity: 0.12;
+	}
+	.puffer {
+		fill: var(--c-accent);
+	}
+	.quilt {
+		stroke: var(--c-visor);
+		stroke-width: 1.4;
+		stroke-linecap: round;
+		opacity: 0.16;
+	}
+	.puffer-light {
+		fill: #fff;
+		opacity: 0.22;
+	}
+	.zip {
+		fill: var(--c-visor);
+	}
+	.tag {
+		fill: var(--c-body-light);
+	}
+	.tag-dot {
+		fill: var(--c-visor);
+	}
+
+	.scarf {
+		fill: var(--c-accent);
+	}
+	.scarf-stripe,
+	.fringe {
 		fill: none;
-		stroke: #fff;
-		stroke-opacity: 0.5;
-		stroke-width: 1.3;
+		stroke: var(--c-body-light);
+		stroke-width: 2.4;
 		stroke-linecap: round;
 	}
 	.fringe {
-		fill: none;
-		stroke: var(--c-cheek);
-		stroke-width: 1.2;
-		stroke-linecap: round;
+		stroke: var(--c-accent);
+		stroke-width: 2;
 	}
-	.knot {
-		stroke: var(--c-visor);
-		stroke-opacity: 0.2;
-		stroke-width: 0.8;
-	}
-	.tails {
+	.tail {
 		transform-box: view-box;
-		transform-origin: 0 0;
-		animation: tails calc(var(--float-speed) * 0.7) ease-in-out infinite alternate;
-	}
-	.bowtie {
-		transform-box: view-box;
-		transform-origin: 0 0;
+		animation: tail 2.8s ease-in-out infinite alternate;
 	}
 
-	/* Arms */
-	.tube-edge,
-	.tube,
-	.tube-shine {
-		fill: none;
-		stroke-linecap: round;
+	.bow,
+	.bow-knot {
+		fill: var(--c-accent);
 	}
+	.bow-knot {
+		filter: brightness(0.85);
+	}
+
 	.tube-edge {
-		stroke: var(--c-body-dark);
-		stroke-opacity: 0.6;
-		stroke-width: 10.4;
+		fill: none;
+		stroke: var(--c-visor);
+		stroke-width: 15.6;
+		stroke-linecap: round;
+		opacity: 0.14;
 	}
 	.tube {
+		fill: none;
 		stroke: var(--c-body-mid);
-		stroke-width: 8.6;
-	}
-	.tube-shine {
-		stroke: var(--c-body-light);
-		stroke-width: 2.6;
-		stroke-opacity: 0.9;
+		stroke-width: 14;
+		stroke-linecap: round;
 	}
 	.sleeve .tube {
 		stroke: var(--c-accent);
 	}
-	.sleeve .tube-shine {
-		stroke: #fff;
-		stroke-opacity: 0.35;
-	}
 	.joint {
-		stroke: #fff;
-		stroke-opacity: 0.5;
-		stroke-width: 0.7;
+		fill: var(--c-body-mid);
 	}
 	.sleeve .joint {
 		fill: var(--c-accent);
 	}
-	.mitten-skin {
-		stroke: #fff;
-		stroke-opacity: 0.6;
-		stroke-width: 0.8;
-	}
-	.mitten-shine {
-		fill: none;
-		stroke: #fff;
-		stroke-opacity: 0.8;
-		stroke-width: 1.1;
-		stroke-linecap: round;
-	}
-	.cuff {
-		fill: var(--c-accent);
-		stroke: #fff;
-		stroke-opacity: 0.5;
-		stroke-width: 0.6;
-	}
-	.sleeve .cuff {
-		fill: #fff;
+	.hand {
+		fill: var(--c-body-light);
+		stroke: var(--c-visor);
+		stroke-width: 1.2;
+		stroke-opacity: 0.2;
 	}
 
 	/* The forearm group's origin is the elbow, so rotating it swings the forearm like a real wave. */
-	.fore,
-	.mitten {
+	.fore {
 		transform-box: view-box;
 		transform-origin: 0 0;
 	}
@@ -582,109 +470,71 @@
 	.fore.swing.gesture {
 		animation: gesture 1.1s ease-in-out infinite alternate;
 	}
-	.fidget .mitten {
+	.fidget .hand {
+		transform-box: fill-box;
+		transform-origin: center;
 		animation: fidget 0.5s ease-in-out 2;
 	}
-	.fidget .arm-r .mitten {
-		animation-delay: 0.12s;
-	}
 
-	@keyframes sway {
-		from {
-			transform: rotate(-1.4deg);
+	@keyframes tap {
+		0%,
+		76%,
+		100% {
+			transform: rotate(0);
 		}
-		to {
-			transform: rotate(1.4deg);
+		81% {
+			transform: rotate(-13deg);
+		}
+		86% {
+			transform: rotate(0);
+		}
+		91% {
+			transform: rotate(-9deg);
+		}
+		96% {
+			transform: rotate(0);
 		}
 	}
-	@keyframes heartbeat {
+	@keyframes beat {
 		0%,
+		60%,
 		100% {
-			transform: scale(1);
+			opacity: 0.35;
 		}
-		14% {
-			transform: scale(1.26);
-		}
-		28% {
-			transform: scale(1);
-		}
-		42% {
-			transform: scale(1.14);
-		}
-		64% {
-			transform: scale(1);
+		20% {
+			opacity: 1;
 		}
 	}
 	@keyframes dim {
-		from {
-			opacity: 0.25;
+		0%,
+		100% {
+			opacity: 0.15;
 		}
-		to {
-			opacity: 0.6;
+		50% {
+			opacity: 0.45;
 		}
 	}
 	@keyframes flicker {
 		0%,
-		18%,
-		22%,
-		58%,
 		100% {
-			opacity: 0.75;
+			opacity: 0.6;
 		}
-		20% {
+		40% {
 			opacity: 0.2;
 		}
-		60% {
-			opacity: 0.35;
+		45% {
+			opacity: 0.7;
 		}
-		64% {
-			opacity: 0.8;
-		}
-		66% {
-			opacity: 0.25;
+		50% {
+			opacity: 0.15;
 		}
 	}
-	@keyframes jet {
+	@keyframes tail {
 		from {
-			transform: scale(1, 0.86);
+			transform: rotate(-4deg);
 		}
 		to {
-			transform: scale(0.92, 1.05);
-		}
-	}
-	@keyframes halo {
-		to {
-			transform: scale(1.2, 0.9);
-			opacity: 0.2;
-		}
-	}
-	@keyframes spark {
-		0% {
-			opacity: 0;
-			transform: translateY(0) scale(1);
-		}
-		20% {
-			opacity: 0.9;
-		}
-		100% {
-			opacity: 0;
-			transform: translateY(18px) scale(0.3);
-		}
-	}
-	@keyframes cape {
-		from {
-			transform: skewX(-2.5deg);
-		}
-		to {
-			transform: skewX(2.5deg);
-		}
-	}
-	@keyframes tails {
-		from {
-			transform: rotate(-7deg);
-		}
-		to {
-			transform: rotate(6deg);
+			transform: rotate(5deg);
 		}
 	}
 	@keyframes wave {
@@ -714,13 +564,10 @@
 	@keyframes fidget {
 		0%,
 		100% {
-			transform: rotate(0);
+			transform: scale(1);
 		}
-		30% {
-			transform: rotate(-16deg) scale(1.08);
-		}
-		70% {
-			transform: rotate(12deg) scale(0.95);
+		40% {
+			transform: scale(1.15);
 		}
 	}
 </style>

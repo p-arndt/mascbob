@@ -169,7 +169,7 @@
 		<Mascot
 			{mood}
 			level={mode === 'mic' ? level : undefined}
-			theme="midnight"
+			theme="noir"
 			shape="orb"
 			accessories={['headphones']}
 			size="min(230px, 56vw)"

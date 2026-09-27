@@ -1,86 +1,72 @@
 import type { ThemeColors } from './types.js';
 
+/**
+ * Colorways in the spirit of sneaker drops: a matte neutral body and one loud
+ * accent. `visor` is the ink tone (soles, outlines), `eye` the LED color.
+ */
 export const THEMES = {
-	aurora: {
-		bodyLight: '#ffffff',
-		bodyMid: '#dcd6ff',
-		bodyDark: '#a9c4ff',
-		visor: '#17173a',
-		eye: '#6d5dfc',
-		cheek: '#ff8fc0',
-		accent: '#b69cff'
+	og: {
+		bodyLight: '#fdfcf8',
+		bodyMid: '#eeebe3',
+		bodyDark: '#d3cec2',
+		visor: '#1d1d1f',
+		eye: '#1d1d1f',
+		cheek: '#ff7a59',
+		accent: '#ff5a1f'
 	},
-	peach: {
-		bodyLight: '#fff8f2',
-		bodyMid: '#ffd6bf',
-		bodyDark: '#ffab9c',
-		visor: '#2b1a24',
-		eye: '#f0602a',
-		cheek: '#ff7a95',
-		accent: '#ffb38a'
+	volt: {
+		bodyLight: '#f7f8f5',
+		bodyMid: '#e4e7e1',
+		bodyDark: '#c6cbc2',
+		visor: '#17181a',
+		eye: '#17181a',
+		cheek: '#ff8a80',
+		accent: '#c6f432'
 	},
-	mint: {
-		bodyLight: '#f6fffb',
-		bodyMid: '#c4f5df',
-		bodyDark: '#8fdcc6',
-		visor: '#0f2e2a',
-		eye: '#0f9f8c',
-		cheek: '#ff9bb4',
-		accent: '#5eead4'
+	ice: {
+		bodyLight: '#f8fbff',
+		bodyMid: '#e5edf7',
+		bodyDark: '#c7d5e6',
+		visor: '#0f1b2d',
+		eye: '#1f6fff',
+		cheek: '#ff8fb1',
+		accent: '#4cc3ff'
 	},
-	bubblegum: {
-		bodyLight: '#fff5fc',
-		bodyMid: '#ffcdec',
-		bodyDark: '#d5b6ff',
-		visor: '#2a1036',
-		eye: '#c026d3',
-		cheek: '#ff5fa2',
-		accent: '#f472b6'
-	},
-	sunny: {
-		bodyLight: '#fffdf0',
-		bodyMid: '#fff0a8',
-		bodyDark: '#ffcf7a',
-		visor: '#2a2210',
-		eye: '#e07a00',
-		cheek: '#ff9e7a',
-		accent: '#facc15'
-	},
-	midnight: {
-		bodyLight: '#7c80c9',
-		bodyMid: '#3d4080',
-		bodyDark: '#24214f',
-		visor: '#07081a',
-		eye: '#ffd76e',
-		cheek: '#ff6fa5',
-		accent: '#f0abfc'
-	},
-	holo: {
-		bodyLight: '#ffffff',
-		bodyMid: '#d9f4ff',
-		bodyDark: '#c2b6ff',
-		visor: '#0f1533',
-		eye: '#2f7bff',
-		cheek: '#ff9ad5',
-		accent: '#6ee7f9'
-	},
-	lavender: {
-		bodyLight: '#fdfaff',
-		bodyMid: '#eadfff',
-		bodyDark: '#c4a9f4',
+	lilac: {
+		bodyLight: '#faf7ff',
+		bodyMid: '#e9e1ff',
+		bodyDark: '#cbbcf3',
 		visor: '#231638',
-		eye: '#8b3dff',
-		cheek: '#ff9cc9',
-		accent: '#a78bfa'
+		eye: '#5b3fd9',
+		cheek: '#ff7ab8',
+		accent: '#ff4fa3'
+	},
+	mocha: {
+		bodyLight: '#f7ede1',
+		bodyMid: '#e6d3bd',
+		bodyDark: '#c9ab8a',
+		visor: '#33241a',
+		eye: '#33241a',
+		cheek: '#ff8f70',
+		accent: '#2f6b4f'
+	},
+	bred: {
+		bodyLight: '#3a3a40',
+		bodyMid: '#26262b',
+		bodyDark: '#141417',
+		visor: '#08080a',
+		eye: '#ff453a',
+		cheek: '#ff6b6b',
+		accent: '#e10600'
 	},
 	noir: {
-		bodyLight: '#6a6d80',
-		bodyMid: '#2e3040',
-		bodyDark: '#16171f',
-		visor: '#050508',
+		bodyLight: '#3b3d45',
+		bodyMid: '#282a30',
+		bodyDark: '#17181c',
+		visor: '#050506',
 		eye: '#7dffd4',
-		cheek: '#ff6b9a',
-		accent: '#8b7bff'
+		cheek: '#ff6fa5',
+		accent: '#7dffd4'
 	}
 } satisfies Record<string, ThemeColors>;
 
@@ -89,11 +75,11 @@ export type ThemeName = keyof typeof THEMES;
 /** A preset name, or a preset extended with color overrides. */
 export type ThemeInput = ThemeName | (Partial<ThemeColors> & { base?: ThemeName });
 
-export function resolveTheme(input: ThemeInput = 'aurora'): ThemeColors {
-	if (typeof input === 'string') return THEMES[input] ?? THEMES.aurora;
-	const { base = 'aurora', ...overrides } = input;
+export function resolveTheme(input: ThemeInput = 'og'): ThemeColors {
+	if (typeof input === 'string') return THEMES[input] ?? THEMES.og;
+	const { base = 'og', ...overrides } = input;
 	const defined = Object.fromEntries(Object.entries(overrides).filter(([, v]) => v !== undefined));
-	return { ...(THEMES[base] ?? THEMES.aurora), ...defined };
+	return { ...(THEMES[base] ?? THEMES.og), ...defined };
 }
 
 const CSS_VARS: Record<keyof ThemeColors, string> = {

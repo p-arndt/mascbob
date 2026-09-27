@@ -13,7 +13,7 @@ export const MOODS = [
 ] as const;
 export type Mood = (typeof MOODS)[number];
 
-export const SHAPES = ['pebble', 'orb', 'squircle', 'bean', 'ghost'] as const;
+export const SHAPES = ['capsule', 'pebble', 'orb', 'squircle', 'bean', 'ghost'] as const;
 export type Shape = (typeof SHAPES)[number];
 
 export const EYE_STYLES = ['round', 'pill', 'wide', 'dot'] as const;

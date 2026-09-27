@@ -11,12 +11,12 @@
 	} from '$lib/index.js';
 
 	// Visual test bench: /lab?body=1&theme=mint&size=180&acc=ring,ears&outfit=scarf
-	const body = $derived(page.url.searchParams.get('body') === '1');
-	const theme = $derived((page.url.searchParams.get('theme') ?? 'aurora') as ThemeName);
+	const body = $derived(page.url.searchParams.get('body') !== '0');
+	const theme = $derived((page.url.searchParams.get('theme') ?? 'og') as ThemeName);
 	const size = $derived(Number(page.url.searchParams.get('size') ?? 150));
-	const outfitParam = $derived(page.url.searchParams.get('outfit') ?? 'none');
-	const outfit = $derived<Outfit>(
-		(OUTFITS as readonly string[]).includes(outfitParam) ? (outfitParam as Outfit) : 'none'
+	const outfitParam = $derived(page.url.searchParams.get('outfit') ?? '');
+	const outfit = $derived<Outfit | undefined>(
+		(OUTFITS as readonly string[]).includes(outfitParam) ? (outfitParam as Outfit) : undefined
 	);
 	const acc = $derived(
 		(page.url.searchParams.get('acc') ?? '')

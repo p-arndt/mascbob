@@ -2,8 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { MOODS } from '../types.js';
 import {
 	FOREARM,
+	HIP_Y,
 	OUTFITS,
-	SHOULDER_X,
+	TORSO_TOP,
+	torsoHalfWidth,
+	torsoPath,
+	shoulderX,
 	SHOULDER_Y,
 	UPPER_ARM,
 	armJoints,
@@ -30,7 +34,7 @@ describe('limbEnd', () => {
 describe('armJoints', () => {
 	it('chains the upper arm and forearm from the shoulder', () => {
 		const { shoulder, elbow, wrist } = armJoints({ a1: 0, a2: 0 }, 2);
-		expect(shoulder).toEqual({ x: SHOULDER_X, y: SHOULDER_Y + 2 });
+		expect(shoulder).toEqual({ x: shoulderX(48), y: SHOULDER_Y + 2 });
 		expect(elbow.y).toBeCloseTo(SHOULDER_Y + 2 + UPPER_ARM);
 		expect(wrist.y).toBeCloseTo(SHOULDER_Y + 2 + UPPER_ARM + FOREARM);
 	});
@@ -53,12 +57,13 @@ describe('bodyPose', () => {
 	it('brings the thinking hand up to the chin', () => {
 		const { wrist } = armJoints(bodyPose('think', 'thinking').right);
 		expect(wrist.y).toBeLessThan(SHOULDER_Y + 5);
-		expect(wrist.x).toBeGreaterThan(SHOULDER_X);
+		expect(wrist.x).toBeGreaterThan(shoulderX(48));
 	});
 
-	it('clasps the hands near the chest center when in love', () => {
-		const { wrist } = armJoints(bodyPose('up', 'love').left);
-		expect(wrist.x).toBeGreaterThan(84);
+	it('brings the hands in toward the chest when in love', () => {
+		const love = armJoints(bodyPose('up', 'love').left).wrist;
+		const rest = armJoints(bodyPose('rest', 'idle').left).wrist;
+		expect(love.x).toBeGreaterThan(rest.x + 15);
 	});
 
 	it('slumps the shoulders when sad or sleepy', () => {
@@ -98,9 +103,25 @@ describe('floatingHands', () => {
 });
 
 describe('OUTFITS', () => {
-	it('starts with none and offers several outfits', () => {
-		expect(OUTFITS[0]).toBe('none');
+	it('starts with the signature puffer and offers several outfits', () => {
+		expect(OUTFITS[0]).toBe('puffer');
+		expect(OUTFITS).toContain('none');
 		expect(OUTFITS.length).toBeGreaterThanOrEqual(4);
 		expect(new Set(OUTFITS).size).toBe(OUTFITS.length);
+	});
+});
+
+describe('torso', () => {
+	it('stays compact under wide heads', () => {
+		expect(torsoHalfWidth(40)).toBe(40);
+		expect(torsoHalfWidth(70)).toBe(48);
+	});
+
+	it('spans from the torso top down to the hips', () => {
+		const ys = (torsoPath(48).match(/-?\d+(\.\d+)?/g) ?? [])
+			.map(Number)
+			.filter((_, i) => i % 2 === 1);
+		expect(Math.min(...ys)).toBe(TORSO_TOP);
+		expect(Math.max(...ys)).toBe(HIP_Y);
 	});
 });
