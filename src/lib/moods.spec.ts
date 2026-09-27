@@ -38,6 +38,14 @@ describe('moods', () => {
 		expect(face.right.brow).toBe(0);
 	});
 
+	it('waves with both eyes open and winks without waving', () => {
+		const waving = moodConfig('waving');
+		expect(waving.hands).toBe('wave');
+		expect(waving.face.left.open).toBe(1);
+		expect(waving.face.right.open).toBe(1);
+		expect(moodConfig('wink').hands).not.toBe('wave');
+	});
+
 	it('looks away and blushes when shy', () => {
 		const { face } = moodConfig('shy');
 		expect(face.gazeY).toBeGreaterThan(0);

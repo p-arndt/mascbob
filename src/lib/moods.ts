@@ -179,8 +179,24 @@ export const MOOD_CONFIGS: Record<Mood, MoodConfig> = {
 			tilt: 5
 		}),
 		effect: 'sparkles',
-		hands: 'wave',
+		// Waving has its own mood; a wink while waving read as a squint.
+		hands: 'rest',
 		floatSpeed: 2.4
+	},
+	waving: {
+		face: face({
+			// Both eyes open and bright, brows up: a hello, not a wink.
+			eyes: { scale: 1.06, lift: 0.3, brow: 0.6, browLift: 2.5, browTilt: 0.1 },
+			mouthWidth: 16,
+			mouthCurve: 4.5,
+			mouthOpen: 3.5,
+			tongue: 0.8,
+			cheeks: 0.8,
+			tilt: -4
+		}),
+		effect: null,
+		hands: 'wave',
+		floatSpeed: 2.2
 	},
 	shy: {
 		face: face({

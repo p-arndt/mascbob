@@ -24,7 +24,7 @@
 	type Reaction = { mood: Mood; label: string; ms: number; say?: string };
 	const REACTIONS = (
 		[
-			{ mood: 'happy', label: 'Say hi', ms: 2000, say: 'Hey there!' },
+			{ mood: 'waving', label: 'Say hi', ms: 2000, say: 'Hey there!' },
 			{ mood: 'love', label: 'Love', ms: 2200, say: 'Aww.' },
 			{ mood: 'surprised', label: 'Surprise', ms: 1600, say: 'Whoa!' },
 			{ mood: 'thinking', label: 'Think', ms: 2600, say: 'Hmm…' },
@@ -78,7 +78,7 @@
 	onMount(() => {
 		// A short greeting makes the first impression feel alive rather than static.
 		later(500, () => {
-			mood = 'wink';
+			mood = 'waving';
 			bubble = 'Oh, hi!';
 		});
 		later(1700, () => (mood = 'happy'));

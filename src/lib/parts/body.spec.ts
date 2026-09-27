@@ -51,7 +51,7 @@ describe('bodyPose', () => {
 	});
 
 	it('waves with the right forearm pointing up', () => {
-		const p = bodyPose('wave', 'wink');
+		const p = bodyPose('wave', 'waving');
 		expect(p.swing).toBe('wave');
 		expect(p.swingArm).toBe('right');
 		expect(p.right.a1 + p.right.a2).toBeGreaterThan(135);
@@ -100,7 +100,7 @@ describe('floatingHands', () => {
 	});
 
 	it('raises the right hand to wave', () => {
-		const { left, right } = floatingHands('wave', 'wink', 64);
+		const { left, right } = floatingHands('wave', 'waving', 64);
 		expect(right.y).toBeLessThan(left.y);
 	});
 });
