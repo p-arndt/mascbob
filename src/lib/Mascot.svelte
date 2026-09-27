@@ -13,8 +13,9 @@
 	import Hands from './parts/Hands.svelte';
 	import Shell from './parts/Shell.svelte';
 	import { moodConfig } from './moods.js';
+	import { createBabble } from './speech.js';
 	import { resolveTheme, themeStyle, type ThemeInput } from './themes.js';
-	import type { Accessory, EyeStyle, LookAt, Mood, Motion, Outfit, Shape } from './types.js';
+	import type { Accessory, EyeStyle, LookAt, Mood, Motion, Outfit, Shape, Shoes } from './types.js';
 
 	interface Props {
 		mood?: Mood;
@@ -27,7 +28,10 @@
 		hands?: boolean;
 		/** Full figure with legs (default). `false` shows just the head, square, e.g. for avatars. */
 		body?: boolean;
+		/** Clothing on the full figure; bare shell by default. */
 		outfit?: Outfit;
+		/** Footwear on the full figure; plain feet by default. */
+		shoes?: Shoes;
 		lookAt?: LookAt;
 		/** Mouth opening 0..1 while `mood` is `talking`, e.g. from audio amplitude. Omit to animate on its own. */
 		level?: number;
@@ -52,7 +56,8 @@
 		accessories = [],
 		hands = true,
 		body = true,
-		outfit = 'puffer',
+		outfit = 'none',
+		shoes = 'none',
 		lookAt = 'pointer',
 		level,
 		size = 160,
@@ -283,21 +288,16 @@
 		};
 	});
 
-	// Without a `level`, fake speech: random syllable openings with short pauses.
+	// Without a `level`, fake speech: words of snappy syllables with pauses.
 	$effect(() => {
-		if (activeMood !== 'talking' || level !== undefined || reduced) {
+		if (activeMood !== 'talking' || level !== undefined || reduced || !onscreen) {
 			talk = 0;
 			return;
 		}
+		const babble = createBabble();
 		let raf = 0;
-		let next = 0;
-		let target = 0;
 		const tick = (t: number) => {
-			if (t > next) {
-				target = Math.random() < 0.18 ? 0 : 0.3 + Math.random() * 0.7;
-				next = t + 80 + Math.random() * 110;
-			}
-			talk += (target - talk) * 0.35;
+			talk = babble.level(t);
 			raf = requestAnimationFrame(tick);
 		};
 		raf = requestAnimationFrame(tick);
@@ -407,6 +407,9 @@
 		},
 		get outfit() {
 			return outfit;
+		},
+		get shoes() {
+			return shoes;
 		},
 		get lean() {
 			return rock;

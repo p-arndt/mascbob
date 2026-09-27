@@ -8,17 +8,19 @@ moods, themes, shapes, eye styles and accessories. The SvelteKit app in
 ## Layout
 
 - `src/lib/Mascot.svelte`: the component. The head is drawn in 200×200 coordinates; the
-  full figure (default) extends the viewBox to 200×300 with legs and sneakers below.
+  full figure (default) extends the viewBox to 200×300 with legs and feet below.
   Face values are tweened (`Tween.of`), gaze/hands/squish use `Spring`, and loops
   (blink, float, effects) are CSS animations or timers.
-- `src/lib/parts/Face.svelte` + `face.ts`: the face is an LED matrix. Expressions are
-  modelled as smooth shapes (eyes, brows, mouth, blush), then rasterized: `lightAt`
-  returns how strongly each LED is covered. Keep new face features in that model.
+- `src/lib/parts/Face.svelte` + `face.ts`: the face is screen-printed: every feature is drawn
+  twice, an ink plate and an offset accent plate (the misprint), plus halftone cheeks. Eyes and
+  mouth are single outlines built in `face.ts` so every mood tweens by morphing, not crossfading.
+- `src/lib/speech.ts`: fake syllables for `talking` without an audio `level`; the face picks a
+  vowel shape per syllable.
 - `src/lib/moods.ts`: one `MoodConfig` per mood (face parameters, effect, hand pose, float speed).
   Add a mood here and in `MOODS` in `types.ts`.
 - `src/lib/geometry.ts`: body silhouettes, eye/mouth path builders, shared paths.
-- `src/lib/parts/Body.svelte` + `body.ts`: torso, collar/outfits, arms (`front`), legs and
-  sneakers (`feet`, kept outside the mood tilt so they stay planted).
+- `src/lib/parts/Body.svelte` + `body.ts`: torso, outfits, arms (`front`), legs and
+  `shoes` (`feet`, kept outside the mood tilt so they stay planted).
 - `src/lib/themes.ts`: sneaker-style colorways (matte neutral body + one loud accent). Colors reach the SVG through CSS variables
   (`--_mascott-*` from the prop, overridable by public `--mascott-*`).
 - `*.spec.ts` run in node; `*.svelte.spec.ts` run in Chromium via vitest browser mode.

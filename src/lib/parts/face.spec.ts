@@ -1,121 +1,140 @@
 import { describe, expect, it } from 'vitest';
+import { MOOD_CONFIGS } from '../moods.js';
 import {
-	LED_ROWS,
-	LED_STEP,
-	LED_TOP,
-	ledGrid,
-	lightAt,
+	catMouthPath,
+	eyeOutline,
+	halftone,
+	mouthPath,
+	smoothPath,
 	type EyeShape,
-	type FaceScene
+	type MouthShape
 } from './face.js';
 
 const eye = (p: Partial<EyeShape> = {}): EyeShape => ({
 	cx: 80,
-	cy: 97,
-	w: 16,
-	h: 20,
+	cy: 96,
+	w: 15,
+	h: 21,
+	round: 2.4,
 	lift: 0,
 	lidLeft: 0,
 	lidRight: 0,
-	heart: 0,
-	squeeze: 0,
-	side: 'left',
-	shine: 0,
 	...p
 });
 
-const scene = (p: Partial<FaceScene> = {}): FaceScene => ({
-	eyes: [eye()],
-	brows: [],
-	mouth: { cx: 100, y: 116, width: 12, curve: 3, open: 0, round: 0, cat: 0, tongue: 0 },
-	blush: [],
-	blushLines: 0,
-	...p
+const bounds = (points: [number, number][]) => ({
+	minY: Math.min(...points.map((p) => p[1])),
+	maxY: Math.max(...points.map((p) => p[1])),
+	minX: Math.min(...points.map((p) => p[0])),
+	maxX: Math.max(...points.map((p) => p[0]))
 });
 
-describe('ledGrid', () => {
-	const dots = ledGrid(90);
+/** Vertical extent of the outline at the column closest to x. */
+const column = (points: [number, number][], x: number) => {
+	const near = points.filter((p) => Math.abs(p[0] - x) < 0.01);
+	return Math.max(...near.map((p) => p[1])) - Math.min(...near.map((p) => p[1]));
+};
 
-	it('stays centered and inside the face area', () => {
-		const xs = dots.map((d) => d.x);
-		expect(Math.min(...xs) + Math.max(...xs)).toBeCloseTo(200, 5);
-		for (const d of dots) {
-			expect(d.y).toBeGreaterThanOrEqual(LED_TOP);
-			expect(d.y).toBeLessThanOrEqual(LED_TOP + (LED_ROWS - 1) * LED_STEP + 1e-9);
-		}
+describe('eyeOutline', () => {
+	it('spans the eye size around its center', () => {
+		const b = bounds(eyeOutline(eye()));
+		expect(b.minX).toBeCloseTo(72.5);
+		expect(b.maxX).toBeCloseTo(87.5);
+		expect(b.minY).toBeCloseTo(85.5);
+		expect(b.maxY).toBeCloseTo(106.5);
 	});
 
-	it('rounds off the corners', () => {
-		const top = Math.min(...dots.map((d) => d.y));
-		const middle = LED_TOP + ((LED_ROWS - 1) / 2) * LED_STEP;
-		const width = (y: number) => dots.filter((d) => Math.abs(d.y - y) < 0.01).length;
-		expect(width(top)).toBeLessThan(width(middle));
+	it('keeps a shut eye as a thin stroke instead of vanishing', () => {
+		const shut = eyeOutline(eye({ h: 0 }));
+		const b = bounds(shut);
+		expect(b.maxY - b.minY).toBeGreaterThan(2);
+		expect(b.maxY - b.minY).toBeLessThan(4);
+		expect(b.maxX - b.minX).toBeCloseTo(15);
 	});
 
-	it('shrinks for narrow heads', () => {
-		expect(ledGrid(70).length).toBeLessThan(dots.length);
+	it('arches into a crescent when lifted', () => {
+		const open = eyeOutline(eye());
+		const happy = eyeOutline(eye({ lift: 0.8 }));
+		expect(column(happy, 80)).toBeLessThan(column(open, 80) * 0.7);
+		// The top edge stays where it was: the eye is cut from below.
+		expect(bounds(happy).minY).toBeCloseTo(bounds(open).minY);
+	});
+
+	it('drops the lid on one side only', () => {
+		const lidded = eyeOutline(eye({ lidRight: 0.5 }));
+		const top = (x: number) =>
+			Math.min(...lidded.filter((p) => Math.abs(p[0] - x) < 0.01).map((p) => p[1]));
+		const xs = lidded.map((p) => p[0]);
+		const rightX = Math.max(...xs.filter((x) => x < 87));
+		expect(top(rightX)).toBeGreaterThan(top(80));
 	});
 });
 
-describe('lightAt', () => {
-	it('lights the eye center and leaves far dots dark', () => {
-		expect(lightAt(80, 97, scene()).main).toBe(1);
-		expect(lightAt(140, 80, scene()).main).toBe(0);
+describe('smoothPath', () => {
+	it('closes a cubic path through every point', () => {
+		const d = smoothPath([
+			[0, 0],
+			[10, 0],
+			[10, 10]
+		]);
+		expect(d.startsWith('M0 0')).toBe(true);
+		expect(d.match(/C/g)).toHaveLength(3);
+		expect(d.endsWith('Z')).toBe(true);
+	});
+});
+
+describe('mouthPath', () => {
+	const mouth = (p: Partial<MouthShape> = {}): MouthShape => ({
+		cx: 100,
+		y: 118,
+		width: 12,
+		curve: 3,
+		open: 0,
+		round: 0,
+		...p
+	});
+	const ys = (d: string) => [...d.matchAll(/(-?[\d.]+) (-?[\d.]+)/g)].map((x) => Number(x[2]));
+
+	it('draws a shut smile as coinciding lips that dip in the middle', () => {
+		const [cornerY, upper, , lower] = ys(mouthPath(mouth()));
+		expect(upper).toBeCloseTo(lower);
+		expect(upper).toBeGreaterThan(cornerY);
 	});
 
-	it('keeps a closed eye as a lit line', () => {
-		const closed = scene({ eyes: [eye({ h: 0 })] });
-		const row = LED_TOP + Math.round((97 - LED_TOP) / LED_STEP) * LED_STEP;
-		expect(lightAt(80, row, closed).main).toBeGreaterThan(0.8);
-		expect(lightAt(80, row - LED_STEP * 2, closed).main).toBe(0);
+	it('opens the lower lip for an open mouth', () => {
+		const [, upper, , lower] = ys(mouthPath(mouth({ open: 8 })));
+		expect(lower - upper).toBeGreaterThan(10);
 	});
 
-	it('turns a happy crescent into an arch: the top lights, the center does not', () => {
-		const happy = scene({ eyes: [eye({ lift: 0.8 })] });
-		expect(lightAt(80, 97 + LED_STEP, happy).main).toBe(0);
-		expect(lightAt(80, 88, happy).main).toBeGreaterThan(0.5);
+	it('pulls into a narrow round shape', () => {
+		const xs = (d: string) => [...d.matchAll(/(-?[\d.]+) (-?[\d.]+)/g)].map((x) => Number(x[1]));
+		const wide = xs(mouthPath(mouth({ width: 20, open: 6 })));
+		const round = xs(mouthPath(mouth({ width: 20, open: 6, round: 1 })));
+		expect(Math.max(...round) - Math.min(...round)).toBeLessThan(
+			Math.max(...wide) - Math.min(...wide)
+		);
 	});
 
-	it('draws hearts and chevrons', () => {
-		expect(lightAt(80, 97, scene({ eyes: [eye({ heart: 1 })] })).main).toBe(1);
-		const squeezed = scene({ eyes: [eye({ squeeze: 1 })] });
-		// "<"-free center: the chevron's open side has no light.
-		expect(lightAt(80 - 16 * 0.3, 97, squeezed).main).toBeLessThan(0.3);
+	it('draws a cat mouth as two arcs', () => {
+		expect(catMouthPath(100, 118, 12).match(/Q/g)).toHaveLength(2);
 	});
+});
 
-	it('lights a smile lower in the middle than at the corners', () => {
-		const s = scene({ eyes: [] });
-		const rowOf = (x: number) => {
-			let best = 0;
-			let bestY = 0;
-			for (let r = 0; r < LED_ROWS; r++) {
-				const y = LED_TOP + r * LED_STEP;
-				const l = lightAt(x, y, s).main;
-				if (l > best) [best, bestY] = [l, y];
-			}
-			return bestY;
-		};
-		expect(rowOf(100)).toBeGreaterThan(rowOf(95));
+describe('halftone', () => {
+	it('stays inside the ellipse with dots shrinking toward the edge', () => {
+		const dots = halftone(10, 6, 2.5);
+		expect(dots.length).toBeGreaterThan(10);
+		for (const d of dots) expect(Math.hypot(d.x / 10, d.y / 6)).toBeLessThan(1);
+		const center = dots.reduce((a, b) => (Math.hypot(a.x, a.y) < Math.hypot(b.x, b.y) ? a : b));
+		expect(Math.max(...dots.map((d) => d.r))).toBe(center.r);
 	});
+});
 
-	it('shows brows only when visible', () => {
-		const brow = { x0: 74, y0: 82, x1: 86, y1: 82, alpha: 1 };
-		expect(lightAt(80, 82, scene({ eyes: [], brows: [brow] })).main).toBeGreaterThan(0.9);
-		expect(lightAt(80, 82, scene({ eyes: [], brows: [{ ...brow, alpha: 0 }] })).main).toBe(0);
-	});
-
-	it('uses the cheek channel for blush and tongue', () => {
-		const blush = scene({ eyes: [], blush: [{ x: 60, y: 113, alpha: 0.8 }] });
-		expect(lightAt(60, 113, blush).pink).toBeCloseTo(0.8);
-		const tongue = scene({
-			eyes: [],
-			mouth: { cx: 100, y: 112, width: 16, curve: 2, open: 8, round: 0, cat: 0, tongue: 1 }
-		});
-		expect(lightAt(100, 112 + 2 + 8 * 0.8, tongue).pink).toBe(1);
-	});
-
-	it('puts a white catchlight in open eyes', () => {
-		const shiny = scene({ eyes: [eye({ shine: 1 })] });
-		expect(lightAt(80 + 16 * 0.22, 97 - 20 * 0.22, shiny).white).toBeGreaterThan(0.5);
+describe('talking vs idle', () => {
+	it('reads differently even between syllables', () => {
+		const idle = MOOD_CONFIGS.idle.face;
+		const talking = MOOD_CONFIGS.talking.face;
+		expect(talking.mouthOpen).toBeGreaterThan(idle.mouthOpen + 2);
+		expect(talking.left.brow).toBeGreaterThan(idle.left.brow);
 	});
 });

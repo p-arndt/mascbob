@@ -1,7 +1,7 @@
 # mascott
 
 A friendly, animated and highly customizable SVG mascot for Svelte 5: a matte,
-streetwear-styled capsule bot in a puffer collar and chunky sneakers, whose face is a matrix of tiny LEDs under its shell. It blinks, breathes, follows the
+streetwear-styled capsule bot whose face is screen-printed onto its shell, with an accent plate that never quite lines up and halftone cheeks. It blinks, breathes, follows the
 cursor, reacts to boops, switches moods and lip-syncs to your voice. Show the full figure or just the head.
 
 ## Install
@@ -21,21 +21,21 @@ pnpm add mascott
 <Mascot {mood} theme="og" accessories={['ring']} onboop={() => (mood = 'love')} />
 ```
 
-The full figure is 2:3 (`size` is the width). Dress it with `outfit`, or use `body={false}` for a square head-only avatar:
+The full figure is 2:3 (`size` is the width). Dress it with `outfit` and `shoes`, or use `body={false}` for a square head-only avatar:
 
 ```svelte
-<Mascot outfit="hoodie" theme="bred" mood="happy" size={220} />
+<Mascot outfit="hoodie" shoes="hightops" theme="bred" mood="happy" size={220} />
 <Mascot body={false} size={64} />
 ```
 
 ### Props
 
 The value lists grow over time, so the library exports them. Import `MOODS`, `SHAPES`,
-`EYE_STYLES`, `ACCESSORIES`, `OUTFITS` and `THEMES` (an object keyed by theme name) to see
+`EYE_STYLES`, `ACCESSORIES`, `OUTFITS`, `SHOES` and `THEMES` (an object keyed by theme name) to see
 every option or to build your own pickers:
 
 ```ts
-import { MOODS, SHAPES, EYE_STYLES, ACCESSORIES, OUTFITS, THEMES } from 'mascott';
+import { MOODS, SHAPES, EYE_STYLES, ACCESSORIES, OUTFITS, SHOES, THEMES } from 'mascott';
 ```
 
 | Prop          | Type                                                                                       | Default   |
@@ -45,8 +45,9 @@ import { MOODS, SHAPES, EYE_STYLES, ACCESSORIES, OUTFITS, THEMES } from 'mascott
 | `shape`       | one of `SHAPES` (head silhouette)                                                          | `pebble`  |
 | `eyes`        | one of `EYE_STYLES`                                                                        | `round`   |
 | `accessories` | array of `ACCESSORIES`                                                                     | `[]`      |
-| `body`        | full figure with legs and sneakers, 2:3 (`size` is the width); `false` shows just the head | `true`    |
-| `outfit`      | one of `OUTFITS`; only visible with `body`                                                 | `puffer`  |
+| `body`        | full figure with arms and legs, 2:3 (`size` is the width); `false` shows just the head     | `true`    |
+| `outfit`      | one of `OUTFITS`; only visible with `body`                                                 | `none`    |
+| `shoes`       | one of `SHOES`; only visible with `body`                                                   | `none`    |
 | `hands`       | floating hands that gesture with the mood (head-only mode)                                 | `true`    |
 | `lookAt`      | `pointer` `wander` `none` or `{ x, y }` in -1..1                                           | `pointer` |
 | `level`       | mouth opening 0..1 while `talking` (e.g. mic amplitude); omit for automatic lip movement   | –         |

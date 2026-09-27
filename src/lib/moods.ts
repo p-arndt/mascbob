@@ -93,10 +93,11 @@ export const MOOD_CONFIGS: Record<Mood, MoodConfig> = {
 	},
 	talking: {
 		face: face({
-			eyes: { scale: 1.04 },
+			// Smiling eyes and raised brows keep talking readable between syllables.
+			eyes: { scale: 1.04, lift: 0.25, brow: 0.7, browLift: 1.5 },
 			mouthWidth: 14,
 			mouthCurve: 3,
-			mouthOpen: 0.5,
+			mouthOpen: 2.5,
 			tongue: 0.7,
 			cheeks: 0.65
 		}),
