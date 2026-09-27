@@ -4,6 +4,7 @@ import {
 	STUDIO_START,
 	fromQuery,
 	mascotAttrs,
+	stageStyle,
 	svelteFile,
 	themeOverrides,
 	toQuery,
@@ -20,7 +21,8 @@ describe('share links', () => {
 			body: false,
 			float: false,
 			colors: { accent: '#12ab34', bodyMid: '#eeeeee' },
-			reactions: ['pet', 'shy']
+			reactions: ['pet', 'shy'],
+			stage: '#ffe4d6'
 		});
 		expect(fromQuery(new URLSearchParams(toQuery(c)))).toEqual(c);
 	});
@@ -38,6 +40,30 @@ describe('share links', () => {
 		expect(c.size).toBe(160);
 		expect(c.colors).toEqual({});
 		expect(c.shoes).toBe('none');
+		expect(fromQuery(new URLSearchParams('stage=chartreuse')).stage).toBe('tint');
+	});
+
+	it('keeps stage presets readable', () => {
+		expect(fromQuery(new URLSearchParams(toQuery(config({ stage: 'dark' })))).stage).toBe('dark');
+	});
+});
+
+describe('stage backdrop', () => {
+	it('tints from the accent and follows the page scheme', () => {
+		expect(stageStyle('tint', '#ff5a1f')).toEqual({
+			background: 'color-mix(in srgb, #ff5a1f 14%, var(--bg))',
+			scheme: null
+		});
+	});
+
+	it('pins a scheme that keeps text readable on fixed colors', () => {
+		expect(stageStyle('dark', '#000000').scheme).toBe('dark');
+		expect(stageStyle('#fdf6d8', '#000000').scheme).toBe('light');
+		expect(stageStyle('#1c2a4a', '#000000').scheme).toBe('dark');
+	});
+
+	it('never leaks into the generated code', () => {
+		expect(mascotAttrs(config({ stage: '#123456' }))).toEqual([]);
 	});
 });
 

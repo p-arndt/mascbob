@@ -29,14 +29,17 @@
 	import {
 		COLOR_KEYS,
 		GAZES,
+		STAGES,
 		STUDIO_START,
 		fromQuery,
+		stageStyle,
 		mascotAttrs,
 		svelteFile,
 		themeProp,
 		toQuery,
 		type ColorKey,
 		type Gaze,
+		type Stage,
 		type StudioConfig
 	} from './studio.js';
 
@@ -58,6 +61,7 @@
 	let lookAt = $state<Gaze>(start.lookAt);
 	let reactions = $state<Reaction[]>(start.reactions);
 	let size = $state(start.size);
+	let stage = $state<Stage>(start.stage);
 	let boops = $state(0);
 
 	const config: StudioConfig = $derived({
@@ -74,18 +78,41 @@
 		float,
 		lookAt,
 		reactions,
-		size
+		size,
+		stage
 	});
 	const themeValue = $derived(themeProp(config));
 	const colors = $derived(resolveTheme(themeValue));
+	const backdrop = $derived(stageStyle(stage, colors.accent));
+	const STAGE_LABELS: Record<(typeof STAGES)[number], string> = {
+		tint: 'Colorway tint',
+		neutral: 'Neutral',
+		light: 'Light',
+		dark: 'Dark'
+	};
+	const customStage = $derived(stage.startsWith('#') ? stage : null);
 
 	// A share link restores its configuration into the studio.
 	onMount(() => {
 		const q = new URLSearchParams(location.search);
 		if (![...q.keys()].length) return;
 		const c = fromQuery(q);
-		({ mood, theme, shape, eyes, accessories, body, outfit, shoes, hands, float, lookAt, size } =
-			c);
+		({
+			mood,
+			theme,
+			shape,
+			eyes,
+			accessories,
+			body,
+			outfit,
+			shoes,
+			hands,
+			float,
+			lookAt,
+			reactions,
+			size,
+			stage
+		} = c);
 		custom = c.colors;
 	});
 
@@ -330,6 +357,8 @@
 <div class="playground card">
 	<div
 		class="stage"
+		style:background={backdrop.background}
+		style:color-scheme={backdrop.scheme}
 		style:--accent={colors.accent}
 		style:--eye={colors.eye}
 		style:--mid={colors.bodyMid}
@@ -466,6 +495,31 @@
 								<span>{COLOR_LABELS[key]}</span>
 							</label>
 						{/each}
+					</div>
+				</fieldset>
+
+				<fieldset>
+					<legend>Background <span class="value">studio only</span></legend>
+					<div class="chips">
+						{#each STAGES as preset (preset)}
+							<button
+								class="chip stage-chip"
+								class:active={stage === preset}
+								aria-pressed={stage === preset}
+								onclick={() => (stage = preset)}
+							>
+								<i style:background={stageStyle(preset, colors.accent).background}></i>
+								{STAGE_LABELS[preset]}
+							</button>
+						{/each}
+						<label class="color" class:changed={customStage}>
+							<input
+								type="color"
+								value={customStage ?? '#ffe9a8'}
+								oninput={(e) => (stage = e.currentTarget.value as Stage)}
+							/>
+							<span>Custom</span>
+						</label>
 					</div>
 				</fieldset>
 
@@ -668,7 +722,7 @@
 		gap: 0.75rem;
 		min-height: 0;
 		padding: 1rem;
-		background: color-mix(in srgb, var(--accent) 14%, var(--bg));
+		color: var(--text-1);
 		transition: background 0.6s;
 	}
 	.stage-bar {
@@ -879,6 +933,22 @@
 		color: var(--text-2);
 	}
 
+	.stage-chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.45rem;
+		padding-left: 0.4rem;
+	}
+	.stage-chip i {
+		width: 1.1rem;
+		height: 1.1rem;
+		border-radius: 50%;
+		box-shadow: inset 0 0 0 1px var(--ring);
+	}
+	.stage-chip.active i {
+		box-shadow: 0 0 0 1.5px var(--on-ink);
+	}
+
 	.swatches {
 		display: flex;
 		flex-wrap: wrap;
@@ -954,11 +1024,11 @@
 		padding: 0;
 	}
 	.color input::-webkit-color-swatch {
-		border: 1px solid rgb(0 0 0 / 0.1);
+		border: 1px solid var(--ring);
 		border-radius: 50%;
 	}
 	.color input::-moz-color-swatch {
-		border: 1px solid rgb(0 0 0 / 0.1);
+		border: 1px solid var(--ring);
 		border-radius: 50%;
 	}
 

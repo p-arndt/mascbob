@@ -26,6 +26,11 @@ export type Gaze = (typeof GAZES)[number];
 export const COLOR_KEYS = ['bodyMid', 'eye', 'cheek', 'accent'] as const;
 export type ColorKey = (typeof COLOR_KEYS)[number];
 
+/** Stage backdrop presets; any `#rrggbb` works too. `tint` derives a wash from the accent. */
+export const STAGES = ['tint', 'neutral', 'light', 'dark'] as const;
+export type StagePreset = (typeof STAGES)[number];
+export type Stage = StagePreset | `#${string}`;
+
 export interface StudioConfig {
 	mood: Mood;
 	theme: ThemeName;
@@ -41,6 +46,8 @@ export interface StudioConfig {
 	lookAt: Gaze;
 	reactions: Reaction[];
 	size: number;
+	/** Studio-only: the backdrop behind the preview. Not a component prop, so never in the code. */
+	stage: Stage;
 }
 
 /** The library's own defaults: generated code and share links only spell out what differs. */
@@ -58,7 +65,8 @@ export const LIBRARY_DEFAULTS: StudioConfig = {
 	float: true,
 	lookAt: 'pointer',
 	reactions: [...DEFAULT_REACTIONS],
-	size: 160
+	size: 160,
+	stage: 'tint'
 };
 
 /** What the studio shows before anyone touches it: dressed up, so the options are discoverable. */
@@ -87,6 +95,7 @@ export function toQuery(c: StudioConfig): string {
 	}
 	if (!sameSet(c.reactions, d.reactions)) q.set('react', c.reactions.join(',') || 'none');
 	if (c.size !== d.size) q.set('size', String(c.size));
+	if (c.stage !== d.stage) q.set('stage', c.stage.replace('#', ''));
 	for (const key of COLOR_KEYS) {
 		const v = c.colors[key];
 		if (v) q.set(key, v.slice(1).toLowerCase());
@@ -122,8 +131,49 @@ export function fromQuery(q: URLSearchParams): StudioConfig {
 		reactions: q.has('react')
 			? REACTIONS.filter((r) => (q.get('react') ?? '').split(',').includes(r))
 			: [...d.reactions],
-		size: Number.isFinite(size) && size >= 40 && size <= 640 ? Math.round(size) : d.size
+		size: Number.isFinite(size) && size >= 40 && size <= 640 ? Math.round(size) : d.size,
+		stage: parseStage(q.get('stage')) ?? d.stage
 	};
+}
+
+function parseStage(v: string | null): Stage | undefined {
+	const preset = oneOf(STAGES, v);
+	if (preset) return preset;
+	const hex = `#${v ?? ''}`;
+	return HEX.test(hex) ? (hex.toLowerCase() as Stage) : undefined;
+}
+
+/** Relative luminance of a `#rrggbb` color, 0 (black) to 1 (white). */
+export function luminance(hex: string): number {
+	const [r, g, b] = [1, 3, 5].map((i) => {
+		const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+		return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+	});
+	return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/**
+ * CSS for the stage. `scheme` pins light or dark on the stage when its backdrop is fixed, so the
+ * page's light-dark() tokens (labels, pills, the mood dock) stay readable on top of it; null means
+ * the backdrop follows the page scheme.
+ */
+export function stageStyle(
+	stage: Stage,
+	accent: string
+): { background: string; scheme: 'light' | 'dark' | null } {
+	switch (stage) {
+		case 'tint':
+			return { background: `color-mix(in srgb, ${accent} 14%, var(--bg))`, scheme: null };
+		case 'neutral':
+			return { background: 'var(--surface)', scheme: null };
+		case 'light':
+			return { background: '#f5f4f1', scheme: 'light' };
+		case 'dark':
+			return { background: '#161616', scheme: 'dark' };
+		default:
+			// 0.18 is roughly where dark text and light text have equal contrast.
+			return { background: stage, scheme: luminance(stage) > 0.18 ? 'light' : 'dark' };
+	}
 }
 
 function mix(a: string, b: string, t: number): string {

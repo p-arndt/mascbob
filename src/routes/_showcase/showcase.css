@@ -37,9 +37,12 @@ html:has(.site)[data-theme='dark'] {
 	/* Controls that sit on top of a surface or a tinted stage. */
 	--raised: light-dark(#fff, #2a2a28);
 	--text-1: light-dark(#141414, #f2f1ee);
-	--text-2: light-dark(#5f5e5b, #aeaca7);
-	--text-3: light-dark(#8f8d88, #7a7874);
-	--line: light-dark(#e7e5e0, #2c2c2a);
+	/* text-3 still clears WCAG AA (4.5:1) on --surface in both schemes. */
+	--text-2: light-dark(#55534f, #c4c2bd);
+	--text-3: light-dark(#6f6d68, #9a9893);
+	--line: light-dark(#e7e5e0, #33332f);
+	/* Outline for color swatches, so a near-black or near-white pick doesn't vanish into its chip. */
+	--ring: light-dark(rgb(0 0 0 / 0.14), rgb(255 255 255 / 0.4));
 	/* Text on a filled text-1 button, and that button's hover. */
 	--on-ink: var(--bg);
 	--ink-hover: light-dark(#333, #d9d8d4);
