@@ -81,6 +81,9 @@ html:has(.site) body {
 .site .t-tag {
 	color: #f9a8d4;
 }
+.site .t-kw {
+	color: #f0abfc;
+}
 .site .t-attr {
 	color: #a5f3fc;
 }

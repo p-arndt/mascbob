@@ -9,6 +9,7 @@
 		SHAPES,
 		SHOES,
 		THEMES,
+		resolveTheme,
 		type Accessory,
 		type EyeStyle,
 		type Mood,
@@ -17,28 +18,88 @@
 		type Shoes,
 		type ThemeName
 	} from '$lib/index.js';
-	import Code, { plain, type Token } from './Code.svelte';
+	import { onMount } from 'svelte';
+	import { page } from '$app/state';
+	import Code, { type Token } from './Code.svelte';
+	import { download, snapshotSvg, svgToPng } from './exporter.js';
 	import { copyText, pick } from './interactions.js';
+	import {
+		COLOR_KEYS,
+		GAZES,
+		STUDIO_START,
+		fromQuery,
+		mascotAttrs,
+		svelteFile,
+		themeProp,
+		toQuery,
+		type ColorKey,
+		type Gaze,
+		type StudioConfig
+	} from './studio.js';
 
 	const themeNames = Object.keys(THEMES) as ThemeName[];
-	const GAZES = ['pointer', 'wander', 'none'] as const;
 	const reduced = new MediaQuery('(prefers-reduced-motion: reduce)');
+	const start = STUDIO_START;
 
-	let mood = $state<Mood>('happy');
-	let theme = $state<ThemeName>('og');
-	let shape = $state<Shape>('pebble');
-	let eyes = $state<EyeStyle>('round');
-	let accessories = $state<Accessory[]>(['ring']);
-	let body = $state(true);
-	let outfit = $state<Outfit>('puffer');
-	let shoes = $state<Shoes>('sneakers');
-	let hands = $state(true);
-	let float = $state(true);
-	let lookAt = $state<(typeof GAZES)[number]>('pointer');
-	let size = $state(240);
+	let mood = $state<Mood>(start.mood);
+	let theme = $state<ThemeName>(start.theme);
+	let custom = $state<StudioConfig['colors']>({});
+	let shape = $state<Shape>(start.shape);
+	let eyes = $state<EyeStyle>(start.eyes);
+	let accessories = $state<Accessory[]>(start.accessories);
+	let body = $state(start.body);
+	let outfit = $state<Outfit>(start.outfit);
+	let shoes = $state<Shoes>(start.shoes);
+	let hands = $state(start.hands);
+	let float = $state(start.float);
+	let lookAt = $state<Gaze>(start.lookAt);
+	let size = $state(start.size);
 	let boops = $state(0);
 
-	const colors = $derived(THEMES[theme]);
+	const config: StudioConfig = $derived({
+		mood,
+		theme,
+		colors: custom,
+		shape,
+		eyes,
+		accessories,
+		body,
+		outfit,
+		shoes,
+		hands,
+		float,
+		lookAt,
+		size
+	});
+	const themeValue = $derived(themeProp(config));
+	const colors = $derived(resolveTheme(themeValue));
+
+	// A share link restores its configuration into the studio.
+	onMount(() => {
+		const q = new URLSearchParams(location.search);
+		if (![...q.keys()].length) return;
+		const c = fromQuery(q);
+		({ mood, theme, shape, eyes, accessories, body, outfit, shoes, hands, float, lookAt, size } =
+			c);
+		custom = c.colors;
+	});
+
+	const COLOR_LABELS: Record<ColorKey, string> = {
+		bodyMid: 'Body',
+		eye: 'Face',
+		cheek: 'Cheeks',
+		accent: 'Accent'
+	};
+
+	function setColor(key: ColorKey, value: string) {
+		custom = { ...custom, [key]: value };
+	}
+
+	function pickTheme(name: ThemeName) {
+		theme = name;
+		// A preset is a fresh start; stale overrides would hide what the preset looks like.
+		custom = {};
+	}
 
 	function toggle(a: Accessory) {
 		accessories = accessories.includes(a)
@@ -109,48 +170,86 @@
 		}
 	}
 
-	type Attr = { name: string; value: string; expr?: boolean };
-	const attrs = $derived(
-		(
-			[
-				{ name: 'mood', value: mood },
-				{ name: 'theme', value: theme },
-				shape !== 'pebble' && { name: 'shape', value: shape },
-				eyes !== 'round' && { name: 'eyes', value: eyes },
-				accessories.length > 0 && {
-					name: 'accessories',
-					value: `[${accessories.map((a) => `'${a}'`).join(', ')}]`,
-					expr: true
-				},
-				body && { name: 'body', value: '' },
-				body && outfit !== 'none' && { name: 'outfit', value: outfit },
-				body && shoes !== 'none' && { name: 'shoes', value: shoes },
-				!hands && { name: 'hands', value: 'false', expr: true },
-				!float && { name: 'float', value: 'false', expr: true },
-				lookAt !== 'pointer' && { name: 'lookAt', value: lookAt },
-				size !== 160 && { name: 'size', value: String(size), expr: true }
-			] as (Attr | false)[]
-		).filter((a): a is Attr => !!a)
-	);
-	const tokens = $derived<Token[][]>([
-		[
-			['t-p', '<'],
-			['t-tag', 'Mascot']
-		],
-		...attrs.map((a): Token[] => {
-			const name: Token = ['t-attr', `  ${a.name}`];
-			if (a.value === '') return [name];
-			if (a.expr) return [name, ['t-p', '={'], ['t-expr', a.value], ['t-p', '}']];
-			return [name, ['t-p', '='], ['t-str', `"${a.value}"`]];
-		}),
-		[['t-p', '/>']]
-	]);
-	const code = $derived(plain(tokens));
+	type Tab = 'svelte' | 'link';
+	let tab = $state<Tab>('svelte');
+	const INSTALL = 'pnpm add mascott';
 
-	let copied = $state(false);
-	async function copy() {
-		copied = await copyText(code);
-		setTimeout(() => (copied = false), 1400);
+	const tokens = $derived<Token[][]>(svelteTokens(config));
+	const shareUrl = $derived.by(() => {
+		const q = toQuery(config);
+		return `${page.url.origin}${page.url.pathname}${q ? `?${q}` : ''}#playground`;
+	});
+
+	function svelteTokens(c: StudioConfig): Token[][] {
+		const attrs = mascotAttrs(c);
+		return [
+			[
+				['t-p', '<'],
+				['t-tag', 'script'],
+				['t-p', '>']
+			],
+			[
+				['t-kw', '  import'],
+				['t-p', ' { Mascot } '],
+				['t-kw', 'from'],
+				['t-str', " 'mascott'"],
+				['t-p', ';']
+			],
+			[
+				['t-p', '</'],
+				['t-tag', 'script'],
+				['t-p', '>']
+			],
+			[],
+			[['t-p', '<'], ['t-tag', 'Mascot'], ...(attrs.length ? [] : ([['t-p', ' />']] as Token[]))],
+			...attrs.map((a): Token[] => {
+				const name: Token = ['t-attr', `  ${a.name}`];
+				if (a.expr) return [name, ['t-p', '={'], ['t-expr', a.value], ['t-p', '}']];
+				return [name, ['t-p', '='], ['t-str', `"${a.value}"`]];
+			}),
+			...(attrs.length ? [[['t-p', '/>']] as Token[]] : [])
+		];
+	}
+
+	let done = $state<string | null>(null);
+	let doneTimer: ReturnType<typeof setTimeout>;
+	function flash(what: string) {
+		done = what;
+		clearTimeout(doneTimer);
+		doneTimer = setTimeout(() => (done = null), 1400);
+	}
+
+	async function copy(what: string, text: string) {
+		if (await copyText(text)) flash(what);
+	}
+
+	let figure = $state<HTMLElement>();
+	function snapshot() {
+		const svg = figure?.querySelector('svg');
+		if (!svg) return null;
+		const rect = svg.getBoundingClientRect();
+		return { text: snapshotSvg(svg, rect), width: rect.width, height: rect.height };
+	}
+	const fileName = $derived(`mascott-${mood}-${theme}`);
+
+	function exportSvg() {
+		const s = snapshot();
+		if (!s) return;
+		download(s.text, `${fileName}.svg`, 'image/svg+xml');
+		flash('svg');
+	}
+
+	async function exportPng() {
+		const s = snapshot();
+		if (!s) return;
+		// Exports at 1024px wide whatever the preview size, so icons and slides stay sharp.
+		download(await svgToPng(s.text, s.width, s.height, 1024 / s.width), `${fileName}.png`);
+		flash('png');
+	}
+
+	function exportSvelte() {
+		download(svelteFile(config), 'MyMascot.svelte');
+		flash('file');
 	}
 </script>
 
@@ -192,10 +291,10 @@
 			</button>
 		</div>
 
-		<div class="figure">
+		<div class="figure" bind:this={figure}>
 			<Mascot
 				{mood}
-				{theme}
+				theme={themeValue}
 				{shape}
 				{eyes}
 				{accessories}
@@ -245,17 +344,41 @@
 				{#each themeNames as name (name)}
 					<button
 						class="swatch"
-						class:active={theme === name}
+						class:active={theme === name && !Object.keys(custom).length}
 						aria-pressed={theme === name}
 						title={name}
 						aria-label="{name} theme"
 						style:--a={THEMES[name].bodyLight}
 						style:--b={THEMES[name].bodyMid}
 						style:--c={THEMES[name].bodyDark}
-						style:--v={THEMES[name].visor}
+						style:--k={THEMES[name].accent}
 						style:--e={THEMES[name].eye}
-						onclick={() => (theme = name)}
+						onclick={() => pickTheme(name)}
 					></button>
+				{/each}
+			</div>
+		</fieldset>
+
+		<fieldset>
+			<legend>
+				Colors
+				{#if Object.keys(custom).length}
+					<button class="reset" onclick={() => (custom = {})}>reset to {theme}</button>
+				{:else}
+					<span class="value">from {theme}</span>
+				{/if}
+			</legend>
+			<div class="colors">
+				{#each COLOR_KEYS as key (key)}
+					<label class="color" class:changed={custom[key]}>
+						<input
+							type="color"
+							value={colors[key]}
+							defaultValue={colors[key]}
+							oninput={(e) => setColor(key, e.currentTarget.value)}
+						/>
+						<span>{COLOR_LABELS[key]}</span>
+					</label>
 				{/each}
 			</div>
 		</fieldset>
@@ -384,10 +507,82 @@
 			/>
 		</fieldset>
 
-		<div class="code">
-			<Code lines={tokens} />
-			<button class="copy" class:done={copied} onclick={copy}>{copied ? 'Copied' : 'Copy'}</button>
-		</div>
+		<section class="export" aria-label="Export">
+			<div class="export-head">
+				<h3>Take it home</h3>
+				<button
+					class="install"
+					onclick={() => copy('install', INSTALL)}
+					title="Copy install command"
+				>
+					<code>{INSTALL}</code>
+					<span>{done === 'install' ? 'Copied' : 'Copy'}</span>
+				</button>
+			</div>
+			<div class="tabs" role="tablist" aria-label="Export format">
+				<button
+					role="tab"
+					aria-selected={tab === 'svelte'}
+					class:active={tab === 'svelte'}
+					onclick={() => (tab = 'svelte')}
+				>
+					Svelte
+				</button>
+				<button
+					role="tab"
+					aria-selected={tab === 'link'}
+					class:active={tab === 'link'}
+					onclick={() => (tab = 'link')}
+				>
+					Share link
+				</button>
+			</div>
+			{#if tab === 'svelte'}
+				<div class="code">
+					<Code lines={tokens} />
+					<button
+						class="copy"
+						class:done={done === 'code'}
+						onclick={() => copy('code', svelteFile(config))}
+					>
+						{done === 'code' ? 'Copied' : 'Copy'}
+					</button>
+				</div>
+			{:else}
+				<div class="link">
+					<input
+						readonly
+						value={shareUrl}
+						aria-label="Share link"
+						onfocus={(e) => e.currentTarget.select()}
+					/>
+					<button
+						class="copy static"
+						class:done={done === 'link'}
+						onclick={() => copy('link', shareUrl)}
+					>
+						{done === 'link' ? 'Copied' : 'Copy'}
+					</button>
+				</div>
+				<p class="note">Opens this page with your mascot already set up in the studio.</p>
+			{/if}
+			<div class="downloads">
+				<span class="label">Download</span>
+				<button class="file" class:done={done === 'file'} onclick={exportSvelte}>.svelte</button>
+				<button class="file" class:done={done === 'svg'} onclick={exportSvg}>SVG</button>
+				<button class="file" class:done={done === 'png'} onclick={exportPng}>PNG</button>
+				<button
+					class="file"
+					class:done={done === 'svgcode'}
+					onclick={() => {
+						const s = snapshot();
+						if (s) copy('svgcode', s.text);
+					}}
+				>
+					{done === 'svgcode' ? 'Copied' : 'Copy SVG'}
+				</button>
+			</div>
+		</section>
 	</div>
 </div>
 
@@ -395,13 +590,19 @@
 	.playground {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
-		overflow: hidden;
+		/* clip, not hidden: hidden would become the scroll container and break the sticky stage. */
+		overflow: clip;
 	}
 	.stage {
 		position: relative;
 		display: grid;
 		grid-template-rows: auto 1fr auto;
 		min-height: 560px;
+		/* The controls run long; keeping the stage in view shows every change as it happens. */
+		position: sticky;
+		top: 0;
+		align-self: start;
+		height: min(100vh, 820px);
 		padding: 1rem;
 		background:
 			radial-gradient(
@@ -550,9 +751,10 @@
 		border: 0;
 		padding: 0;
 		background:
-			radial-gradient(circle at 42% 52%, var(--e) 0 7%, transparent 9%),
-			radial-gradient(circle at 60% 52%, var(--e) 0 7%, transparent 9%),
-			radial-gradient(ellipse 36% 26% at 50% 54%, var(--v) 0 96%, transparent 100%),
+			radial-gradient(circle at 40% 48%, var(--e) 0 8%, transparent 10%),
+			radial-gradient(circle at 60% 48%, var(--e) 0 8%, transparent 10%),
+			radial-gradient(circle at 42% 51%, var(--k) 0 8%, transparent 10%),
+			radial-gradient(circle at 62% 51%, var(--k) 0 8%, transparent 10%),
 			radial-gradient(circle at 32% 28%, var(--a), var(--b) 45%, var(--c));
 		box-shadow:
 			inset 0 -2px 4px rgb(0 0 0 / 0.15),
@@ -642,11 +844,196 @@
 		color: #0b1030;
 	}
 
+	.colors {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+	}
+	.color {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.45rem;
+		padding: 0.3rem 0.7rem 0.3rem 0.3rem;
+		border-radius: 999px;
+		border: 1px solid rgb(255 255 255 / 0.1);
+		background: rgb(255 255 255 / 0.04);
+		font-size: 0.8rem;
+		color: var(--text-2);
+		cursor: pointer;
+		transition: border-color 0.2s;
+	}
+	.color.changed {
+		border-color: rgb(255 255 255 / 0.35);
+		color: var(--text-1);
+	}
+	.color input {
+		width: 1.6rem;
+		height: 1.6rem;
+		padding: 0;
+		border: 0;
+		border-radius: 50%;
+		background: none;
+		cursor: pointer;
+	}
+	.color input::-webkit-color-swatch-wrapper {
+		padding: 0;
+	}
+	.color input::-webkit-color-swatch {
+		border: 1px solid rgb(255 255 255 / 0.2);
+		border-radius: 50%;
+	}
+	.color input::-moz-color-swatch {
+		border: 1px solid rgb(255 255 255 / 0.2);
+		border-radius: 50%;
+	}
+	.reset {
+		border: 0;
+		padding: 0;
+		background: none;
+		color: var(--text-2);
+		font: inherit;
+		text-transform: none;
+		letter-spacing: 0;
+		text-decoration: underline;
+		cursor: pointer;
+	}
+
+	.export {
+		display: grid;
+		gap: 0.75rem;
+		padding-top: 1.25rem;
+		border-top: 1px solid rgb(255 255 255 / 0.07);
+	}
+	.export-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+		flex-wrap: wrap;
+	}
+	.export-head h3 {
+		margin: 0;
+		font-size: 1.05rem;
+		letter-spacing: -0.01em;
+	}
+	.install {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.6rem;
+		padding: 0.3rem 0.35rem 0.3rem 0.75rem;
+		border-radius: 10px;
+		border: 1px solid rgb(255 255 255 / 0.1);
+		background: rgb(0 0 0 / 0.3);
+		color: var(--text-1);
+		font: inherit;
+		font-size: 0.8rem;
+		cursor: pointer;
+	}
+	.install code {
+		font-family: var(--mono);
+	}
+	.install span {
+		padding: 0.15rem 0.5rem;
+		border-radius: 6px;
+		background: rgb(255 255 255 / 0.08);
+		color: var(--text-2);
+		font-weight: 600;
+		font-size: 0.72rem;
+	}
+	.tabs {
+		display: flex;
+		gap: 0.25rem;
+	}
+	.tabs button {
+		padding: 0.35rem 0.8rem;
+		border-radius: 8px;
+		border: 0;
+		background: none;
+		color: var(--text-3);
+		font: inherit;
+		font-size: 0.82rem;
+		font-weight: 600;
+		cursor: pointer;
+		transition:
+			background 0.2s,
+			color 0.2s;
+	}
+	.tabs button:hover {
+		color: var(--text-1);
+	}
+	.tabs button.active {
+		background: rgb(255 255 255 / 0.08);
+		color: var(--text-1);
+	}
+	.link {
+		display: flex;
+		gap: 0.5rem;
+	}
+	.link input {
+		flex: 1;
+		min-width: 0;
+		padding: 0.6rem 0.8rem;
+		border-radius: 10px;
+		border: 1px solid rgb(255 255 255 / 0.1);
+		background: rgb(0 0 0 / 0.3);
+		color: var(--text-1);
+		font-family: var(--mono);
+		font-size: 0.8rem;
+	}
+	.copy.static {
+		position: static;
+	}
+	.note {
+		margin: 0;
+		color: var(--text-3);
+		font-size: 0.8rem;
+	}
+	.downloads {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.4rem;
+	}
+	.downloads .label {
+		margin-right: 0.3rem;
+		font-size: 0.7rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.12em;
+		color: var(--text-3);
+	}
+	.file {
+		padding: 0.4rem 0.8rem;
+		border-radius: 999px;
+		border: 1px solid rgb(255 255 255 / 0.12);
+		background: rgb(255 255 255 / 0.05);
+		color: var(--text-1);
+		font: inherit;
+		font-size: 0.8rem;
+		font-weight: 600;
+		cursor: pointer;
+		transition:
+			background 0.2s,
+			transform 0.15s;
+	}
+	.file:hover {
+		background: rgb(255 255 255 / 0.1);
+	}
+	.file:active {
+		transform: scale(0.94);
+	}
+	.file.done {
+		background: #7cf3ff;
+		color: #0b1030;
+	}
+
 	@media (max-width: 900px) {
 		.playground {
 			grid-template-columns: 1fr;
 		}
 		.stage {
+			position: relative;
+			height: auto;
 			min-height: 460px;
 		}
 		.controls {
