@@ -9,7 +9,8 @@ export const MOODS = [
 	'sad',
 	'love',
 	'wink',
-	'grumpy'
+	'grumpy',
+	'shy'
 ] as const;
 export type Mood = (typeof MOODS)[number];
 

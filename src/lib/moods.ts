@@ -167,17 +167,37 @@ export const MOOD_CONFIGS: Record<Mood, MoodConfig> = {
 	},
 	wink: {
 		face: face({
-			right: { ...crescent, brow: 0.6, browLift: 1.5, browTilt: -0.15 },
-			mouthWidth: 13,
-			mouthCurve: 3,
-			mouthCat: 1,
+			// A thin closed arch, not a squint: no brow pressing down on it.
+			left: { scale: 1.08 },
+			right: { open: 0.5, lift: 0.8 },
+			mouthWidth: 15,
+			mouthCurve: 4,
+			mouthOpen: 2.5,
+			mouthX: 2,
+			tongue: 1,
 			cheeks: 0.9,
-			blushLines: 0.5,
 			tilt: 5
 		}),
 		effect: 'sparkles',
 		hands: 'wave',
 		floatSpeed: 2.4
+	},
+	shy: {
+		face: face({
+			// Glancing down and away, blushing hard, lips pressed into a tiny smile.
+			eyes: { open: 0.85, lidOuter: 0.15, scale: 0.95, brow: 0.6, browTilt: 0.3, browLift: 1 },
+			gazeX: -0.6,
+			gazeY: 0.55,
+			mouthWidth: 6,
+			mouthCurve: 1.5,
+			cheeks: 1,
+			blushLines: 1,
+			tilt: -8,
+			stretch: -0.02
+		}),
+		effect: null,
+		hands: 'rest',
+		floatSpeed: 3.4
 	},
 	grumpy: {
 		face: face({

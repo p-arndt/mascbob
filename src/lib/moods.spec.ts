@@ -34,6 +34,15 @@ describe('moods', () => {
 		const { face } = moodConfig('wink');
 		expect(face.left.lift).toBe(0);
 		expect(face.right.lift).toBeGreaterThan(0.5);
+		// A brow over the closed eye made the wink read as a squint.
+		expect(face.right.brow).toBe(0);
+	});
+
+	it('looks away and blushes when shy', () => {
+		const { face } = moodConfig('shy');
+		expect(face.gazeY).toBeGreaterThan(0);
+		expect(Math.abs(face.gazeX)).toBeGreaterThan(0.3);
+		expect(face.cheeks).toBe(1);
 	});
 
 	it('frowns with lowered inner brows when grumpy and raised ones when sad', () => {
@@ -49,9 +58,9 @@ describe('moods', () => {
 		expect(face.right.browLift).toBeGreaterThan(face.left.browLift);
 	});
 
-	it('uses the round mouth for surprised and the cat mouth for wink', () => {
+	it('uses the round mouth for surprised and a tongue-out grin for wink', () => {
 		expect(moodConfig('surprised').face.mouthRound).toBe(1);
-		expect(moodConfig('wink').face.mouthCat).toBe(1);
+		expect(moodConfig('wink').face.tongue).toBe(1);
 	});
 
 	it('only draws brows and blush marks where a mood asks for them', () => {
