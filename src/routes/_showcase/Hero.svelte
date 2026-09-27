@@ -102,9 +102,9 @@
 
 <header class="hero">
 	<div class="copy">
-		<a class="eyebrow" href="#talk">
+		<a class="eyebrow" href="#playground">
 			<span class="dot"></span>
-			New: full-body mode and voice lip-sync
+			New: studio with share links, SVG and PNG export
 			<span class="arrow" aria-hidden="true">→</span>
 		</a>
 		<h1>
@@ -120,7 +120,7 @@
 				<code>pnpm add mascott</code>
 				<span class="copy-state" class:done={copied}>{copied ? 'Copied' : 'Copy'}</span>
 			</button>
-			<a class="btn-primary" href="#playground">Open playground</a>
+			<a class="btn-primary" href="#playground">Open the studio</a>
 		</div>
 		<div class="reactions" role="group" aria-label="Make it react">
 			<span class="reactions-label">Make it react</span>

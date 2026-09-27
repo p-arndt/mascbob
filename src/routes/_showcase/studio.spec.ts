@@ -19,7 +19,8 @@ describe('share links', () => {
 			shape: 'orb',
 			body: false,
 			float: false,
-			colors: { accent: '#12ab34', bodyMid: '#eeeeee' }
+			colors: { accent: '#12ab34', bodyMid: '#eeeeee' },
+			reactions: ['pet', 'shy']
 		});
 		expect(fromQuery(new URLSearchParams(toQuery(c)))).toEqual(c);
 	});
@@ -56,6 +57,16 @@ describe('code generation', () => {
 		const file = svelteFile(config({ theme: 'bred', colors: { accent: '#00ff00' } }));
 		expect(file).toContain("theme={{ base: 'bred', accent: '#00ff00' }}");
 		expect(file).toContain("import { Mascot } from 'mascott';");
+	});
+
+	it('lists reactions only when they differ from the defaults', () => {
+		expect(mascotAttrs(config({ reactions: ['shy', 'pet'] }))).toEqual([
+			{ name: 'reactions', value: "['pet', 'shy']", expr: true }
+		]);
+		expect(svelteFile(config({ reactions: [] }))).toContain('reactions={false}');
+		expect(fromQuery(new URLSearchParams(toQuery(config({ reactions: [] })))).reactions).toEqual(
+			[]
+		);
 	});
 
 	it('derives lighter and darker body shades from one picked color', () => {

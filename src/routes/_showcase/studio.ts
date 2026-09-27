@@ -1,5 +1,8 @@
 import {
 	ACCESSORIES,
+	DEFAULT_REACTIONS,
+	REACTIONS,
+	type Reaction,
 	EYE_STYLES,
 	MOODS,
 	OUTFITS,
@@ -36,6 +39,7 @@ export interface StudioConfig {
 	hands: boolean;
 	float: boolean;
 	lookAt: Gaze;
+	reactions: Reaction[];
 	size: number;
 }
 
@@ -53,6 +57,7 @@ export const LIBRARY_DEFAULTS: StudioConfig = {
 	hands: true,
 	float: true,
 	lookAt: 'pointer',
+	reactions: [...DEFAULT_REACTIONS],
 	size: 160
 };
 
@@ -80,6 +85,7 @@ export function toQuery(c: StudioConfig): string {
 	for (const key of ['body', 'hands', 'float'] as const) {
 		if (c[key] !== d[key]) q.set(key, c[key] ? '1' : '0');
 	}
+	if (!sameSet(c.reactions, d.reactions)) q.set('react', c.reactions.join(',') || 'none');
 	if (c.size !== d.size) q.set('size', String(c.size));
 	for (const key of COLOR_KEYS) {
 		const v = c.colors[key];
@@ -113,6 +119,9 @@ export function fromQuery(q: URLSearchParams): StudioConfig {
 		hands: flag('hands', d.hands),
 		float: flag('float', d.float),
 		lookAt: oneOf(GAZES, q.get('lookAt')) ?? d.lookAt,
+		reactions: q.has('react')
+			? REACTIONS.filter((r) => (q.get('react') ?? '').split(',').includes(r))
+			: [...d.reactions],
 		size: Number.isFinite(size) && size >= 40 && size <= 640 ? Math.round(size) : d.size
 	};
 }
@@ -173,9 +182,20 @@ export function mascotAttrs(c: StudioConfig): Attr[] {
 		c.hands !== d.hands && { name: 'hands', value: String(c.hands), expr: true },
 		c.float !== d.float && { name: 'float', value: String(c.float), expr: true },
 		c.lookAt !== d.lookAt && { name: 'lookAt', value: c.lookAt },
+		reactionsAttr(c),
 		c.size !== d.size && { name: 'size', value: String(c.size), expr: true }
 	];
 	return attrs.filter((a): a is Attr => !!a);
+}
+
+const sameSet = (a: readonly string[], b: readonly string[]) =>
+	a.length === b.length && a.every((x) => b.includes(x));
+
+function reactionsAttr(c: StudioConfig): Attr | false {
+	if (sameSet(c.reactions, LIBRARY_DEFAULTS.reactions)) return false;
+	if (!c.reactions.length) return { name: 'reactions', value: 'false', expr: true };
+	const list = REACTIONS.filter((r) => c.reactions.includes(r));
+	return { name: 'reactions', value: `[${list.map((r) => `'${r}'`).join(', ')}]`, expr: true };
 }
 
 function themeAttr(c: StudioConfig): Attr | false {

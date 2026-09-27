@@ -21,6 +21,14 @@ pnpm add mascott
 <Mascot {mood} theme="og" accessories={['ring']} onboop={() => (mood = 'love')} />
 ```
 
+It reacts to the pointer: stroke over its head to pet it, circle around it to make it dizzy,
+boop it over and over to tickle it, or leave it alone until it gets bored. `follow`, `pet`,
+`dizzy`, `tickle` and `bored` are on by default; `startle` and `shy` are opt-in:
+
+```svelte
+<Mascot reactions={['pet', 'shy', 'startle']} onreaction={(e) => console.log(e.type)} />
+```
+
 The full figure is 2:3 (`size` is the width). Dress it with `outfit` and `shoes`, or use `body={false}` for a square head-only avatar:
 
 ```svelte
@@ -38,26 +46,28 @@ every option or to build your own pickers:
 import { MOODS, SHAPES, EYE_STYLES, ACCESSORIES, OUTFITS, SHOES, THEMES } from 'mascott';
 ```
 
-| Prop          | Type                                                                                       | Default   |
-| ------------- | ------------------------------------------------------------------------------------------ | --------- |
-| `mood`        | one of `MOODS`                                                                             | `idle`    |
-| `theme`       | a key of `THEMES`, or `{ base?, bodyLight, bodyMid, bodyDark, visor, eye, cheek, accent }` | `og`      |
-| `shape`       | one of `SHAPES` (head silhouette)                                                          | `pebble`  |
-| `eyes`        | one of `EYE_STYLES`                                                                        | `round`   |
-| `accessories` | array of `ACCESSORIES`                                                                     | `[]`      |
-| `body`        | full figure with arms and legs, 2:3 (`size` is the width); `false` shows just the head     | `true`    |
-| `outfit`      | one of `OUTFITS`; only visible with `body`                                                 | `none`    |
-| `shoes`       | one of `SHOES`; only visible with `body`                                                   | `none`    |
-| `hands`       | floating hands that gesture with the mood (head-only mode)                                 | `true`    |
-| `lookAt`      | `pointer` `wander` `none` or `{ x, y }` in -1..1                                           | `pointer` |
-| `level`       | mouth opening 0..1 while `talking` (e.g. mic amplitude); omit for automatic lip movement   | –         |
-| `size`        | px number or any CSS length                                                                | `160`     |
-| `float`       | idle hover animation (head-only mode; the full figure stands)                              | `true`    |
-| `motion`      | `auto` (respects `prefers-reduced-motion`), `full`, `reduced`                              | `auto`    |
-| `interactive` | render as a button that reacts to clicks                                                   | `true`    |
-| `label`       | accessible name                                                                            | `Mascott` |
-| `onboop`      | click/tap handler                                                                          | –         |
-| `accessory`   | snippet `({ top, halfWidth })` drawing custom SVG in the head's 200×200 viewBox            | –         |
+| Prop          | Type                                                                                                   | Default   |
+| ------------- | ------------------------------------------------------------------------------------------------------ | --------- |
+| `mood`        | one of `MOODS`                                                                                         | `idle`    |
+| `theme`       | a key of `THEMES`, or `{ base?, bodyLight, bodyMid, bodyDark, visor, eye, cheek, accent }`             | `og`      |
+| `shape`       | one of `SHAPES` (head silhouette)                                                                      | `pebble`  |
+| `eyes`        | one of `EYE_STYLES`                                                                                    | `round`   |
+| `accessories` | array of `ACCESSORIES`                                                                                 | `[]`      |
+| `body`        | full figure with arms and legs, 2:3 (`size` is the width); `false` shows just the head                 | `true`    |
+| `outfit`      | one of `OUTFITS`; only visible with `body`                                                             | `none`    |
+| `shoes`       | one of `SHOES`; only visible with `body`                                                               | `none`    |
+| `hands`       | floating hands that gesture with the mood (head-only mode)                                             | `true`    |
+| `lookAt`      | `pointer` `wander` `none` or `{ x, y }` in -1..1                                                       | `pointer` |
+| `level`       | mouth opening 0..1 while `talking` (e.g. mic amplitude); omit for automatic lip movement               | –         |
+| `size`        | px number or any CSS length                                                                            | `160`     |
+| `float`       | idle hover animation (head-only mode; the full figure stands)                                          | `true`    |
+| `motion`      | `auto` (respects `prefers-reduced-motion`), `full`, `reduced`                                          | `auto`    |
+| `interactive` | render as a button that reacts to clicks                                                               | `true`    |
+| `reactions`   | pointer reactions: `true` (defaults), `false`, a list of `REACTIONS`, or `{ shy: true, bored: false }` | `true`    |
+| `label`       | accessible name                                                                                        | `Mascott` |
+| `onboop`      | click/tap handler                                                                                      | –         |
+| `onreaction`  | called with a `ReactionEvent` (`pet`, `startle`, `dizzy`, `shy`, `tickle`, `bored`, `wake`)            | –         |
+| `accessory`   | snippet `({ top, halfWidth })` drawing custom SVG in the head's 200×200 viewBox                        | –         |
 
 ### Styling with CSS
 

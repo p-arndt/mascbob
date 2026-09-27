@@ -137,7 +137,7 @@
 			<span>mascott</span>
 		</a>
 		<div class="links">
-			<a href="#playground">Playground</a>
+			<a href="#playground">Studio</a>
 			<a href="#talk">Voice</a>
 			<a href="#moods">Moods</a>
 			<a class="hide-sm" href="#usage">Docs</a>
@@ -178,9 +178,11 @@
 
 		<section id="playground" class="section">
 			<div class="section-head" {@attach reveal()}>
-				<span class="kicker">Playground</span>
+				<span class="kicker">Studio</span>
 				<h2>Build your own in seconds.</h2>
-				<p>Tweak anything, roll the dice, then copy the snippet straight into your app.</p>
+				<p>
+					Tweak looks and reactions, then take it home as Svelte code, SVG, PNG or a share link.
+				</p>
 			</div>
 			<div {@attach reveal(100)}>
 				<Playground />

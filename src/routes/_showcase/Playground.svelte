@@ -4,6 +4,7 @@
 		ACCESSORIES,
 		EYE_STYLES,
 		MOODS,
+		REACTIONS,
 		Mascot,
 		OUTFITS,
 		SHAPES,
@@ -14,6 +15,8 @@
 		type EyeStyle,
 		type Mood,
 		type Outfit,
+		type Reaction,
+		type ReactionEvent,
 		type Shape,
 		type Shoes,
 		type ThemeName
@@ -53,6 +56,7 @@
 	let hands = $state(start.hands);
 	let float = $state(start.float);
 	let lookAt = $state<Gaze>(start.lookAt);
+	let reactions = $state<Reaction[]>(start.reactions);
 	let size = $state(start.size);
 	let boops = $state(0);
 
@@ -69,6 +73,7 @@
 		hands,
 		float,
 		lookAt,
+		reactions,
 		size
 	});
 	const themeValue = $derived(themeProp(config));
@@ -99,6 +104,47 @@
 		theme = name;
 		// A preset is a fresh start; stale overrides would hide what the preset looks like.
 		custom = {};
+	}
+
+	const REACTION_HINTS: Record<Reaction, string> = {
+		follow: 'leans toward your cursor',
+		pet: 'stroke back and forth over its head',
+		startle: 'flick the cursor past it, fast',
+		dizzy: 'circle around it twice',
+		shy: 'get really close',
+		tickle: 'boop it again and again',
+		bored: 'leave the mouse alone for 20 s'
+	};
+
+	function toggleReaction(r: Reaction) {
+		reactions = reactions.includes(r) ? reactions.filter((x) => x !== r) : [...reactions, r];
+	}
+
+	// The last reaction, shown on the stage so people learn what the gestures do.
+	let lastReaction = $state<{ id: number; text: string } | null>(null);
+	let reactionTimer: ReturnType<typeof setTimeout>;
+	function describe(e: ReactionEvent): string {
+		switch (e.type) {
+			case 'pet':
+				return `petted ×${e.strokes}`;
+			case 'startle':
+				return 'startled!';
+			case 'dizzy':
+				return 'dizzy…';
+			case 'shy':
+				return 'feeling shy';
+			case 'tickle':
+				return e.level === 'giggle' ? 'giggles' : 'had enough';
+			case 'bored':
+				return 'bored';
+			case 'wake':
+				return 'awake again';
+		}
+	}
+	function onreaction(e: ReactionEvent) {
+		lastReaction = { id: (lastReaction?.id ?? 0) + 1, text: describe(e) };
+		clearTimeout(reactionTimer);
+		reactionTimer = setTimeout(() => (lastReaction = null), 2400);
 	}
 
 	function toggle(a: Accessory) {
@@ -304,6 +350,8 @@
 				{hands}
 				{float}
 				{lookAt}
+				{reactions}
+				{onreaction}
 				{size}
 				onboop={() => boops++}
 			/>
@@ -315,6 +363,11 @@
 			{/key}
 			{boops === 1 ? 'boop' : 'boops'}
 			<span class="hint">· tap it</span>
+			{#if lastReaction}
+				{#key lastReaction.id}
+					<span class="reaction">{lastReaction.text}</span>
+				{/key}
+			{/if}
 		</div>
 	</div>
 
@@ -495,6 +548,24 @@
 		</div>
 
 		<fieldset>
+			<legend>
+				Reactions <span class="value">{reactions.length ? `${reactions.length} on` : 'off'}</span>
+			</legend>
+			<div class="chips">
+				{#each REACTIONS as r (r)}
+					<button
+						class="chip"
+						class:active={reactions.includes(r)}
+						aria-pressed={reactions.includes(r)}
+						title={REACTION_HINTS[r]}
+						onclick={() => toggleReaction(r)}>{r}</button
+					>
+				{/each}
+			</div>
+			<p class="note">Hover a chip to see how to trigger it, then try it on the stage.</p>
+		</fieldset>
+
+		<fieldset>
 			<legend>Size <span class="value">{size}px</span></legend>
 			<input
 				class="range"
@@ -652,8 +723,8 @@
 		transform: scale(0.94);
 	}
 	.dice svg {
-		color: var(--eye);
-		filter: drop-shadow(0 0 6px color-mix(in srgb, var(--eye) 50%, transparent));
+		color: var(--accent);
+		filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 50%, transparent));
 	}
 
 	.boops {
@@ -684,6 +755,15 @@
 	}
 	.hint {
 		color: var(--text-3);
+	}
+	.reaction {
+		margin-left: 0.3rem;
+		padding: 0.1rem 0.55rem;
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--accent) 35%, transparent);
+		color: var(--text-1);
+		font-weight: 600;
+		animation: pop 0.4s cubic-bezier(0.3, 1.6, 0.5, 1);
 	}
 
 	.controls {
@@ -983,6 +1063,9 @@
 	.copy.static {
 		position: static;
 	}
+	fieldset .note {
+		margin-top: 0.55rem;
+	}
 	.note {
 		margin: 0;
 		color: var(--text-3);
@@ -1046,7 +1129,8 @@
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {
-		.boops .pop {
+		.boops .pop,
+		.reaction {
 			animation: none;
 		}
 	}
