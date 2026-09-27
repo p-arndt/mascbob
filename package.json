@@ -69,5 +69,11 @@
 	],
 	"packageManager": "pnpm@12.6.0",
 	"description": "Animated, highly customizable, futuristic-cute SVG mascot for Svelte 5",
-	"license": "MIT"
+	"license": "MIT",
+	"homepage": "https://github.com/p-arndt/mascbob#readme",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/p-arndt/mascbob.git"
+	},
+	"bugs": "https://github.com/p-arndt/mascbob/issues"
 }
