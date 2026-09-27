@@ -10,3 +10,6 @@ bun.lockb
 
 # Agent worktrees
 /.claude/
+
+# Generated README art (`just readme-art`)
+/.github/assets/

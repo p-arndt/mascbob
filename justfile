@@ -32,5 +32,9 @@ test:
 build:
     pnpm build
 
+# Render the README images into .github/assets
+readme-art:
+    pnpm vitest run -c tests/readme-art/vitest.config.ts
+
 # Everything CI runs
 ci: check lint test build
