@@ -18,12 +18,42 @@ describe('Body', () => {
 
 	it('wears no outfit unless one is chosen', async () => {
 		const bare = render(Mascot).container;
-		for (const part of ['.puffer', '.scarf', '.bow', '.hoodie', '.rib']) {
+		for (const part of [
+			'.puffer',
+			'.scarf',
+			'.bow',
+			'.hoodie',
+			'.rib',
+			'.denim',
+			'.shorts',
+			'.jersey',
+			'.tie',
+			'.cape'
+		]) {
 			expect(bare.querySelector(part)).toBeNull();
 		}
 		const { container } = render(Mascot, { outfit: 'scarf' });
 		expect(container.querySelector('.scarf')).not.toBeNull();
 		expect(container.querySelector('.puffer')).toBeNull();
+	});
+
+	it.each([
+		['overalls', ['.denim', '.strap', '.button']],
+		['jersey', ['.jersey', '.jersey-number', '.neck-band']],
+		['tie', ['.tie', '.tie-knot', '.shirt-collar']],
+		['cape', ['.cape', '.clasp']]
+	] as const)('dresses in %s', async (outfit, parts) => {
+		const { container } = render(Mascot, { outfit });
+		for (const part of parts) expect(container.querySelector(part)).not.toBeNull();
+		expect(container.querySelector('.puffer')).toBeNull();
+	});
+
+	it('gives the overalls shorts on both legs and the jersey short sleeves', async () => {
+		const overalls = render(Mascot, { outfit: 'overalls' }).container;
+		expect(overalls.querySelectorAll('.shorts')).toHaveLength(2);
+		const jersey = render(Mascot, { outfit: 'jersey' }).container;
+		expect(jersey.querySelector('.arms.short')).not.toBeNull();
+		expect(jersey.querySelectorAll('.sleeve-band')).toHaveLength(2);
 	});
 
 	it('uses floating hands and floats without a body', async () => {
@@ -41,20 +71,35 @@ describe('Body', () => {
 	it.each([
 		['sneakers', '.shoe-sneakers'],
 		['hightops', '.shoe-hightops'],
-		['boots', '.shoe-boots']
+		['boots', '.shoe-boots'],
+		['slippers', '.shoe-slippers'],
+		['rainboots', '.shoe-rainboots'],
+		['skates', '.shoe-skates']
 	] as const)('wears %s when asked', async (shoes, marker) => {
 		const { container } = render(Mascot, { shoes });
 		expect(container.querySelectorAll(`.foot ${marker}`)).toHaveLength(2);
 		expect(container.querySelector('.foot-plain')).toBeNull();
-		for (const other of ['.shoe-sneakers', '.shoe-hightops', '.shoe-boots']) {
+		for (const other of [
+			'.shoe-sneakers',
+			'.shoe-hightops',
+			'.shoe-boots',
+			'.shoe-slippers',
+			'.shoe-rainboots',
+			'.shoe-skates'
+		]) {
 			if (other !== marker) expect(container.querySelector(other)).toBeNull();
 		}
+	});
+
+	it('rolls the skates on two wheels each', async () => {
+		const { container } = render(Mascot, { shoes: 'skates' });
+		expect(container.querySelectorAll('.shoe-skates .wheel')).toHaveLength(4);
 	});
 
 	it('taps a foot only in idle moods', async () => {
 		expect(render(Mascot, { mood: 'idle' }).container.querySelector('.foot.tap')).not.toBeNull();
 		expect(render(Mascot, { mood: 'sad' }).container.querySelector('.foot.tap')).toBeNull();
-		for (const shoes of ['none', 'boots'] as const) {
+		for (const shoes of ['none', 'boots', 'skates'] as const) {
 			const { container } = render(Mascot, { mood: 'idle', shoes });
 			// The tapping foot is drawn in two passes (collar rim, then shoe) that move together.
 			expect(container.querySelectorAll('.foot.tap')).toHaveLength(2);

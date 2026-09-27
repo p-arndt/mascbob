@@ -1,11 +1,29 @@
 import type { HandPose, Mood } from '../types.js';
 
 /** Outfits for the full-body figure. The bare shell is the default; everything else is opt-in. */
-export const OUTFITS = ['none', 'puffer', 'hoodie', 'scarf', 'bowtie'] as const;
+export const OUTFITS = [
+	'none',
+	'puffer',
+	'hoodie',
+	'scarf',
+	'bowtie',
+	'overalls',
+	'jersey',
+	'tie',
+	'cape'
+] as const;
 export type Outfit = (typeof OUTFITS)[number];
 
 /** Footwear for the full-body figure. `none` keeps plain rounded feet in the body colors. */
-export const SHOES = ['none', 'sneakers', 'hightops', 'boots'] as const;
+export const SHOES = [
+	'none',
+	'sneakers',
+	'hightops',
+	'boots',
+	'slippers',
+	'rainboots',
+	'skates'
+] as const;
 export type Shoes = (typeof SHOES)[number];
 
 /** Full-body mode draws in a 200×300 viewBox: the head keeps its 200×200 coordinates on top. */
@@ -36,12 +54,29 @@ export const FOOT_COLLAR: Record<Shoes, number> = {
 	none: 8,
 	sneakers: 24,
 	hightops: 36,
-	boots: 33
+	boots: 33,
+	slippers: 14,
+	rainboots: 40,
+	// Wheels lift the boot, so its collar sits higher than a hightop's.
+	skates: 44
 };
 
 /** Where the leg ends: a little below the collar, hidden inside the shoe or foot. */
 export function legBottomY(shoes: Shoes): number {
 	return BODY_GROUND_Y - ((FOOT_COLLAR[shoes] ?? FOOT_COLLAR.none) - 6) * FOOT_SCALE;
+}
+
+/** Top of a shoe's collar in figure coordinates. */
+export function collarTopY(shoes: Shoes): number {
+	return BODY_GROUND_Y - (FOOT_COLLAR[shoes] ?? FOOT_COLLAR.none) * FOOT_SCALE;
+}
+
+/**
+ * Where the overalls' shorts end on the leg: just below the hips, but always above the
+ * collar so tall shoes never swallow the hem.
+ */
+export function shortsBottomY(shoes: Shoes): number {
+	return Math.min(HIP_Y + 10, collarTopY(shoes) - 2);
 }
 
 /** The torso stays compact under wide heads, otherwise it'd read as a barrel. */

@@ -6,6 +6,8 @@ import {
 	OUTFITS,
 	SHOES,
 	legBottomY,
+	collarTopY,
+	shortsBottomY,
 	BODY_GROUND_Y,
 	TORSO_TOP,
 	torsoHalfWidth,
@@ -109,6 +111,9 @@ describe('OUTFITS', () => {
 	it('starts with the bare default and offers several outfits', () => {
 		expect(OUTFITS[0]).toBe('none');
 		expect(OUTFITS).toContain('puffer');
+		for (const outfit of ['overalls', 'jersey', 'tie', 'cape'] as const) {
+			expect(OUTFITS).toContain(outfit);
+		}
 		expect(OUTFITS.length).toBeGreaterThanOrEqual(4);
 		expect(new Set(OUTFITS).size).toBe(OUTFITS.length);
 	});
@@ -116,7 +121,28 @@ describe('OUTFITS', () => {
 
 describe('SHOES', () => {
 	it('lists plain feet first, then the shoe styles', () => {
-		expect(SHOES).toEqual(['none', 'sneakers', 'hightops', 'boots']);
+		expect(SHOES).toEqual([
+			'none',
+			'sneakers',
+			'hightops',
+			'boots',
+			'slippers',
+			'rainboots',
+			'skates'
+		]);
+	});
+
+	it('keeps slippers low and rainboots and skates tall', () => {
+		expect(legBottomY('slippers')).toBeGreaterThan(legBottomY('sneakers'));
+		expect(legBottomY('rainboots')).toBeLessThan(legBottomY('hightops'));
+		expect(legBottomY('skates')).toBeLessThan(legBottomY('hightops'));
+	});
+
+	it('ends the overalls shorts above every collar and below the hips', () => {
+		for (const shoes of SHOES) {
+			expect(shortsBottomY(shoes)).toBeLessThan(collarTopY(shoes));
+			expect(shortsBottomY(shoes)).toBeGreaterThan(HIP_Y);
+		}
 	});
 
 	it('ends the legs inside the foot, higher for taller shoes', () => {
