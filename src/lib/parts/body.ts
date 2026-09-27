@@ -1,8 +1,220 @@
+import type { HandPose, Mood } from '../types.js';
+
 /** Outfits for the full-body figure (`body` prop). */
-export const OUTFITS = ['none'] as const;
+export const OUTFITS = ['none', 'scarf', 'bowtie', 'hoodie', 'cape'] as const;
 export type Outfit = (typeof OUTFITS)[number];
 
 /** Full-body mode draws in a 200×300 viewBox: the head keeps its 200×200 coordinates on top. */
 export const BODY_VIEWBOX_HEIGHT = 300;
 /** Ground line for the shadow in full-body mode. */
 export const BODY_GROUND_Y = 290;
+
+/** Where the torso hangs from the head; body reactions pivot here so the neck never detaches. */
+export const NECK_Y = 170;
+/** Egg-shaped torso, widest at the belly and tapering into the hover pod. */
+export const TORSO_PATH =
+	'M100 164C123 164 135 180 136.5 201C138 226 122 247 100 248C78 247 62 226 63.5 201C65 180 77 164 100 164Z';
+export const SHOULDER_Y = 185;
+/** Left shoulder x; the right arm is drawn mirrored around x = 100. */
+export const SHOULDER_X = 70;
+export const UPPER_ARM = 16;
+export const FOREARM = 14;
+
+/**
+ * Mitten with a tiny thumb. The wrist sits at the origin and the fingers point
+ * along +y; the thumb is on +x, which faces the torso for a hanging left arm.
+ */
+export const MITTEN_PATH =
+	'M-5.2 1.6C-6.4 7.4-5 12.6 0 12.6C5 12.6 6.3 8 5.7 5.4C7.7 5.7 9 3.9 8.2 2.1C7.4 .6 5.7 .7 4.7 1.9C4 -1 -4.6 -1 -5.2 1.6Z';
+
+/** Arm angles in degrees, 0 = hanging straight down, positive = swung outward/up. */
+export interface ArmAngles {
+	/** Upper arm at the shoulder. */
+	a1: number;
+	/** Forearm relative to the upper arm. */
+	a2: number;
+}
+
+/** Looping motion laid on top of a pose: `wave` swings the forearm, the rest are subtler. */
+export type ArmSwing = 'none' | 'wave' | 'cheer' | 'gesture';
+
+export interface BodyPose {
+	left: ArmAngles;
+	/** Mirrored: the same numbers give a symmetric pose. */
+	right: ArmAngles;
+	/** Which arm carries the swing. */
+	swing: ArmSwing;
+	swingArm: 'left' | 'right' | 'both';
+	/** Shoulders sag by this many units (sad, sleepy). */
+	drop: number;
+}
+
+const REST: ArmAngles = { a1: 20, a2: -6 };
+
+const HAND_POSES: Record<HandPose, BodyPose> = {
+	rest: { left: REST, right: REST, swing: 'none', swingArm: 'both', drop: 0 },
+	up: {
+		left: { a1: 140, a2: 18 },
+		right: { a1: 140, a2: 18 },
+		swing: 'cheer',
+		swingArm: 'both',
+		drop: 0
+	},
+	wave: {
+		left: REST,
+		right: { a1: 112, a2: 50 },
+		swing: 'wave',
+		swingArm: 'right',
+		drop: 0
+	},
+	think: {
+		left: { a1: -8, a2: -86 },
+		right: { a1: -18, a2: -136 },
+		swing: 'none',
+		swingArm: 'both',
+		drop: 0
+	}
+};
+
+/** Body language that only makes sense for a mood, layered over the hand pose. */
+const MOOD_POSES: Partial<Record<Mood, BodyPose>> = {
+	listening: {
+		left: REST,
+		right: { a1: 96, a2: 70 },
+		swing: 'none',
+		swingArm: 'both',
+		drop: 0
+	},
+	talking: {
+		left: REST,
+		right: { a1: 30, a2: 78 },
+		swing: 'gesture',
+		swingArm: 'right',
+		drop: 0
+	},
+	surprised: {
+		left: { a1: 118, a2: 48 },
+		right: { a1: 118, a2: 48 },
+		swing: 'none',
+		swingArm: 'both',
+		drop: 0
+	},
+	love: {
+		left: { a1: -16, a2: -70 },
+		right: { a1: -16, a2: -70 },
+		swing: 'none',
+		swingArm: 'both',
+		drop: 0
+	},
+	sad: {
+		left: { a1: 5, a2: -3 },
+		right: { a1: 5, a2: -3 },
+		swing: 'none',
+		swingArm: 'both',
+		drop: 3
+	},
+	sleepy: {
+		left: { a1: 9, a2: -4 },
+		right: { a1: 9, a2: -4 },
+		swing: 'none',
+		swingArm: 'both',
+		drop: 2
+	},
+	grumpy: {
+		left: { a1: -20, a2: -84 },
+		right: { a1: -14, a2: -96 },
+		swing: 'none',
+		swingArm: 'both',
+		drop: 0
+	}
+};
+
+export function bodyPose(hands: HandPose, mood: Mood): BodyPose {
+	return MOOD_POSES[mood] ?? HAND_POSES[hands] ?? HAND_POSES.rest;
+}
+
+/** End point of a limb of length `len` leaving (x, y) at angle `deg` (0 = down, positive = toward -x). */
+export function limbEnd(x: number, y: number, deg: number, len: number) {
+	const r = (deg * Math.PI) / 180;
+	return { x: x - Math.sin(r) * len, y: y + Math.cos(r) * len };
+}
+
+/** Joint positions of the left arm (mirror x around 100 for the right one). */
+export function armJoints(angles: ArmAngles, drop = 0) {
+	const shoulder = { x: SHOULDER_X, y: SHOULDER_Y + drop };
+	const elbow = limbEnd(shoulder.x, shoulder.y, angles.a1, UPPER_ARM);
+	const wrist = limbEnd(elbow.x, elbow.y, angles.a1 + angles.a2, FOREARM);
+	return { shoulder, elbow, wrist };
+}
+
+export type CoreMode = 'beat' | 'dim' | 'flicker';
+
+/** Heartbeat of the chest core: seconds per beat and how it glows. */
+export function coreBeat(mood: Mood): { period: number; mode: CoreMode } {
+	switch (mood) {
+		case 'surprised':
+			return { period: 0.5, mode: 'beat' };
+		case 'love':
+			return { period: 0.6, mode: 'beat' };
+		case 'happy':
+			return { period: 0.72, mode: 'beat' };
+		case 'wink':
+		case 'talking':
+			return { period: 0.9, mode: 'beat' };
+		case 'sleepy':
+			return { period: 2.8, mode: 'dim' };
+		case 'sad':
+			return { period: 2.2, mode: 'flicker' };
+		case 'grumpy':
+		case 'thinking':
+			return { period: 1.4, mode: 'beat' };
+		default:
+			return { period: 1.15, mode: 'beat' };
+	}
+}
+
+/** Floating hand placement in head-only mode: center point plus a tilt in degrees. */
+export interface FloatingHand {
+	x: number;
+	y: number;
+	rot: number;
+}
+
+/**
+ * Where the floating hands hover beside a head of half width `hw`. Returned for
+ * the left hand in its own mirrored frame (x measured outward from the head's
+ * edge), so both sides share the same numbers.
+ */
+export function floatingHands(
+	hands: HandPose,
+	mood: Mood,
+	hw: number
+): { left: FloatingHand; right: FloatingHand } {
+	const edge = 100 - hw;
+	const at = (out: number, y: number, rot: number): FloatingHand => ({ x: edge - out, y, rot });
+	const rest = at(12, 136, 18);
+	switch (mood) {
+		case 'surprised':
+			return { left: at(4, 104, 160), right: at(4, 104, 160) };
+		case 'love':
+			return { left: at(-26, 162, -70), right: at(-26, 162, -70) };
+		case 'sad':
+			return { left: at(8, 146, 6), right: at(8, 146, 6) };
+		case 'sleepy':
+			return { left: at(10, 144, 10), right: at(10, 144, 10) };
+		case 'listening':
+			return { left: rest, right: at(8, 110, 150) };
+		case 'grumpy':
+			return { left: at(-18, 158, -60), right: at(-22, 164, -80) };
+	}
+	switch (hands) {
+		case 'up':
+			return { left: at(16, 84, 150), right: at(16, 84, 150) };
+		case 'wave':
+			return { left: rest, right: at(14, 90, 160) };
+		case 'think':
+			return { left: rest, right: at(-hw + 30, 160, -140) };
+		default:
+			return { left: rest, right: rest };
+	}
+}
