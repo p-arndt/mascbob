@@ -2,17 +2,20 @@
 	import { page } from '$app/state';
 	import {
 		ACCESSORIES,
+		EYE_STYLES,
 		MOODS,
 		Mascot,
 		OUTFITS,
 		SHAPES,
 		SHOES,
+		type EyeStyle,
 		type Outfit,
 		type Shoes,
 		type ThemeName
 	} from '$lib/index.js';
 
 	// Visual test bench: /lab?body=1&theme=mint&size=180&acc=ring,ears&outfit=scarf&shoes=boots
+	// &eyes=cat&bg=ffe9a8 (hex without #, or a CSS color name), &pair=1 for every figure on white and black.
 	const body = $derived(page.url.searchParams.get('body') !== '0');
 	const theme = $derived((page.url.searchParams.get('theme') ?? 'og') as ThemeName);
 	const size = $derived(Number(page.url.searchParams.get('size') ?? 150));
@@ -24,6 +27,16 @@
 	const shoes = $derived<Shoes | undefined>(
 		(SHOES as readonly string[]).includes(shoesParam) ? (shoesParam as Shoes) : undefined
 	);
+	const eyesParam = $derived(page.url.searchParams.get('eyes') ?? '');
+	const eyes = $derived<EyeStyle | undefined>(
+		(EYE_STYLES as readonly string[]).includes(eyesParam) ? (eyesParam as EyeStyle) : undefined
+	);
+	const bg = $derived.by(() => {
+		const v = page.url.searchParams.get('bg') ?? '';
+		if (/^[0-9a-f]{3}([0-9a-f]{3})?$/i.test(v)) return `#${v}`;
+		return /^[a-z]+$/i.test(v) ? v : '#0b0b1e';
+	});
+	const grounds = $derived(page.url.searchParams.get('pair') === '1' ? ['#fff', '#111'] : [null]);
 	const acc = $derived(
 		(page.url.searchParams.get('acc') ?? '')
 			.split(',')
@@ -31,39 +44,36 @@
 				(ACCESSORIES as readonly string[]).includes(a)
 			)
 	);
+
+	const cases = [
+		...MOODS.map((mood) => ({ key: `mood-${mood}`, name: mood, mood, shape: undefined })),
+		...SHAPES.map((shape) => ({ key: `shape-${shape}`, name: shape, mood: undefined, shape }))
+	];
 </script>
 
-<div class="bench">
-	{#each MOODS as mood (mood)}
+<div class="bench" style:background={bg}>
+	{#each cases as c (c.key)}
 		<figure>
-			<Mascot
-				{mood}
-				{body}
-				{outfit}
-				{shoes}
-				{theme}
-				{size}
-				accessories={acc}
-				lookAt="none"
-				interactive={false}
-			/>
-			<figcaption>{mood}</figcaption>
-		</figure>
-	{/each}
-	{#each SHAPES as shape (shape)}
-		<figure>
-			<Mascot
-				{shape}
-				{body}
-				{outfit}
-				{shoes}
-				{theme}
-				{size}
-				accessories={acc}
-				lookAt="none"
-				interactive={false}
-			/>
-			<figcaption>{shape}</figcaption>
+			<div class="grounds">
+				{#each grounds as ground, i (i)}
+					<div class="ground" style:background={ground}>
+						<Mascot
+							mood={c.mood}
+							shape={c.shape}
+							{eyes}
+							{body}
+							{outfit}
+							{shoes}
+							{theme}
+							{size}
+							accessories={acc}
+							lookAt="none"
+							interactive={false}
+						/>
+					</div>
+				{/each}
+			</div>
+			<figcaption>{c.name}</figcaption>
 		</figure>
 	{/each}
 </div>
@@ -71,12 +81,13 @@
 <style>
 	:global(body) {
 		margin: 0;
-		background: #0b0b1e;
-		color: #ccc;
 		font-family: system-ui;
 	}
 	.bench {
+		min-height: 100vh;
+		box-sizing: border-box;
 		display: flex;
+		align-content: flex-start;
 		flex-wrap: wrap;
 		gap: 12px;
 		padding: 16px;
@@ -86,5 +97,18 @@
 		display: grid;
 		justify-items: center;
 		gap: 4px;
+	}
+	.grounds {
+		display: flex;
+	}
+	.ground {
+		display: grid;
+		place-items: center;
+		padding: 6px;
+	}
+	/* Readable on any bg= without having to compute its luminance. */
+	figcaption {
+		color: #fff;
+		mix-blend-mode: difference;
 	}
 </style>

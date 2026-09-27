@@ -28,6 +28,17 @@ describe('share links', () => {
 		expect(fromQuery(new URLSearchParams(toQuery(c)))).toEqual(c);
 	});
 
+	it('round-trips motion, interactivity and a fixed talking level', () => {
+		const c = config({
+			mood: 'talking',
+			motion: 'reduced',
+			interactive: false,
+			level: 0.35,
+			stage: 'paper'
+		});
+		expect(fromQuery(new URLSearchParams(toQuery(c)))).toEqual(c);
+	});
+
 	it('is empty for the library defaults', () => {
 		expect(toQuery(LIBRARY_DEFAULTS)).toBe('');
 	});
@@ -42,6 +53,9 @@ describe('share links', () => {
 		expect(c.colors).toEqual({});
 		expect(c.shoes).toBe('none');
 		expect(fromQuery(new URLSearchParams('stage=chartreuse')).stage).toBe('tint');
+		const odd = fromQuery(new URLSearchParams('motion=slow&level=2'));
+		expect(odd.motion).toBe('auto');
+		expect(odd.level).toBeNull();
 	});
 
 	it('keeps stage presets readable', () => {
@@ -61,6 +75,12 @@ describe('stage backdrop', () => {
 		expect(stageStyle('dark', '#000000').scheme).toBe('dark');
 		expect(stageStyle('#fdf6d8', '#000000').scheme).toBe('light');
 		expect(stageStyle('#1c2a4a', '#000000').scheme).toBe('dark');
+		expect(stageStyle('paper', '#000000').scheme).toBe('light');
+	});
+
+	it('draws the paper preset in pure CSS', () => {
+		expect(stageStyle('paper', '#000000').background).toMatch(/^(repeating-|radial-)?.*gradient\(/);
+		expect(stageStyle('paper', '#000000').background).not.toMatch(/url\(/);
 	});
 
 	it('never leaks into the generated code', () => {
@@ -94,6 +114,23 @@ describe('code generation', () => {
 		expect(fromQuery(new URLSearchParams(toQuery(config({ reactions: [] })))).reactions).toEqual(
 			[]
 		);
+	});
+
+	it('writes the talking level only while talking', () => {
+		expect(mascotAttrs(config({ mood: 'talking', level: 0.6 }))).toEqual([
+			{ name: 'mood', value: 'talking' },
+			{ name: 'level', value: '0.6', expr: true }
+		]);
+		expect(mascotAttrs(config({ mood: 'happy', level: 0.6 })).map((a) => a.name)).toEqual(['mood']);
+		expect(mascotAttrs(config({ mood: 'talking' })).map((a) => a.name)).toEqual(['mood']);
+	});
+
+	it('serializes motion and a static mascot', () => {
+		const file = svelteFile(config({ motion: 'reduced', interactive: false, reactions: [] }));
+		expect(file).toContain('motion="reduced"');
+		expect(file).toContain('interactive={false}');
+		// Reactions need interactive, so listing them would be noise.
+		expect(file).not.toContain('reactions');
 	});
 
 	it('derives lighter and darker body shades from one picked color', () => {

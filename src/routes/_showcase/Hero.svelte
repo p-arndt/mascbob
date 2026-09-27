@@ -19,8 +19,11 @@
 	const reduced = new MediaQuery('(prefers-reduced-motion: reduce)');
 	const themeNames = Object.keys(THEMES) as ThemeName[];
 
-	/** The headline is the mascot's current mood, said the way a person would say it. */
-	const WORDS: Record<Mood, string> = {
+	/**
+	 * The headline is the mascot's current mood, said the way a person would say it. Partial, so a
+	 * mood added to the library shows up under its own name instead of breaking the build.
+	 */
+	const WORDS: Partial<Record<Mood, string>> = {
 		idle: 'chill',
 		happy: 'happy',
 		listening: 'curious',
@@ -58,7 +61,7 @@
 	let bubble = $state<string | null>(null);
 
 	const accent = $derived(THEMES[theme].accent);
-	const word = $derived(WORDS[mood]);
+	const word = $derived(WORDS[mood] ?? mood);
 
 	type Prop = 'mood' | 'theme' | 'shape' | 'outfit';
 	const OPTIONS: Record<Prop, readonly string[]> = {

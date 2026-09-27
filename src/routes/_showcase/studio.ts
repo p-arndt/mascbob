@@ -12,6 +12,7 @@ import {
 	type Accessory,
 	type EyeStyle,
 	type Mood,
+	type Motion,
 	type Outfit,
 	type Shape,
 	type Shoes,
@@ -22,12 +23,17 @@ import {
 export const GAZES = ['pointer', 'wander', 'none'] as const;
 export type Gaze = (typeof GAZES)[number];
 
+export const MOTIONS = ['auto', 'full', 'reduced'] as const satisfies readonly Motion[];
+
 /** The colors a user can override in the studio; the body shades are derived from `body`. */
 export const COLOR_KEYS = ['bodyMid', 'eye', 'cheek', 'accent'] as const;
 export type ColorKey = (typeof COLOR_KEYS)[number];
 
-/** Stage backdrop presets; any `#rrggbb` works too. `tint` derives a wash from the accent. */
-export const STAGES = ['tint', 'neutral', 'light', 'dark'] as const;
+/**
+ * Stage backdrop presets; any `#rrggbb` works too. `tint` derives a wash from the accent; `paper`
+ * is a lit, grainy surface, because shadows read differently on texture than on a flat fill.
+ */
+export const STAGES = ['tint', 'neutral', 'light', 'dark', 'paper'] as const;
 export type StagePreset = (typeof STAGES)[number];
 export type Stage = StagePreset | `#${string}`;
 
@@ -46,6 +52,10 @@ export interface StudioConfig {
 	effects: boolean;
 	lookAt: Gaze;
 	reactions: Reaction[];
+	motion: Motion;
+	interactive: boolean;
+	/** Mouth opening while talking; null lets the component babble on its own. */
+	level: number | null;
 	size: number;
 	/** Studio-only: the backdrop behind the preview. Not a component prop, so never in the code. */
 	stage: Stage;
@@ -67,6 +77,9 @@ export const LIBRARY_DEFAULTS: StudioConfig = {
 	effects: true,
 	lookAt: 'pointer',
 	reactions: [...DEFAULT_REACTIONS],
+	motion: 'auto',
+	interactive: true,
+	level: null,
 	size: 160,
 	stage: 'tint'
 };
@@ -88,14 +101,24 @@ const oneOf = <T extends string>(list: readonly T[], v: string | null): T | unde
 export function toQuery(c: StudioConfig): string {
 	const q = new URLSearchParams();
 	const d = LIBRARY_DEFAULTS;
-	for (const key of ['mood', 'theme', 'shape', 'eyes', 'outfit', 'shoes', 'lookAt'] as const) {
+	for (const key of [
+		'mood',
+		'theme',
+		'shape',
+		'eyes',
+		'outfit',
+		'shoes',
+		'lookAt',
+		'motion'
+	] as const) {
 		if (c[key] !== d[key]) q.set(key, c[key]);
 	}
 	if (c.accessories.length) q.set('acc', c.accessories.join(','));
-	for (const key of ['body', 'hands', 'float', 'effects'] as const) {
+	for (const key of ['body', 'hands', 'float', 'effects', 'interactive'] as const) {
 		if (c[key] !== d[key]) q.set(key, c[key] ? '1' : '0');
 	}
 	if (!sameSet(c.reactions, d.reactions)) q.set('react', c.reactions.join(',') || 'none');
+	if (c.level !== null) q.set('level', String(c.level));
 	if (c.size !== d.size) q.set('size', String(c.size));
 	if (c.stage !== d.stage) q.set('stage', c.stage.replace('#', ''));
 	for (const key of COLOR_KEYS) {
@@ -110,6 +133,7 @@ export function fromQuery(q: URLSearchParams): StudioConfig {
 	const d = LIBRARY_DEFAULTS;
 	const flag = (key: string, fallback: boolean) => (q.has(key) ? q.get(key) === '1' : fallback);
 	const size = Number(q.get('size'));
+	const level = q.has('level') ? Number(q.get('level')) : NaN;
 	const colors: StudioConfig['colors'] = {};
 	for (const key of COLOR_KEYS) {
 		const v = `#${q.get(key) ?? ''}`;
@@ -134,6 +158,9 @@ export function fromQuery(q: URLSearchParams): StudioConfig {
 		reactions: q.has('react')
 			? REACTIONS.filter((r) => (q.get('react') ?? '').split(',').includes(r))
 			: [...d.reactions],
+		motion: oneOf(MOTIONS, q.get('motion')) ?? d.motion,
+		interactive: flag('interactive', d.interactive),
+		level: Number.isFinite(level) && level >= 0 && level <= 1 ? level : d.level,
 		size: Number.isFinite(size) && size >= 40 && size <= 640 ? Math.round(size) : d.size,
 		stage: parseStage(q.get('stage')) ?? d.stage
 	};
@@ -173,6 +200,15 @@ export function stageStyle(
 			return { background: '#f5f4f1', scheme: 'light' };
 		case 'dark':
 			return { background: '#161616', scheme: 'dark' };
+		case 'paper':
+			return {
+				background: [
+					'repeating-linear-gradient(0deg, rgb(60 40 10 / 0.03) 0 1px, transparent 1px 3px)',
+					'repeating-linear-gradient(90deg, rgb(60 40 10 / 0.02) 0 1px, transparent 1px 4px)',
+					'radial-gradient(130% 90% at 40% 20%, #fbf8f1, #efe8d9 60%, #ddd3bf)'
+				].join(', '),
+				scheme: 'light'
+			};
 		default:
 			// 0.18 is roughly where dark text and light text have equal contrast.
 			return { background: stage, scheme: luminance(stage) > 0.18 ? 'light' : 'dark' };
@@ -236,7 +272,15 @@ export function mascotAttrs(c: StudioConfig): Attr[] {
 		c.float !== d.float && { name: 'float', value: String(c.float), expr: true },
 		c.effects !== d.effects && { name: 'effects', value: String(c.effects), expr: true },
 		c.lookAt !== d.lookAt && { name: 'lookAt', value: c.lookAt },
-		reactionsAttr(c),
+		c.mood === 'talking' &&
+			c.level !== null && { name: 'level', value: String(c.level), expr: true },
+		c.motion !== d.motion && { name: 'motion', value: c.motion },
+		c.interactive !== d.interactive && {
+			name: 'interactive',
+			value: String(c.interactive),
+			expr: true
+		},
+		c.interactive && reactionsAttr(c),
 		c.size !== d.size && { name: 'size', value: String(c.size), expr: true }
 	];
 	return attrs.filter((a): a is Attr => !!a);

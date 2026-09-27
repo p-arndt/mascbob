@@ -14,6 +14,7 @@
 		type Accessory,
 		type EyeStyle,
 		type Mood,
+		type Motion,
 		type Outfit,
 		type Reaction,
 		type ReactionEvent,
@@ -21,7 +22,7 @@
 		type Shoes,
 		type ThemeName
 	} from '$lib/index.js';
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { page } from '$app/state';
 	import Code, { type Token } from './Code.svelte';
 	import { download, snapshotSvg, svgToPng } from './exporter.js';
@@ -29,6 +30,7 @@
 	import {
 		COLOR_KEYS,
 		GAZES,
+		MOTIONS,
 		STAGES,
 		STUDIO_START,
 		fromQuery,
@@ -61,6 +63,12 @@
 	let effects = $state(start.effects);
 	let lookAt = $state<Gaze>(start.lookAt);
 	let reactions = $state<Reaction[]>(start.reactions);
+	let motion = $state<Motion>(start.motion);
+	let interactive = $state(start.interactive);
+	let levelAuto = $state(start.level === null);
+	// Kept apart from levelAuto so switching back to manual restores the last slider position.
+	let levelValue = $state(start.level ?? 0.5);
+	let compare = $state(false);
 	let size = $state(start.size);
 	let stage = $state<Stage>(start.stage);
 	let boops = $state(0);
@@ -80,6 +88,9 @@
 		effects,
 		lookAt,
 		reactions,
+		motion,
+		interactive,
+		level: levelAuto ? null : levelValue,
 		size,
 		stage
 	});
@@ -90,7 +101,8 @@
 		tint: 'Colorway tint',
 		neutral: 'Neutral',
 		light: 'Light',
-		dark: 'Dark'
+		dark: 'Dark',
+		paper: 'Paper'
 	};
 	const customStage = $derived(stage.startsWith('#') ? stage : null);
 
@@ -113,10 +125,14 @@
 			effects,
 			lookAt,
 			reactions,
+			motion,
+			interactive,
 			size,
 			stage
 		} = c);
 		custom = c.colors;
+		levelAuto = c.level === null;
+		levelValue = c.level ?? levelValue;
 	});
 
 	const COLOR_LABELS: Record<ColorKey, string> = {
@@ -309,7 +325,12 @@
 	}
 
 	let figure = $state<HTMLElement>();
-	function snapshot() {
+	async function snapshot() {
+		// The compare grid replaces the single figure, and an export is always of that one mascot.
+		if (compare) {
+			compare = false;
+			await tick();
+		}
 		const svg = figure?.querySelector('svg');
 		if (!svg) return null;
 		const rect = svg.getBoundingClientRect();
@@ -317,15 +338,15 @@
 	}
 	const fileName = $derived(`mascott-${mood}-${theme}`);
 
-	function exportSvg() {
-		const s = snapshot();
+	async function exportSvg() {
+		const s = await snapshot();
 		if (!s) return;
 		download(s.text, `${fileName}.svg`, 'image/svg+xml');
 		flash('svg');
 	}
 
 	async function exportPng() {
-		const s = snapshot();
+		const s = await snapshot();
 		if (!s) return;
 		// Exports at 1024px wide whatever the preview size, so icons and slides stay sharp.
 		download(await svgToPng(s.text, s.width, s.height, 1024 / s.width), `${fileName}.png`);
@@ -395,30 +416,88 @@
 					</svg>
 					<span>Randomize</span>
 				</button>
+				<button
+					class="pill"
+					class:on={compare}
+					aria-pressed={compare}
+					title="Compare colorways"
+					onclick={() => (compare = !compare)}
+				>
+					<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+						{#each [4, 12, 20] as cx (cx)}
+							{#each [7, 17] as cy (cy)}
+								<circle {cx} {cy} r="3" fill="currentColor" />
+							{/each}
+						{/each}
+					</svg>
+					<span>Compare</span>
+				</button>
 				<button class="pill dark" onclick={() => (panel = 'export')}>Get code</button>
 			</div>
 		</div>
 
-		<div class="figure" bind:this={figure}>
-			<Mascot
-				{mood}
-				theme={themeValue}
-				{shape}
-				{eyes}
-				{accessories}
-				{body}
-				{outfit}
-				{shoes}
-				{hands}
-				{float}
-				{effects}
-				{lookAt}
-				{reactions}
-				{onreaction}
-				{size}
-				onboop={() => boops++}
-			/>
-		</div>
+		{#if compare}
+			<ul class="compare" aria-label="Colorways">
+				{#each themeNames as name (name)}
+					<li>
+						<button
+							class:active={theme === name}
+							aria-pressed={theme === name}
+							title="Use {name}"
+							onclick={() => {
+								pickTheme(name);
+								compare = false;
+							}}
+						>
+							<Mascot
+								{mood}
+								theme={name}
+								{shape}
+								{eyes}
+								{accessories}
+								{body}
+								{outfit}
+								{shoes}
+								{hands}
+								{float}
+								{effects}
+								{motion}
+								level={config.level ?? undefined}
+								lookAt="none"
+								size="100%"
+								interactive={false}
+								label="{name} colorway"
+							/>
+							<span>{name}</span>
+						</button>
+					</li>
+				{/each}
+			</ul>
+		{:else}
+			<div class="figure" bind:this={figure}>
+				<Mascot
+					{mood}
+					theme={themeValue}
+					{shape}
+					{eyes}
+					{accessories}
+					{body}
+					{outfit}
+					{shoes}
+					{hands}
+					{float}
+					{effects}
+					{lookAt}
+					{reactions}
+					{onreaction}
+					{motion}
+					{interactive}
+					level={config.level ?? undefined}
+					{size}
+					onboop={() => boops++}
+				/>
+			</div>
+		{/if}
 
 		<div class="boops" aria-live="polite">
 			{#key boops}
@@ -610,12 +689,55 @@
 							<input type="checkbox" bind:checked={effects} />
 							<span>Effects</span>
 						</label>
+						<label class="toggle">
+							<input type="checkbox" bind:checked={interactive} />
+							<span>Interactive</span>
+						</label>
 					</div>
 				</fieldset>
 				<fieldset>
+					<legend
+						>Motion <span class="value">{motion === 'auto' ? 'follows your OS' : ''}</span></legend
+					>
+					{@render chipGroup(
+						MOTIONS,
+						(m) => motion === m,
+						(m) => (motion = m)
+					)}
+				</fieldset>
+				{#if mood === 'talking'}
+					<fieldset>
+						<legend>
+							Mouth level
+							<span class="value">{levelAuto ? 'babbling' : levelValue.toFixed(2)}</span>
+						</legend>
+						<div class="level">
+							<label class="toggle">
+								<input type="checkbox" bind:checked={levelAuto} />
+								<span>Auto</span>
+							</label>
+							<input
+								class="range"
+								type="range"
+								min="0"
+								max="1"
+								step="0.05"
+								disabled={levelAuto}
+								bind:value={levelValue}
+								style:--p="{levelValue * 100}%"
+								aria-label="Mouth level"
+							/>
+						</div>
+					</fieldset>
+				{/if}
+				<fieldset disabled={!interactive} class:off={!interactive}>
 					<legend>
 						Pointer reactions <span class="value"
-							>{reactions.length ? `${reactions.length} on` : 'off'}</span
+							>{!interactive
+								? 'needs interactive'
+								: reactions.length
+									? `${reactions.length} on`
+									: 'off'}</span
 						>
 					</legend>
 					<ul class="reactions">
@@ -701,8 +823,8 @@
 						<button
 							class="file"
 							class:done={done === 'svgcode'}
-							onclick={() => {
-								const s = snapshot();
+							onclick={async () => {
+								const s = await snapshot();
 								if (s) copy('svgcode', s.text);
 							}}
 						>
@@ -781,6 +903,54 @@
 		display: grid;
 		place-items: center;
 		min-height: 0;
+	}
+	.pill.on {
+		background: var(--text-1);
+		color: var(--on-ink);
+	}
+
+	.compare {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+		align-content: start;
+		gap: 0.5rem;
+		min-height: 0;
+		margin: 0;
+		padding: 0.25rem;
+		list-style: none;
+		overflow-y: auto;
+	}
+	.compare button {
+		display: grid;
+		justify-items: center;
+		gap: 0.2rem;
+		width: 100%;
+		padding: 0.35rem;
+		border: 0;
+		border-radius: 14px;
+		background: none;
+		color: var(--text-2);
+		font: inherit;
+		font-size: 0.78rem;
+		font-weight: 600;
+		cursor: pointer;
+		transition: background 0.15s;
+	}
+	.compare button:hover {
+		background: color-mix(in srgb, var(--raised) 50%, transparent);
+	}
+	.compare button.active {
+		box-shadow: inset 0 0 0 1.5px var(--text-1);
+		color: var(--text-1);
+	}
+	.level {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+	}
+	.range:disabled {
+		opacity: 0.4;
+		cursor: default;
 	}
 
 	.boops {
