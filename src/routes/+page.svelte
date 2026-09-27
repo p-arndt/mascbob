@@ -233,7 +233,8 @@
 	.blob {
 		position: absolute;
 		border-radius: 50%;
-		filter: blur(80px);
+		/* Baked-in falloff instead of filter: blur(), which re-rasterizes huge layers every frame. */
+		background: radial-gradient(closest-side, var(--blob), transparent);
 		opacity: 0.55;
 		will-change: transform;
 	}
@@ -242,7 +243,7 @@
 		height: 40vmax;
 		top: -15vmax;
 		left: -10vmax;
-		background: #5b4dfc;
+		--blob: #5b4dfc;
 		animation: drift1 22s ease-in-out infinite alternate;
 	}
 	.b2 {
@@ -250,7 +251,7 @@
 		height: 35vmax;
 		top: -5vmax;
 		right: -15vmax;
-		background: #d946ef;
+		--blob: #d946ef;
 		opacity: 0.35;
 		animation: drift2 26s ease-in-out infinite alternate;
 	}
@@ -259,7 +260,7 @@
 		height: 30vmax;
 		bottom: -20vmax;
 		left: 20vmax;
-		background: #06b6d4;
+		--blob: #06b6d4;
 		opacity: 0.22;
 		animation: drift1 30s ease-in-out infinite alternate-reverse;
 	}

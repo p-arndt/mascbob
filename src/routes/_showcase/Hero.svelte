@@ -360,7 +360,6 @@
 		background:
 			radial-gradient(circle at 50% 45%, rgb(182 156 255 / 0.45), transparent 58%),
 			radial-gradient(circle at 60% 60%, rgb(124 243 255 / 0.25), transparent 60%);
-		filter: blur(40px);
 	}
 	.orbit {
 		position: absolute;
