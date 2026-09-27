@@ -216,6 +216,15 @@
 		}
 	}
 
+	type Panel = 'look' | 'gear' | 'motion' | 'export';
+	const PANELS: { id: Panel; label: string }[] = [
+		{ id: 'look', label: 'Look' },
+		{ id: 'gear', label: 'Gear' },
+		{ id: 'motion', label: 'Motion' },
+		{ id: 'export', label: 'Export' }
+	];
+	let panel = $state<Panel>('look');
+
 	type Tab = 'svelte' | 'link';
 	let tab = $state<Tab>('svelte');
 	const INSTALL = 'pnpm add mascott';
@@ -299,7 +308,26 @@
 	}
 </script>
 
-<div class="playground glass">
+{#snippet chipGroup<T extends string>(
+	items: readonly T[],
+	isOn: (item: T) => boolean,
+	set: (item: T) => void,
+	hint?: (item: T) => string
+)}
+	<div class="chips">
+		{#each items as item (item)}
+			<button
+				class="chip"
+				class:active={isOn(item)}
+				aria-pressed={isOn(item)}
+				title={hint?.(item)}
+				onclick={() => set(item)}>{item}</button
+			>
+		{/each}
+	</div>
+{/snippet}
+
+<div class="playground card">
 	<div
 		class="stage"
 		style:--accent={colors.accent}
@@ -316,25 +344,27 @@
 				</button>
 				<span class="thumb" class:right={body} aria-hidden="true"></span>
 			</div>
-			<button class="dice" onclick={randomize} aria-label="Randomize" title="Randomize">
-				<svg bind:this={dice} viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-					<rect
-						x="2.5"
-						y="2.5"
-						width="19"
-						height="19"
-						rx="5.5"
-						fill="currentColor"
-						opacity="0.16"
-						stroke="currentColor"
-						stroke-width="1.5"
-					/>
-					{#each PIPS[face] as [cx, cy], i (i)}
-						<circle cx={7 + cx * 5} cy={7 + cy * 5} r="1.6" fill="currentColor" />
-					{/each}
-				</svg>
-				<span>Randomize</span>
-			</button>
+			<div class="stage-actions">
+				<button class="pill" onclick={randomize} aria-label="Randomize" title="Randomize">
+					<svg bind:this={dice} viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+						<rect
+							x="2.5"
+							y="2.5"
+							width="19"
+							height="19"
+							rx="5.5"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.6"
+						/>
+						{#each PIPS[face] as [cx, cy], i (i)}
+							<circle cx={7 + cx * 5} cy={7 + cy * 5} r="1.6" fill="currentColor" />
+						{/each}
+					</svg>
+					<span>Randomize</span>
+				</button>
+				<button class="pill dark" onclick={() => (panel = 'export')}>Get code</button>
+			</div>
 		</div>
 
 		<div class="figure" bind:this={figure}>
@@ -362,326 +392,283 @@
 				<strong class:pop={boops > 0}>{boops}</strong>
 			{/key}
 			{boops === 1 ? 'boop' : 'boops'}
-			<span class="hint">· tap it</span>
 			{#if lastReaction}
 				{#key lastReaction.id}
 					<span class="reaction">{lastReaction.text}</span>
 				{/key}
+			{:else}
+				<span class="hint">· tap it</span>
 			{/if}
+		</div>
+
+		<div class="dock" role="group" aria-label="Mood">
+			{#each MOODS as m (m)}
+				<button class:active={mood === m} aria-pressed={mood === m} onclick={() => (mood = m)}
+					>{m}</button
+				>
+			{/each}
 		</div>
 	</div>
 
-	<div class="controls">
-		<div class="controls-head">
-			<h2>Make it yours</h2>
-			<p>Every option below comes straight from the library's exported arrays.</p>
-		</div>
-
-		<fieldset>
-			<legend>Mood</legend>
-			<div class="chips">
-				{#each MOODS as m (m)}
-					<button
-						class="chip"
-						class:active={mood === m}
-						aria-pressed={mood === m}
-						onclick={() => (mood = m)}>{m}</button
-					>
-				{/each}
-			</div>
-		</fieldset>
-
-		<fieldset>
-			<legend>Theme <span class="value">{theme}</span></legend>
-			<div class="swatches">
-				{#each themeNames as name (name)}
-					<button
-						class="swatch"
-						class:active={theme === name && !Object.keys(custom).length}
-						aria-pressed={theme === name}
-						title={name}
-						aria-label="{name} theme"
-						style:--a={THEMES[name].bodyLight}
-						style:--b={THEMES[name].bodyMid}
-						style:--c={THEMES[name].bodyDark}
-						style:--k={THEMES[name].accent}
-						style:--e={THEMES[name].eye}
-						onclick={() => pickTheme(name)}
-					></button>
-				{/each}
-			</div>
-		</fieldset>
-
-		<fieldset>
-			<legend>
-				Colors
-				{#if Object.keys(custom).length}
-					<button class="reset" onclick={() => (custom = {})}>reset to {theme}</button>
-				{:else}
-					<span class="value">from {theme}</span>
-				{/if}
-			</legend>
-			<div class="colors">
-				{#each COLOR_KEYS as key (key)}
-					<label class="color" class:changed={custom[key]}>
-						<input
-							type="color"
-							value={colors[key]}
-							defaultValue={colors[key]}
-							oninput={(e) => setColor(key, e.currentTarget.value)}
-						/>
-						<span>{COLOR_LABELS[key]}</span>
-					</label>
-				{/each}
-			</div>
-		</fieldset>
-
-		<div class="row">
-			<fieldset>
-				<legend>Shape</legend>
-				<div class="chips">
-					{#each SHAPES as s (s)}
-						<button
-							class="chip"
-							class:active={shape === s}
-							aria-pressed={shape === s}
-							onclick={() => (shape = s)}>{s}</button
-						>
-					{/each}
-				</div>
-			</fieldset>
-			<fieldset>
-				<legend>Eyes</legend>
-				<div class="chips">
-					{#each EYE_STYLES as e (e)}
-						<button
-							class="chip"
-							class:active={eyes === e}
-							aria-pressed={eyes === e}
-							onclick={() => (eyes = e)}>{e}</button
-						>
-					{/each}
-				</div>
-			</fieldset>
-		</div>
-
-		<fieldset>
-			<legend>Accessories <span class="value">{accessories.length || 'none'}</span></legend>
-			<div class="chips">
-				{#each ACCESSORIES as a (a)}
-					<button
-						class="chip"
-						class:active={accessories.includes(a)}
-						aria-pressed={accessories.includes(a)}
-						onclick={() => toggle(a)}>{a}</button
-					>
-				{/each}
-			</div>
-		</fieldset>
-
-		<div class="row">
-			<fieldset disabled={!body} class:off={!body}>
-				<legend>
-					Outfit
-					{#if !body}<span class="value">needs full body</span>{/if}
-				</legend>
-				<div class="chips">
-					{#each OUTFITS as o (o)}
-						<button
-							class="chip"
-							class:active={outfit === o}
-							aria-pressed={outfit === o}
-							onclick={() => (outfit = o)}>{o}</button
-						>
-					{/each}
-				</div>
-			</fieldset>
-			<fieldset disabled={!body} class:off={!body}>
-				<legend>
-					Shoes
-					{#if !body}<span class="value">needs full body</span>{/if}
-				</legend>
-				<div class="chips">
-					{#each SHOES as f (f)}
-						<button
-							class="chip"
-							class:active={shoes === f}
-							aria-pressed={shoes === f}
-							onclick={() => (shoes = f)}>{f}</button
-						>
-					{/each}
-				</div>
-			</fieldset>
-		</div>
-
-		<div class="row">
-			<fieldset>
-				<legend>Gaze</legend>
-				<div class="chips">
-					{#each GAZES as l (l)}
-						<button
-							class="chip"
-							class:active={lookAt === l}
-							aria-pressed={lookAt === l}
-							onclick={() => (lookAt = l)}>{l}</button
-						>
-					{/each}
-				</div>
-			</fieldset>
-			<fieldset>
-				<legend>Extras</legend>
-				<div class="chips">
-					<button
-						class="chip"
-						class:active={hands}
-						aria-pressed={hands}
-						onclick={() => (hands = !hands)}>hands</button
-					>
-					<button
-						class="chip"
-						class:active={float}
-						aria-pressed={float}
-						onclick={() => (float = !float)}>float</button
-					>
-				</div>
-			</fieldset>
-		</div>
-
-		<fieldset>
-			<legend>
-				Reactions <span class="value">{reactions.length ? `${reactions.length} on` : 'off'}</span>
-			</legend>
-			<div class="chips">
-				{#each REACTIONS as r (r)}
-					<button
-						class="chip"
-						class:active={reactions.includes(r)}
-						aria-pressed={reactions.includes(r)}
-						title={REACTION_HINTS[r]}
-						onclick={() => toggleReaction(r)}>{r}</button
-					>
-				{/each}
-			</div>
-			<p class="note">Hover a chip to see how to trigger it, then try it on the stage.</p>
-		</fieldset>
-
-		<fieldset>
-			<legend>Size <span class="value">{size}px</span></legend>
-			<input
-				class="range"
-				type="range"
-				min="80"
-				max="320"
-				bind:value={size}
-				style:--p="{((size - 80) / 240) * 100}%"
-				aria-label="Size"
-			/>
-		</fieldset>
-
-		<section class="export" aria-label="Export">
-			<div class="export-head">
-				<h3>Take it home</h3>
-				<button
-					class="install"
-					onclick={() => copy('install', INSTALL)}
-					title="Copy install command"
-				>
-					<code>{INSTALL}</code>
-					<span>{done === 'install' ? 'Copied' : 'Copy'}</span>
-				</button>
-			</div>
-			<div class="tabs" role="tablist" aria-label="Export format">
+	<div class="panel">
+		<div class="tabs" role="tablist" aria-label="Studio sections">
+			{#each PANELS as t (t.id)}
 				<button
 					role="tab"
-					aria-selected={tab === 'svelte'}
-					class:active={tab === 'svelte'}
-					onclick={() => (tab = 'svelte')}
+					aria-selected={panel === t.id}
+					class:active={panel === t.id}
+					onclick={() => (panel = t.id)}>{t.label}</button
 				>
-					Svelte
-				</button>
-				<button
-					role="tab"
-					aria-selected={tab === 'link'}
-					class:active={tab === 'link'}
-					onclick={() => (tab = 'link')}
-				>
-					Share link
-				</button>
-			</div>
-			{#if tab === 'svelte'}
-				<div class="code">
-					<Code lines={tokens} />
-					<button
-						class="copy"
-						class:done={done === 'code'}
-						onclick={() => copy('code', svelteFile(config))}
-					>
-						{done === 'code' ? 'Copied' : 'Copy'}
-					</button>
-				</div>
-			{:else}
-				<div class="link">
+			{/each}
+		</div>
+
+		<div class="panel-body" role="tabpanel">
+			{#if panel === 'look'}
+				<fieldset>
+					<legend>Colorway <span class="value">{theme}</span></legend>
+					<div class="swatches">
+						{#each themeNames as name (name)}
+							<button
+								class="swatch"
+								class:active={theme === name && !Object.keys(custom).length}
+								aria-pressed={theme === name}
+								title={name}
+								aria-label="{name} theme"
+								style:--a={THEMES[name].bodyLight}
+								style:--b={THEMES[name].bodyMid}
+								style:--c={THEMES[name].bodyDark}
+								style:--k={THEMES[name].accent}
+								style:--e={THEMES[name].eye}
+								onclick={() => pickTheme(name)}
+							></button>
+						{/each}
+					</div>
+				</fieldset>
+
+				<fieldset>
+					<legend>
+						Colors
+						{#if Object.keys(custom).length}
+							<button class="reset" onclick={() => (custom = {})}>Reset to {theme}</button>
+						{:else}
+							<span class="value">from {theme}</span>
+						{/if}
+					</legend>
+					<div class="colors">
+						{#each COLOR_KEYS as key (key)}
+							<label class="color" class:changed={custom[key]}>
+								<input
+									type="color"
+									value={colors[key]}
+									defaultValue={colors[key]}
+									oninput={(e) => setColor(key, e.currentTarget.value)}
+								/>
+								<span>{COLOR_LABELS[key]}</span>
+							</label>
+						{/each}
+					</div>
+				</fieldset>
+
+				<fieldset>
+					<legend>Shape</legend>
+					{@render chipGroup(
+						SHAPES,
+						(s) => shape === s,
+						(s) => (shape = s)
+					)}
+				</fieldset>
+				<fieldset>
+					<legend>Eyes</legend>
+					{@render chipGroup(
+						EYE_STYLES,
+						(e) => eyes === e,
+						(e) => (eyes = e)
+					)}
+				</fieldset>
+
+				<fieldset>
+					<legend>Size <span class="value">{size}px</span></legend>
 					<input
-						readonly
-						value={shareUrl}
-						aria-label="Share link"
-						onfocus={(e) => e.currentTarget.select()}
+						class="range"
+						type="range"
+						min="80"
+						max="320"
+						bind:value={size}
+						style:--p="{((size - 80) / 240) * 100}%"
+						aria-label="Size"
 					/>
+				</fieldset>
+			{:else if panel === 'gear'}
+				<fieldset>
+					<legend>Accessories <span class="value">{accessories.length || 'none'}</span></legend>
+					{@render chipGroup(ACCESSORIES, (a) => accessories.includes(a), toggle)}
+				</fieldset>
+				<fieldset disabled={!body} class:off={!body}>
+					<legend>
+						Outfit
+						{#if !body}<span class="value">needs full body</span>{/if}
+					</legend>
+					{@render chipGroup(
+						OUTFITS,
+						(o) => outfit === o,
+						(o) => (outfit = o)
+					)}
+				</fieldset>
+				<fieldset disabled={!body} class:off={!body}>
+					<legend>
+						Shoes
+						{#if !body}<span class="value">needs full body</span>{/if}
+					</legend>
+					{@render chipGroup(
+						SHOES,
+						(f) => shoes === f,
+						(f) => (shoes = f)
+					)}
+				</fieldset>
+				{#if !body}
+					<button class="link-btn" onclick={() => (body = true)}>Switch to full body →</button>
+				{/if}
+			{:else if panel === 'motion'}
+				<fieldset>
+					<legend>Gaze</legend>
+					{@render chipGroup(
+						GAZES,
+						(l) => lookAt === l,
+						(l) => (lookAt = l)
+					)}
+				</fieldset>
+				<fieldset>
+					<legend>Extras</legend>
+					<div class="toggles">
+						<label class="toggle">
+							<input type="checkbox" bind:checked={hands} />
+							<span>Hands</span>
+						</label>
+						<label class="toggle">
+							<input type="checkbox" bind:checked={float} />
+							<span>Float</span>
+						</label>
+					</div>
+				</fieldset>
+				<fieldset>
+					<legend>
+						Pointer reactions <span class="value"
+							>{reactions.length ? `${reactions.length} on` : 'off'}</span
+						>
+					</legend>
+					<ul class="reactions">
+						{#each REACTIONS as r (r)}
+							<li>
+								<label class="toggle">
+									<input
+										type="checkbox"
+										checked={reactions.includes(r)}
+										onchange={() => toggleReaction(r)}
+									/>
+									<span>{r}</span>
+								</label>
+								<em>{REACTION_HINTS[r]}</em>
+							</li>
+						{/each}
+					</ul>
+				</fieldset>
+			{:else}
+				<div class="export">
 					<button
-						class="copy static"
-						class:done={done === 'link'}
-						onclick={() => copy('link', shareUrl)}
+						class="install"
+						onclick={() => copy('install', INSTALL)}
+						title="Copy install command"
 					>
-						{done === 'link' ? 'Copied' : 'Copy'}
+						<code>{INSTALL}</code>
+						<span>{done === 'install' ? 'Copied' : 'Copy'}</span>
 					</button>
+					<div class="segmented" role="tablist" aria-label="Export format">
+						<button
+							role="tab"
+							aria-selected={tab === 'svelte'}
+							class:active={tab === 'svelte'}
+							onclick={() => (tab = 'svelte')}>Svelte</button
+						>
+						<button
+							role="tab"
+							aria-selected={tab === 'link'}
+							class:active={tab === 'link'}
+							onclick={() => (tab = 'link')}>Share link</button
+						>
+						<span class="thumb" class:right={tab === 'link'} aria-hidden="true"></span>
+					</div>
+					{#if tab === 'svelte'}
+						<div class="code">
+							<Code lines={tokens} />
+							<button
+								class="copy"
+								class:done={done === 'code'}
+								onclick={() => copy('code', svelteFile(config))}
+							>
+								{done === 'code' ? 'Copied' : 'Copy'}
+							</button>
+						</div>
+					{:else}
+						<div class="link">
+							<input
+								readonly
+								value={shareUrl}
+								aria-label="Share link"
+								onfocus={(e) => e.currentTarget.select()}
+							/>
+							<button
+								class="copy static"
+								class:done={done === 'link'}
+								onclick={() => copy('link', shareUrl)}
+							>
+								{done === 'link' ? 'Copied' : 'Copy'}
+							</button>
+						</div>
+						<p class="note">Opens this page with your mascot already set up in the studio.</p>
+					{/if}
+					<div class="downloads">
+						<button class="file" class:done={done === 'file'} onclick={exportSvelte}>
+							<span>.svelte</span><small>Component</small>
+						</button>
+						<button class="file" class:done={done === 'svg'} onclick={exportSvg}>
+							<span>SVG</span><small>Vector</small>
+						</button>
+						<button class="file" class:done={done === 'png'} onclick={exportPng}>
+							<span>PNG</span><small>1024 px</small>
+						</button>
+						<button
+							class="file"
+							class:done={done === 'svgcode'}
+							onclick={() => {
+								const s = snapshot();
+								if (s) copy('svgcode', s.text);
+							}}
+						>
+							<span>{done === 'svgcode' ? 'Copied' : 'Copy'}</span><small>SVG markup</small>
+						</button>
+					</div>
 				</div>
-				<p class="note">Opens this page with your mascot already set up in the studio.</p>
 			{/if}
-			<div class="downloads">
-				<span class="label">Download</span>
-				<button class="file" class:done={done === 'file'} onclick={exportSvelte}>.svelte</button>
-				<button class="file" class:done={done === 'svg'} onclick={exportSvg}>SVG</button>
-				<button class="file" class:done={done === 'png'} onclick={exportPng}>PNG</button>
-				<button
-					class="file"
-					class:done={done === 'svgcode'}
-					onclick={() => {
-						const s = snapshot();
-						if (s) copy('svgcode', s.text);
-					}}
-				>
-					{done === 'svgcode' ? 'Copied' : 'Copy SVG'}
-				</button>
-			</div>
-		</section>
+		</div>
 	</div>
 </div>
 
 <style>
 	.playground {
 		display: grid;
-		grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
-		/* clip, not hidden: hidden would become the scroll container and break the sticky stage. */
+		grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+		height: 700px;
 		overflow: clip;
 	}
+
 	.stage {
 		position: relative;
 		display: grid;
-		grid-template-rows: auto 1fr auto;
-		min-height: 560px;
-		/* The controls run long; keeping the stage in view shows every change as it happens. */
-		position: sticky;
-		top: 0;
-		align-self: start;
-		height: min(100vh, 820px);
+		grid-template-rows: auto 1fr auto auto;
+		gap: 0.75rem;
+		min-height: 0;
 		padding: 1rem;
-		background:
-			radial-gradient(
-				circle at 50% 48%,
-				color-mix(in srgb, var(--accent) 30%, transparent),
-				transparent 55%
-			),
-			radial-gradient(circle, rgb(255 255 255 / 0.08) 1px, transparent 1.5px) 0 0 / 22px 22px;
+		background: color-mix(in srgb, var(--accent) 14%, var(--bg));
 		transition: background 0.6s;
 	}
 	.stage-bar {
@@ -691,51 +678,54 @@
 		position: relative;
 		z-index: 2;
 	}
-	.figure {
-		display: grid;
-		place-items: center;
-		padding: 1rem 0;
+	.stage .segmented {
+		background: color-mix(in srgb, var(--raised) 60%, transparent);
 	}
-
-	.dice {
+	.stage-actions {
+		display: flex;
+		gap: 0.4rem;
+	}
+	.pill {
 		display: inline-flex;
 		align-items: center;
-		gap: 0.5rem;
-		padding: 0.4rem 0.85rem 0.4rem 0.55rem;
-		border-radius: 12px;
-		border: 1px solid rgb(255 255 255 / 0.12);
-		background: rgb(255 255 255 / 0.06);
+		gap: 0.45rem;
+		padding: 0.5rem 0.95rem;
+		border: 0;
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--raised) 80%, transparent);
 		color: var(--text-1);
 		font: inherit;
-		font-size: 0.84rem;
+		font-size: 0.88rem;
 		font-weight: 600;
 		cursor: pointer;
 		transition:
-			background 0.2s,
-			transform 0.15s,
-			border-color 0.2s;
+			background 0.15s,
+			transform 0.2s var(--spring);
 	}
-	.dice:hover {
-		background: rgb(255 255 255 / 0.1);
-		border-color: rgb(255 255 255 / 0.2);
+	.pill:hover {
+		background: var(--raised);
 	}
-	.dice:active {
-		transform: scale(0.94);
+	.pill.dark {
+		background: var(--text-1);
+		color: var(--on-ink);
 	}
-	.dice svg {
-		color: var(--accent);
-		filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 50%, transparent));
+	.pill.dark:hover {
+		background: var(--ink-hover);
+	}
+	.pill:active {
+		transform: scale(0.95);
+	}
+	.figure {
+		display: grid;
+		place-items: center;
+		min-height: 0;
 	}
 
 	.boops {
-		justify-self: start;
+		justify-self: center;
 		display: inline-flex;
 		align-items: baseline;
 		gap: 0.35rem;
-		padding: 0.4rem 0.8rem;
-		border-radius: 999px;
-		background: rgb(0 0 0 / 0.3);
-		border: 1px solid rgb(255 255 255 / 0.08);
 		font-size: 0.85rem;
 		color: var(--text-2);
 	}
@@ -750,47 +740,102 @@
 	@keyframes pop {
 		from {
 			transform: scale(1.7);
-			color: var(--eye);
 		}
 	}
 	.hint {
 		color: var(--text-3);
 	}
 	.reaction {
-		margin-left: 0.3rem;
-		padding: 0.1rem 0.55rem;
+		padding: 0.05rem 0.55rem;
 		border-radius: 999px;
-		background: color-mix(in srgb, var(--accent) 35%, transparent);
-		color: var(--text-1);
+		background: var(--text-1);
+		color: var(--on-ink);
 		font-weight: 600;
 		animation: pop 0.4s cubic-bezier(0.3, 1.6, 0.5, 1);
 	}
 
-	.controls {
-		padding: 1.75rem 2rem 2rem;
+	/* The mood dock sits on the stage: it's the most fun control, so it lives next to the mascot. */
+	.dock {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 0.2rem;
+		padding: 0.3rem;
+		border-radius: 22px;
+		background: var(--raised);
+		box-shadow: 0 6px 24px -10px rgb(0 0 0 / 0.25);
+	}
+	.dock button {
+		flex: none;
+		padding: 0.45rem 0.8rem;
+		border: 0;
+		border-radius: 999px;
+		background: none;
+		color: var(--text-2);
+		font: inherit;
+		font-size: 0.85rem;
+		font-weight: 550;
+		cursor: pointer;
+		transition:
+			background 0.15s,
+			color 0.15s;
+	}
+	.dock button:hover {
+		color: var(--text-1);
+		background: var(--surface);
+	}
+	.dock button.active {
+		background: var(--text-1);
+		color: var(--on-ink);
+	}
+
+	.panel {
 		display: grid;
-		/* minmax(0, …): a long line in the code block must scroll, not widen the column and clip the chips. */
-		grid-template-columns: minmax(0, 1fr);
-		gap: 1.25rem;
-		align-content: start;
-		border-left: 1px solid rgb(255 255 255 / 0.07);
-		background: rgb(8 8 24 / 0.35);
+		grid-template-rows: auto 1fr;
+		min-height: 0;
 	}
-	.controls-head h2 {
-		margin: 0;
-		font-size: 1.35rem;
-		letter-spacing: -0.02em;
+	.tabs {
+		display: flex;
+		gap: 0.25rem;
+		padding: 1rem 1.25rem 0;
+		border-bottom: 1px solid var(--line);
 	}
-	.controls-head p {
-		margin: 0.3rem 0 0;
+	.tabs button {
+		position: relative;
+		padding: 0.6rem 0.8rem 0.85rem;
+		border: 0;
+		background: none;
 		color: var(--text-3);
-		font-size: 0.88rem;
+		font: inherit;
+		font-size: 0.95rem;
+		font-weight: 600;
+		cursor: pointer;
+		transition: color 0.15s;
 	}
-	.row {
+	.tabs button:hover,
+	.tabs button.active {
+		color: var(--text-1);
+	}
+	.tabs button.active::after {
+		content: '';
+		position: absolute;
+		left: 0.8rem;
+		right: 0.8rem;
+		bottom: -1px;
+		height: 2px;
+		border-radius: 2px;
+		background: var(--text-1);
+	}
+	.panel-body {
 		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 1.25rem;
+		align-content: start;
+		gap: 1.6rem;
+		min-height: 0;
+		padding: 1.5rem 1.75rem 2rem;
+		overflow-y: auto;
+		overscroll-behavior: contain;
 	}
+
 	fieldset {
 		border: 0;
 		margin: 0;
@@ -805,18 +850,32 @@
 		display: flex;
 		gap: 0.5rem;
 		align-items: baseline;
-		font-size: 0.7rem;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.12em;
-		color: var(--text-3);
-		margin-bottom: 0.55rem;
+		margin-bottom: 0.65rem;
 		padding: 0;
+		font-size: 0.92rem;
+		font-weight: 650;
+		color: var(--text-1);
 	}
 	.value {
-		text-transform: none;
-		letter-spacing: 0;
 		font-weight: 500;
+		color: var(--text-3);
+	}
+	.link-btn,
+	.reset {
+		justify-self: start;
+		padding: 0;
+		border: 0;
+		background: none;
+		color: var(--text-1);
+		font: inherit;
+		font-size: 0.9rem;
+		font-weight: 500;
+		text-decoration: underline;
+		text-underline-offset: 3px;
+		cursor: pointer;
+	}
+	.reset {
+		font-size: 0.85rem;
 		color: var(--text-2);
 	}
 
@@ -827,23 +886,21 @@
 	}
 	.swatch {
 		position: relative;
-		width: 2.3rem;
-		height: 2.3rem;
+		width: 2.4rem;
+		height: 2.4rem;
 		border-radius: 50%;
 		border: 0;
 		padding: 0;
 		background:
 			radial-gradient(circle at 40% 48%, var(--e) 0 8%, transparent 10%),
 			radial-gradient(circle at 60% 48%, var(--e) 0 8%, transparent 10%),
-			radial-gradient(circle at 42% 51%, var(--k) 0 8%, transparent 10%),
-			radial-gradient(circle at 62% 51%, var(--k) 0 8%, transparent 10%),
 			radial-gradient(circle at 32% 28%, var(--a), var(--b) 45%, var(--c));
 		box-shadow:
-			inset 0 -2px 4px rgb(0 0 0 / 0.15),
-			0 0 0 1px rgb(255 255 255 / 0.1);
+			inset 0 -3px 0 var(--k),
+			0 0 0 1px rgb(0 0 0 / 0.08);
 		cursor: pointer;
 		transition:
-			transform 0.2s cubic-bezier(0.3, 1.5, 0.5, 1),
+			transform 0.2s var(--spring),
 			box-shadow 0.2s;
 	}
 	.swatch:hover {
@@ -854,99 +911,34 @@
 	}
 	.swatch.active {
 		box-shadow:
-			0 0 0 2px #0b0b1e,
-			0 0 0 4px var(--b),
-			0 6px 18px -4px var(--c);
-	}
-
-	.range {
-		width: 100%;
-		appearance: none;
-		height: 6px;
-		border-radius: 999px;
-		background: linear-gradient(90deg, #7cf3ff, #c4b5fd var(--p), rgb(255 255 255 / 0.1) var(--p));
-		outline-offset: 6px;
-		cursor: pointer;
-	}
-	.range::-webkit-slider-thumb {
-		appearance: none;
-		width: 18px;
-		height: 18px;
-		border-radius: 50%;
-		background: #fff;
-		box-shadow:
-			0 0 0 4px rgb(196 181 253 / 0.25),
-			0 2px 6px rgb(0 0 0 / 0.4);
-		transition: transform 0.15s;
-	}
-	.range:active::-webkit-slider-thumb {
-		transform: scale(1.2);
-	}
-	.range::-moz-range-thumb {
-		width: 18px;
-		height: 18px;
-		border: 0;
-		border-radius: 50%;
-		background: #fff;
-		box-shadow: 0 0 0 4px rgb(196 181 253 / 0.25);
-	}
-
-	.code {
-		position: relative;
-		min-width: 0;
-	}
-	.code :global(pre) {
-		min-height: 9.5em;
-	}
-	.copy {
-		position: absolute;
-		top: 0.6rem;
-		right: 0.6rem;
-		padding: 0.35rem 0.7rem;
-		border-radius: 8px;
-		border: 1px solid rgb(255 255 255 / 0.1);
-		background: rgb(255 255 255 / 0.06);
-		color: var(--text-2);
-		font: inherit;
-		font-size: 0.78rem;
-		font-weight: 600;
-		cursor: pointer;
-		transition:
-			background 0.2s,
-			color 0.2s,
-			transform 0.15s;
-	}
-	.copy:hover {
-		background: rgb(255 255 255 / 0.12);
-	}
-	.copy:active {
-		transform: scale(0.94);
-	}
-	.copy.done {
-		background: #7cf3ff;
-		color: #0b1030;
+			inset 0 -3px 0 var(--k),
+			0 0 0 2px var(--bg),
+			0 0 0 4px var(--text-1);
 	}
 
 	.colors {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 0.5rem;
+		gap: 0.4rem;
 	}
 	.color {
 		display: inline-flex;
 		align-items: center;
 		gap: 0.45rem;
-		padding: 0.3rem 0.7rem 0.3rem 0.3rem;
+		padding: 0.3rem 0.8rem 0.3rem 0.3rem;
 		border-radius: 999px;
-		border: 1px solid rgb(255 255 255 / 0.1);
-		background: rgb(255 255 255 / 0.04);
-		font-size: 0.8rem;
+		background: var(--raised);
+		box-shadow: inset 0 0 0 1px var(--line);
+		font-size: 0.85rem;
 		color: var(--text-2);
 		cursor: pointer;
-		transition: border-color 0.2s;
+		transition: box-shadow 0.15s;
+	}
+	.color:hover {
+		box-shadow: inset 0 0 0 1px var(--text-3);
 	}
 	.color.changed {
-		border-color: rgb(255 255 255 / 0.35);
+		box-shadow: inset 0 0 0 1.5px var(--text-1);
 		color: var(--text-1);
 	}
 	.color input {
@@ -962,91 +954,180 @@
 		padding: 0;
 	}
 	.color input::-webkit-color-swatch {
-		border: 1px solid rgb(255 255 255 / 0.2);
+		border: 1px solid rgb(0 0 0 / 0.1);
 		border-radius: 50%;
 	}
 	.color input::-moz-color-swatch {
-		border: 1px solid rgb(255 255 255 / 0.2);
+		border: 1px solid rgb(0 0 0 / 0.1);
 		border-radius: 50%;
 	}
-	.reset {
-		border: 0;
-		padding: 0;
-		background: none;
-		color: var(--text-2);
-		font: inherit;
-		text-transform: none;
-		letter-spacing: 0;
-		text-decoration: underline;
+
+	.range {
+		width: 100%;
+		appearance: none;
+		height: 6px;
+		border-radius: 999px;
+		background: linear-gradient(90deg, var(--text-1) var(--p), var(--surface-2) var(--p));
+		outline-offset: 6px;
 		cursor: pointer;
+	}
+	.range::-webkit-slider-thumb {
+		appearance: none;
+		width: 20px;
+		height: 20px;
+		border-radius: 50%;
+		background: #fff;
+		box-shadow:
+			0 0 0 1px rgb(0 0 0 / 0.1),
+			0 2px 6px rgb(0 0 0 / 0.2);
+		transition: transform 0.15s;
+	}
+	.range:active::-webkit-slider-thumb {
+		transform: scale(1.15);
+	}
+	.range::-moz-range-thumb {
+		width: 20px;
+		height: 20px;
+		border: 0;
+		border-radius: 50%;
+		background: #fff;
+		box-shadow: 0 0 0 1px rgb(0 0 0 / 0.1);
+	}
+
+	/* Switch-style checkboxes: native inputs keep keyboard and screen reader behavior for free. */
+	.toggles {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 1.5rem;
+	}
+	.toggle {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.6rem;
+		font-size: 0.92rem;
+		font-weight: 550;
+		cursor: pointer;
+	}
+	.toggle input {
+		appearance: none;
+		position: relative;
+		flex: none;
+		width: 2.3rem;
+		height: 1.35rem;
+		margin: 0;
+		border-radius: 999px;
+		background: var(--surface-2);
+		cursor: pointer;
+		transition: background 0.2s;
+	}
+	.toggle input::after {
+		content: '';
+		position: absolute;
+		top: 2px;
+		left: 2px;
+		width: calc(1.35rem - 4px);
+		aspect-ratio: 1;
+		border-radius: 50%;
+		background: #fff;
+		box-shadow: 0 1px 3px rgb(0 0 0 / 0.2);
+		transition: translate 0.25s var(--spring);
+	}
+	.toggle input:checked {
+		background: var(--text-1);
+	}
+	.toggle input:checked::after {
+		translate: 0.95rem 0;
+	}
+	.reactions {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: grid;
+	}
+	.reactions li {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 1rem;
+		padding: 0.6rem 0;
+		border-bottom: 1px solid var(--line);
+	}
+	.reactions li:last-child {
+		border-bottom: 0;
+	}
+	.reactions em {
+		font-style: normal;
+		font-size: 0.82rem;
+		color: var(--text-3);
+		text-align: right;
 	}
 
 	.export {
 		display: grid;
-		gap: 0.75rem;
-		padding-top: 1.25rem;
-		border-top: 1px solid rgb(255 255 255 / 0.07);
+		gap: 1rem;
 	}
-	.export-head {
+	.export .segmented {
+		justify-self: start;
+	}
+	.install {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		gap: 1rem;
-		flex-wrap: wrap;
-	}
-	.export-head h3 {
-		margin: 0;
-		font-size: 1.05rem;
-		letter-spacing: -0.01em;
-	}
-	.install {
-		display: inline-flex;
-		align-items: center;
 		gap: 0.6rem;
-		padding: 0.3rem 0.35rem 0.3rem 0.75rem;
-		border-radius: 10px;
-		border: 1px solid rgb(255 255 255 / 0.1);
-		background: rgb(0 0 0 / 0.3);
+		padding: 0.4rem 0.4rem 0.4rem 1rem;
+		border: 0;
+		border-radius: 999px;
+		background: var(--raised);
+		box-shadow: inset 0 0 0 1px var(--line);
 		color: var(--text-1);
 		font: inherit;
-		font-size: 0.8rem;
+		font-size: 0.88rem;
 		cursor: pointer;
 	}
 	.install code {
-		font-family: var(--mono);
+		padding: 0;
+		background: none;
 	}
 	.install span {
-		padding: 0.15rem 0.5rem;
-		border-radius: 6px;
-		background: rgb(255 255 255 / 0.08);
-		color: var(--text-2);
+		padding: 0.3rem 0.75rem;
+		border-radius: 999px;
+		background: var(--surface);
 		font-weight: 600;
-		font-size: 0.72rem;
+		font-size: 0.8rem;
 	}
-	.tabs {
-		display: flex;
-		gap: 0.25rem;
+	.code {
+		position: relative;
+		min-width: 0;
 	}
-	.tabs button {
+	.code :global(pre) {
+		min-height: 9.5em;
+	}
+	.copy {
+		position: absolute;
+		top: 0.6rem;
+		right: 0.6rem;
 		padding: 0.35rem 0.8rem;
-		border-radius: 8px;
+		border-radius: 999px;
 		border: 0;
-		background: none;
-		color: var(--text-3);
+		background: rgb(255 255 255 / 0.12);
+		color: #eaeaea;
 		font: inherit;
-		font-size: 0.82rem;
+		font-size: 0.8rem;
 		font-weight: 600;
 		cursor: pointer;
 		transition:
-			background 0.2s,
-			color 0.2s;
+			background 0.15s,
+			transform 0.15s;
 	}
-	.tabs button:hover {
-		color: var(--text-1);
+	.copy:hover {
+		background: rgb(255 255 255 / 0.2);
 	}
-	.tabs button.active {
-		background: rgb(255 255 255 / 0.08);
-		color: var(--text-1);
+	.copy:active {
+		transform: scale(0.94);
+	}
+	.copy.done {
+		background: #fff;
+		color: #161616;
 	}
 	.link {
 		display: flex;
@@ -1055,80 +1136,82 @@
 	.link input {
 		flex: 1;
 		min-width: 0;
-		padding: 0.6rem 0.8rem;
-		border-radius: 10px;
-		border: 1px solid rgb(255 255 255 / 0.1);
-		background: rgb(0 0 0 / 0.3);
+		padding: 0.6rem 0.9rem;
+		border-radius: 999px;
+		border: 0;
+		background: var(--raised);
+		box-shadow: inset 0 0 0 1px var(--line);
 		color: var(--text-1);
 		font-family: var(--mono);
 		font-size: 0.8rem;
 	}
 	.copy.static {
 		position: static;
-	}
-	fieldset .note {
-		margin-top: 0.55rem;
+		background: var(--text-1);
+		color: var(--on-ink);
 	}
 	.note {
 		margin: 0;
 		color: var(--text-3);
-		font-size: 0.8rem;
+		font-size: 0.82rem;
 	}
 	.downloads {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 0.4rem;
-	}
-	.downloads .label {
-		margin-right: 0.3rem;
-		font-size: 0.7rem;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.12em;
-		color: var(--text-3);
+		display: grid;
+		grid-template-columns: repeat(4, 1fr);
+		gap: 0.5rem;
 	}
 	.file {
-		padding: 0.4rem 0.8rem;
-		border-radius: 999px;
-		border: 1px solid rgb(255 255 255 / 0.12);
-		background: rgb(255 255 255 / 0.05);
+		display: grid;
+		gap: 0.1rem;
+		padding: 0.75rem 0.85rem;
+		border: 0;
+		border-radius: 16px;
+		background: var(--raised);
+		box-shadow: inset 0 0 0 1px var(--line);
 		color: var(--text-1);
 		font: inherit;
-		font-size: 0.8rem;
-		font-weight: 600;
+		text-align: left;
 		cursor: pointer;
 		transition:
-			background 0.2s,
-			transform 0.15s;
+			box-shadow 0.15s,
+			transform 0.2s var(--spring);
+	}
+	.file span {
+		font-weight: 650;
+		font-size: 0.95rem;
+	}
+	.file small {
+		font-size: 0.76rem;
+		color: var(--text-3);
 	}
 	.file:hover {
-		background: rgb(255 255 255 / 0.1);
+		box-shadow: inset 0 0 0 1px var(--text-3);
 	}
 	.file:active {
-		transform: scale(0.94);
+		transform: scale(0.96);
 	}
 	.file.done {
-		background: #7cf3ff;
-		color: #0b1030;
+		background: var(--text-1);
+		color: var(--on-ink);
+		box-shadow: none;
+	}
+	.file.done small {
+		color: color-mix(in srgb, var(--on-ink) 60%, transparent);
 	}
 
 	@media (max-width: 900px) {
 		.playground {
 			grid-template-columns: 1fr;
+			height: auto;
 		}
 		.stage {
-			position: relative;
-			height: auto;
-			min-height: 460px;
+			min-height: 480px;
 		}
-		.controls {
-			border-left: 0;
-			border-top: 1px solid rgb(255 255 255 / 0.07);
-			padding: 1.5rem 1.25rem;
+		.panel-body {
+			overflow: visible;
 		}
-		.row {
-			grid-template-columns: 1fr;
+		.downloads {
+			grid-template-columns: repeat(2, 1fr);
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {

@@ -121,10 +121,9 @@
 	);
 </script>
 
-<div class="talk glass">
+<div class="talk">
 	<div class="copy">
-		<span class="kicker">Voice</span>
-		<h2>Talk to it.</h2>
+		<h2>Talk to it.<br /><span>It talks back.</span></h2>
 		<p>
 			Feed any audio amplitude into <code>level</code> and the mouth follows syllable by syllable.
 			This demo reads your microphone through a Web Audio <code>AnalyserNode</code>, smooths the RMS
@@ -132,7 +131,7 @@
 		</p>
 		<div class="buttons">
 			<button
-				class="btn-primary mic"
+				class="mic"
 				class:live={mode === 'mic'}
 				onclick={toggleMic}
 				disabled={status === 'requesting'}
@@ -150,7 +149,7 @@
 				</svg>
 				{mode === 'mic' ? 'Stop microphone' : 'Use microphone'}
 			</button>
-			<button class="btn-ghost" onclick={toggleSim} aria-pressed={mode === 'sim'}>
+			<button class="sim" onclick={toggleSim} aria-pressed={mode === 'sim'}>
 				{mode === 'sim' ? 'Stop' : 'Simulate speech'}
 			</button>
 		</div>
@@ -166,16 +165,18 @@
 
 	<div class="demo">
 		<div class="ring" class:on={mode !== 'off'} style:--l={level} aria-hidden="true"></div>
-		<Mascot
-			{mood}
-			level={mode === 'mic' ? level : undefined}
-			theme="noir"
-			shape="orb"
-			accessories={['headphones']}
-			size="min(230px, 56vw)"
-			interactive={false}
-			label="mascott listening"
-		/>
+		<div class="figure">
+			<Mascot
+				{mood}
+				level={mode === 'mic' ? level : undefined}
+				theme="noir"
+				shape="orb"
+				accessories={['headphones']}
+				size="min(250px, 56vw)"
+				interactive={false}
+				label="mascott listening"
+			/>
+		</div>
 		<div class="meter" aria-hidden="true">
 			{#each history as v, i (i)}
 				<span style:--v={v}></span>
@@ -190,54 +191,97 @@
 		grid-template-columns: 1.1fr 1fr;
 		gap: 2rem;
 		align-items: center;
-		padding: clamp(1.5rem, 4vw, 3rem);
+		padding: clamp(2rem, 5vw, 4.5rem);
+		border-radius: 40px;
+		background: var(--slab);
+		box-shadow: inset 0 0 0 1px var(--slab-line);
+		color: #fff;
 		overflow: hidden;
 	}
-	.kicker {
-		font-size: 0.75rem;
-		font-weight: 600;
-		letter-spacing: 0.14em;
-		text-transform: uppercase;
-		color: #f0abfc;
-	}
 	h2 {
-		font-size: clamp(2rem, 4vw, 3rem);
-		letter-spacing: -0.035em;
-		margin: 0.4rem 0 0.8rem;
-		line-height: 1.05;
+		margin: 0 0 1.25rem;
+		font-size: clamp(2.4rem, 5vw, 4rem);
+		line-height: 1;
+		letter-spacing: -0.05em;
+	}
+	h2 span {
+		color: #7dffd4;
 	}
 	.copy > p {
-		color: var(--text-2);
-		line-height: 1.6;
 		margin: 0;
 		max-width: 32rem;
+		color: #b5b5b5;
+		font-size: 1.05rem;
+		line-height: 1.6;
+	}
+	.copy :global(code) {
+		background: rgb(255 255 255 / 0.1);
+		color: #fff;
 	}
 	.buttons {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.6rem;
-		margin: 1.6rem 0 1rem;
+		margin: 2rem 0 1rem;
 	}
-	.mic {
+	.mic,
+	.sim {
 		display: inline-flex;
 		align-items: center;
 		gap: 0.5rem;
+		padding: 0.85rem 1.35rem;
+		border: 0;
+		border-radius: 999px;
+		font: inherit;
+		font-weight: 600;
+		font-size: 1rem;
+		cursor: pointer;
+		transition:
+			transform 0.2s var(--spring),
+			background 0.15s,
+			color 0.15s;
+	}
+	.mic {
+		background: #fff;
+		color: #161616;
+	}
+	.mic:hover {
+		background: #e8e8e8;
 	}
 	.mic.live {
-		background: linear-gradient(120deg, #fda4af, #f0abfc);
-		box-shadow: 0 0 0 4px rgb(253 164 175 / 0.18);
+		background: #ff453a;
+		color: #fff;
+	}
+	.mic:disabled {
+		opacity: 0.6;
+		cursor: progress;
+	}
+	.sim {
+		background: rgb(255 255 255 / 0.1);
+		color: #fff;
+	}
+	.sim:hover {
+		background: rgb(255 255 255 / 0.16);
+	}
+	.sim[aria-pressed='true'] {
+		background: #7dffd4;
+		color: #161616;
+	}
+	.mic:active,
+	.sim:active {
+		transform: scale(0.96);
 	}
 	.status {
 		display: flex;
 		align-items: center;
 		gap: 0.55rem;
-		font-size: 0.88rem;
-		color: var(--text-3);
 		margin: 0;
 		min-height: 1.4em;
+		font-size: 0.88rem;
+		color: #8a8a8a;
 	}
 	.status.warn {
-		color: #fdba74;
+		color: #ffb37a;
 	}
 	.led {
 		flex: none;
@@ -245,65 +289,59 @@
 		height: 0.5rem;
 		border-radius: 50%;
 		background: rgb(255 255 255 / 0.2);
-		transition:
-			background 0.2s,
-			box-shadow 0.2s;
+		transition: background 0.2s;
 	}
 	.led.on {
-		background: #4ade80;
-		box-shadow: 0 0 10px #4ade80;
+		background: #7dffd4;
 	}
 
 	.demo {
 		position: relative;
 		display: grid;
 		place-items: center;
-		gap: 1.2rem;
+		gap: 1.5rem;
 		padding: 1rem 0;
 	}
+	/* A flat disc behind the head that swells with the voice level, like a speaker cone. */
 	.ring {
 		position: absolute;
 		top: 50%;
 		left: 50%;
-		width: min(300px, 70vw);
+		width: min(320px, 70vw);
 		aspect-ratio: 1;
 		border-radius: 50%;
-		translate: -50% -60%;
-		background: radial-gradient(circle, rgb(240 171 252 / 0.28), transparent 65%);
-		scale: calc(0.85 + var(--l, 0) * 0.35);
-		opacity: 0.5;
+		translate: -50% -58%;
+		background: #232323;
+		scale: calc(0.9 + var(--l, 0) * 0.25);
 		transition:
-			opacity 0.3s,
+			background 0.3s,
 			scale 0.08s linear;
 	}
 	.ring.on {
-		opacity: 1;
+		background: #1f3a33;
+	}
+	.figure {
+		position: relative;
 	}
 	.meter {
+		position: relative;
 		display: flex;
 		align-items: center;
 		gap: 3px;
-		height: 36px;
+		height: 40px;
 	}
 	.meter span {
-		width: 4px;
-		height: calc(4px + var(--v) * 32px);
+		width: 5px;
+		height: calc(4px + var(--v) * 36px);
 		border-radius: 999px;
-		background: linear-gradient(#f0abfc, #7cf3ff);
-		opacity: calc(0.35 + var(--v) * 0.65);
+		background: #7dffd4;
+		opacity: calc(0.25 + var(--v) * 0.75);
 	}
 
 	@media (max-width: 900px) {
 		.talk {
 			grid-template-columns: 1fr;
-			text-align: center;
-		}
-		.copy > p {
-			margin-inline: auto;
-		}
-		.buttons,
-		.status {
-			justify-content: center;
+			border-radius: 32px;
 		}
 		.demo {
 			order: -1;

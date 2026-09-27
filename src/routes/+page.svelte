@@ -1,47 +1,70 @@
 <script lang="ts">
-	import { ACCESSORIES, MOODS, Mascot, SHAPES, THEMES } from '$lib/index.js';
+	import { onMount } from 'svelte';
+	import {
+		ACCESSORIES,
+		MOODS,
+		Mascot,
+		OUTFITS,
+		SHAPES,
+		THEMES,
+		type Mood,
+		type ThemeName
+	} from '$lib/index.js';
 	import './_showcase/showcase.css';
 	import Code, { plain, type Token } from './_showcase/Code.svelte';
 	import Galleries from './_showcase/Galleries.svelte';
 	import Hero from './_showcase/Hero.svelte';
 	import Playground from './_showcase/Playground.svelte';
 	import TalkDemo from './_showcase/TalkDemo.svelte';
-	import { copyText, reveal, spotlight } from './_showcase/interactions.js';
+	import { copyText, reveal } from './_showcase/interactions.js';
+	import { pinScheme, pinnedScheme } from './_showcase/scheme.js';
 
 	let scrolled = $state(false);
 
-	const features = [
-		{
-			title: `${MOODS.length} expressive moods`,
-			text: 'Eyes, lids, mouth, blush and posture are tweened, so every switch is a smooth morph instead of a cut.',
-			icon: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM8.5 14.5s1.3 2 3.5 2 3.5-2 3.5-2M9 9.5h.01M15 9.5h.01',
-			wide: true
-		},
-		{
-			title: 'Alive by default',
-			text: 'Blinks, breathes, floats, follows the cursor and squishes on boop.',
-			icon: 'M3 12h4l2-6 4 12 2-6h6'
-		},
-		{
-			title: 'Themeable to the bone',
-			text: `${Object.keys(THEMES).length} presets, per-color overrides, or plain CSS variables.`,
-			icon: 'M12 3a9 9 0 0 0 0 18c1 0 1.5-.8 1.5-1.5 0-1.2-1-1.5-1-2.5 0-.8.7-1.5 1.5-1.5H16a5 5 0 0 0 5-5c0-4-4-7.5-9-7.5ZM7.5 11h.01M10 7.5h.01M15 7.5h.01'
-		},
+	const themeNames = Object.keys(THEMES) as ThemeName[];
+	const tint = (theme: ThemeName, amount = 14) =>
+		`color-mix(in srgb, ${THEMES[theme].accent} ${amount}%, var(--bg))`;
+
+	// The first card flips through every mood on its own, so the morphing is visible without clicking.
+	let moodIndex = $state(0);
+	const cycled: Mood = $derived(MOODS[moodIndex]);
+	onMount(() => {
+		if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+		const id = setInterval(() => (moodIndex = (moodIndex + 1) % MOODS.length), 1700);
+		return () => clearInterval(id);
+	});
+
+	let swatch = $state<ThemeName>('lilac');
+
+	// Follows the system until the visitor picks a scheme, then stays pinned.
+	let dark = $state(false);
+	onMount(() => {
+		const system = matchMedia('(prefers-color-scheme: dark)');
+		const pinned = pinnedScheme();
+		dark = pinned ? pinned === 'dark' : system.matches;
+		const follow = (e: MediaQueryListEvent) => {
+			if (!pinnedScheme()) dark = e.matches;
+		};
+		system.addEventListener('change', follow);
+		return () => system.removeEventListener('change', follow);
+	});
+	function toggleScheme() {
+		dark = !dark;
+		pinScheme(dark ? 'dark' : 'light');
+	}
+
+	const more = [
 		{
 			title: 'Voice ready',
-			text: 'Pipe audio amplitude into `level` and the mouth lip-syncs in real time.',
-			icon: 'M12 3v18M8 7v10M4 10v4M16 7v10M20 10v4'
+			text: 'Pipe audio amplitude into `level` and the mouth lip-syncs in real time.'
 		},
 		{
 			title: 'Head or full body',
-			text: `${SHAPES.length} head shapes, ${ACCESSORIES.length} accessories and an optional body with outfits and shoes.`,
-			icon: 'M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM5 21c0-4 3-7 7-7s7 3 7 7'
+			text: `${SHAPES.length} head shapes, ${ACCESSORIES.length} accessories, ${OUTFITS.length - 1} outfits and shoes.`
 		},
 		{
 			title: 'Tiny and accessible',
-			text: 'Pure SVG and Svelte 5 motion, zero dependencies. Real button semantics and reduced-motion support built in.',
-			icon: 'M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3ZM9 12l2 2 4-4',
-			wide: true
+			text: 'Pure SVG, zero dependencies. Real button semantics and reduced-motion support.'
 		}
 	];
 
@@ -103,6 +126,7 @@
 			['', '; }']
 		]
 	];
+
 	const usageText = plain(usage);
 
 	let copied = $state(false);
@@ -118,29 +142,46 @@
 		name="description"
 		content="An animated, endlessly customizable SVG mascot for Svelte 5: moods, themes, full body, outfits, shoes and voice lip-sync."
 	/>
-	<meta name="theme-color" content="#07071a" />
+	<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+	<meta name="theme-color" content="#111110" media="(prefers-color-scheme: dark)" />
 </svelte:head>
 
 <svelte:window onscroll={() => (scrolled = scrollY > 8)} />
 
 <div class="site">
-	<div class="backdrop" aria-hidden="true">
-		<div class="blob b1"></div>
-		<div class="blob b2"></div>
-		<div class="blob b3"></div>
-		<div class="grain"></div>
-	</div>
-
 	<nav class:scrolled>
 		<a class="brand" href="#top" aria-label="mascott home">
-			<Mascot size={30} hands={false} float={false} interactive={false} label="" />
+			<Mascot size={28} hands={false} float={false} interactive={false} label="" />
 			<span>mascott</span>
 		</a>
 		<div class="links">
-			<a href="#playground">Studio</a>
+			<a href="#features">Features</a>
 			<a href="#talk">Voice</a>
 			<a href="#moods">Moods</a>
-			<a class="hide-sm" href="#usage">Docs</a>
+			<a href="#usage">Docs</a>
+		</div>
+		<div class="nav-end">
+			<button
+				class="scheme"
+				onclick={toggleScheme}
+				aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+				title={dark ? 'Light mode' : 'Dark mode'}
+			>
+				<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+					{#if dark}
+						<circle cx="12" cy="12" r="4.2" fill="currentColor" />
+						<path
+							d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6"
+							stroke="currentColor"
+							stroke-width="1.8"
+							stroke-linecap="round"
+						/>
+					{:else}
+						<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="currentColor" />
+					{/if}
+				</svg>
+			</button>
+			<a class="btn-primary nav-cta" href="#playground">Studio</a>
 		</div>
 	</nav>
 
@@ -149,36 +190,99 @@
 	</div>
 
 	<main>
-		<section class="bento" aria-label="Features">
-			{#each features as f, i (f.title)}
-				<article
-					class="feature glass"
-					class:wide={f.wide}
-					{@attach reveal((i % 3) * 80)}
-					{@attach spotlight}
-				>
-					<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-						<path
-							d={f.icon}
-							fill="none"
-							stroke="currentColor"
-							stroke-width="1.7"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-						/>
-					</svg>
-					<h3>{f.title}</h3>
-					<p>
-						{#each f.text.split('`') as part, j (j)}{#if j % 2}<code>{part}</code
-								>{:else}{part}{/if}{/each}
-					</p>
+		<section id="features" class="section">
+			<div class="section-head" {@attach reveal()}>
+				<h2>Small component. Big personality.</h2>
+				<p>One Svelte component, drawn in pure SVG. Everything on this page is a prop away.</p>
+			</div>
+
+			<div class="showcase">
+				<article class="feature" style:--tint={tint('og')} {@attach reveal()}>
+					<div class="art">
+						<Mascot mood={cycled} size="min(170px, 40vw)" interactive={false} label="" />
+					</div>
+					<div class="text">
+						<h3>Moods that morph</h3>
+						<p>
+							{MOODS.length} moods. Eyes, lids, mouth and posture tween into each other, so a switch is
+							a smooth morph instead of a cut.
+						</p>
+						<span class="tag" aria-live="polite">mood="{cycled}"</span>
+					</div>
 				</article>
-			{/each}
+
+				<article class="feature" style:--tint={tint('ice')} {@attach reveal(80)}>
+					<div class="art">
+						<Mascot
+							theme="ice"
+							shape="orb"
+							eyes="pill"
+							size="min(170px, 40vw)"
+							lookAt="pointer"
+							label="mascot following your cursor"
+						/>
+					</div>
+					<div class="text">
+						<h3>Alive by default</h3>
+						<p>
+							It blinks, breathes and floats, tracks the cursor with little saccades and squishes
+							when you boop it.
+						</p>
+						<span class="tag">Move your mouse</span>
+					</div>
+				</article>
+
+				<article class="feature" style:--tint={tint(swatch)} {@attach reveal(160)}>
+					<div class="art">
+						<Mascot
+							theme={swatch}
+							shape="ghost"
+							accessories={['halo']}
+							mood="happy"
+							size="min(170px, 40vw)"
+							interactive={false}
+							label="{swatch} mascot"
+						/>
+					</div>
+					<div class="text">
+						<h3>Colorways for every brand</h3>
+						<p>
+							{themeNames.length} presets, per-color overrides, or plain <code>--mascott-*</code> CSS
+							variables.
+						</p>
+						<div class="swatches" role="group" aria-label="Try a colorway">
+							{#each themeNames as name (name)}
+								<button
+									class:active={swatch === name}
+									style:--c={THEMES[name].accent}
+									style:--b={THEMES[name].bodyMid}
+									aria-label="{name} colorway"
+									aria-pressed={swatch === name}
+									title={name}
+									onpointerenter={() => (swatch = name)}
+									onclick={() => (swatch = name)}
+								></button>
+							{/each}
+						</div>
+					</div>
+				</article>
+			</div>
+
+			<div class="more" {@attach reveal()}>
+				{#each more as f (f.title)}
+					<div>
+						<h3>{f.title}</h3>
+						<p>
+							{#each f.text.split('`') as part, j (j)}{#if j % 2}<code>{part}</code
+									>{:else}{part}{/if}{/each}
+						</p>
+					</div>
+				{/each}
+			</div>
 		</section>
 
 		<section id="playground" class="section">
 			<div class="section-head" {@attach reveal()}>
-				<span class="kicker">Studio</span>
 				<h2>Build your own in seconds.</h2>
 				<p>
 					Tweak looks and reactions, then take it home as Svelte code, SVG, PNG or a share link.
@@ -195,15 +299,17 @@
 
 		<Galleries />
 
-		<section id="usage" class="section">
-			<div class="section-head" {@attach reveal()}>
-				<span class="kicker">Get started</span>
+		<section id="usage" class="usage" {@attach reveal()}>
+			<div class="usage-copy">
 				<h2>Three lines to a new friend.</h2>
-				<p>Install the package, drop in the component and let it react to your app.</p>
+				<p>
+					Install the package, drop in the component and let it react to your app. Types included,
+					nothing to configure.
+				</p>
+				<a class="btn-ghost" href="#playground">Design one in the studio</a>
 			</div>
-			<div class="usage glass" {@attach reveal(100)}>
+			<div class="window">
 				<div class="window-bar">
-					<span></span><span></span><span></span>
 					<em>App.svelte</em>
 					<button class="copy" class:done={copied} onclick={copyUsage}
 						>{copied ? 'Copied' : 'Copy'}</button
@@ -216,291 +322,313 @@
 
 	<footer>
 		<div class="footer-mascot">
-			<Mascot mood="sleepy" size={64} hands={false} interactive={false} label="sleeping mascot" />
+			<Mascot mood="sleepy" size={72} hands={false} interactive={false} label="sleeping mascot" />
 		</div>
 		<p>Made with Svelte 5 and a lot of boops. MIT licensed.</p>
+		<a href="#top">Back to top</a>
 	</footer>
 </div>
 
 <style>
-	.backdrop {
-		position: fixed;
-		inset: 0;
-		z-index: -1;
-		overflow: hidden;
-		background:
-			radial-gradient(120% 80% at 50% -10%, #1a1545 0%, transparent 60%),
-			linear-gradient(#07071a, #0a0a22 60%, #07071a);
-	}
-	.blob {
-		position: absolute;
-		border-radius: 50%;
-		/* Baked-in falloff instead of filter: blur(), which re-rasterizes huge layers every frame. */
-		background: radial-gradient(closest-side, var(--blob), transparent);
-		opacity: 0.55;
-		will-change: transform;
-	}
-	.b1 {
-		width: 55vmax;
-		height: 40vmax;
-		top: -15vmax;
-		left: -10vmax;
-		--blob: #5b4dfc;
-		animation: drift1 22s ease-in-out infinite alternate;
-	}
-	.b2 {
-		width: 45vmax;
-		height: 35vmax;
-		top: -5vmax;
-		right: -15vmax;
-		--blob: #d946ef;
-		opacity: 0.35;
-		animation: drift2 26s ease-in-out infinite alternate;
-	}
-	.b3 {
-		width: 50vmax;
-		height: 30vmax;
-		bottom: -20vmax;
-		left: 20vmax;
-		--blob: #06b6d4;
-		opacity: 0.22;
-		animation: drift1 30s ease-in-out infinite alternate-reverse;
-	}
-	@keyframes drift1 {
-		to {
-			transform: translate(8vmax, 5vmax) scale(1.1);
-		}
-	}
-	@keyframes drift2 {
-		to {
-			transform: translate(-6vmax, 8vmax) scale(0.9);
-		}
-	}
-	/* Fine noise breaks up gradient banding on the large blurred blobs. */
-	.grain {
-		position: absolute;
-		inset: 0;
-		opacity: 0.06;
-		mix-blend-mode: overlay;
-		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-	}
-
 	nav {
 		position: sticky;
 		top: 0;
 		z-index: 50;
-		display: flex;
-		justify-content: space-between;
+		display: grid;
+		grid-template-columns: 1fr auto 1fr;
 		align-items: center;
 		max-width: 1200px;
 		margin: 0 auto;
-		padding: 0.9rem 1.5rem;
-		transition:
-			background 0.3s,
-			border-color 0.3s,
-			backdrop-filter 0.3s;
-		border-bottom: 1px solid transparent;
+		padding: 0.8rem 1.5rem;
 	}
 	nav::before {
 		content: '';
 		position: absolute;
 		inset: 0 calc(50% - 50vw);
 		z-index: -1;
-		background: rgb(7 7 26 / 0);
 		border-bottom: 1px solid transparent;
 		transition:
-			background 0.3s,
-			border-color 0.3s;
+			background 0.25s,
+			border-color 0.25s;
 	}
 	nav.scrolled::before {
-		background: rgb(7 7 26 / 0.6);
-		backdrop-filter: blur(16px) saturate(160%);
-		-webkit-backdrop-filter: blur(16px) saturate(160%);
-		border-bottom-color: rgb(255 255 255 / 0.06);
+		background: var(--nav-bg);
+		backdrop-filter: blur(14px) saturate(180%);
+		-webkit-backdrop-filter: blur(14px) saturate(180%);
+		border-bottom-color: var(--line);
 	}
 	.brand {
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
+		gap: 0.45rem;
 		color: var(--text-1);
 		text-decoration: none;
 		font-weight: 700;
-		font-size: 1.05rem;
-		letter-spacing: -0.02em;
+		font-size: 1.15rem;
+		letter-spacing: -0.03em;
 	}
 	.links {
 		display: flex;
-		gap: 0.25rem;
+		gap: 0.15rem;
 	}
 	.links a {
-		padding: 0.45rem 0.8rem;
-		border-radius: 10px;
-		color: var(--text-2);
+		padding: 0.45rem 0.85rem;
+		border-radius: 999px;
+		color: var(--text-1);
 		text-decoration: none;
-		font-size: 0.9rem;
+		font-size: 0.93rem;
 		font-weight: 500;
-		transition:
-			color 0.2s,
-			background 0.2s;
+		transition: background 0.15s;
 	}
 	.links a:hover {
+		background: var(--surface);
+	}
+	.nav-end {
+		justify-self: end;
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+	}
+	.scheme {
+		display: grid;
+		place-items: center;
+		width: 2.4rem;
+		height: 2.4rem;
+		padding: 0;
+		border: 0;
+		border-radius: 50%;
+		background: none;
 		color: var(--text-1);
-		background: rgb(255 255 255 / 0.06);
+		cursor: pointer;
+		transition:
+			background 0.15s,
+			transform 0.3s var(--spring);
+	}
+	.scheme:hover {
+		background: var(--surface);
+	}
+	.scheme:active {
+		transform: rotate(-30deg) scale(0.9);
+	}
+	.nav-cta {
+		padding: 0.55rem 1.1rem;
+		font-size: 0.92rem;
 	}
 
 	main {
 		max-width: 1200px;
 		margin: 0 auto;
-		padding: 2rem 1.5rem 5rem;
+		padding: 2rem 1.5rem 6rem;
 		display: grid;
 		grid-template-columns: minmax(0, 1fr);
-		gap: clamp(5rem, 10vw, 8rem);
+		gap: clamp(6rem, 12vw, 10rem);
 	}
 
-	.bento {
+	.showcase {
 		display: grid;
-		grid-template-columns: repeat(4, 1fr);
+		grid-template-columns: repeat(3, minmax(0, 1fr));
 		gap: 1rem;
 	}
 	.feature {
-		position: relative;
-		grid-column: span 1;
-		padding: 1.5rem;
+		display: grid;
+		grid-template-rows: 1fr auto;
+		min-height: 480px;
+		border-radius: 32px;
+		background: var(--tint);
 		overflow: hidden;
-		transition:
-			border-color 0.3s,
-			transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+		transition: background 0.5s;
 	}
-	.feature.wide {
-		grid-column: span 2;
+	.art {
+		display: grid;
+		place-items: center;
+		padding: 2rem 1rem 0;
 	}
-	.feature::before {
-		content: '';
-		position: absolute;
-		inset: 0;
-		background: radial-gradient(
-			320px circle at var(--mx, 50%) var(--my, 0%),
-			rgb(165 243 252 / 0.1),
-			transparent 60%
-		);
-		opacity: 0;
-		transition: opacity 0.3s;
-		pointer-events: none;
-	}
-	.feature:hover {
-		border-color: rgb(255 255 255 / 0.16);
-		transform: translateY(-2px);
-	}
-	.feature:hover::before {
-		opacity: 1;
-	}
-	.feature svg {
-		color: #a5f3fc;
-		padding: 0.55rem;
-		border-radius: 12px;
-		background: rgb(165 243 252 / 0.08);
-		border: 1px solid rgb(165 243 252 / 0.14);
+	.text {
+		padding: 0 1.75rem 1.75rem;
 	}
 	.feature h3 {
-		margin: 1rem 0 0.35rem;
-		font-size: 1.05rem;
-		letter-spacing: -0.01em;
+		margin: 0;
+		font-size: 1.45rem;
+		letter-spacing: -0.03em;
+		line-height: 1.15;
 	}
 	.feature p {
-		margin: 0;
+		margin: 0.45rem 0 0;
 		color: var(--text-2);
-		font-size: 0.93rem;
-		line-height: 1.55;
+		line-height: 1.5;
+	}
+	.feature :not(pre) > code {
+		background: color-mix(in srgb, var(--raised) 70%, transparent);
+		white-space: nowrap;
+	}
+	.tag {
+		display: inline-block;
+		margin-top: 1rem;
+		padding: 0.3rem 0.7rem;
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--raised) 75%, transparent);
+		font-family: var(--mono);
+		font-size: 0.78rem;
+		color: var(--text-2);
+	}
+	.swatches {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+		margin-top: 1rem;
+	}
+	.swatches button {
+		width: 1.9rem;
+		height: 1.9rem;
+		padding: 0;
+		border: 3px solid var(--raised);
+		border-radius: 50%;
+		background: linear-gradient(135deg, var(--b) 50%, var(--c) 50%);
+		cursor: pointer;
+		transition: transform 0.2s var(--spring);
+	}
+	.swatches button:hover {
+		transform: scale(1.12);
+	}
+	.swatches button.active {
+		box-shadow: 0 0 0 2px var(--text-1);
+	}
+
+	.more {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 2rem;
+		padding-top: 1rem;
+	}
+	.more h3 {
+		margin: 0;
+		font-size: 1.1rem;
+		letter-spacing: -0.02em;
+	}
+	.more p {
+		margin: 0.35rem 0 0;
+		color: var(--text-2);
 	}
 
 	.usage {
-		max-width: 760px;
-		width: 100%;
-		margin: 0 auto;
-		padding: 0.5rem;
-		box-sizing: border-box;
+		display: grid;
+		grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+		gap: 3rem;
+		align-items: center;
+	}
+	.usage h2 {
+		margin: 0;
+		font-size: clamp(2.2rem, 4.6vw, 3.6rem);
+		line-height: 1.02;
+		letter-spacing: -0.045em;
+	}
+	.usage-copy p {
+		margin: 1rem 0 1.75rem;
+		color: var(--text-2);
+		font-size: 1.08rem;
+		max-width: 26rem;
+	}
+	.window {
+		border-radius: 24px;
+		background: var(--slab);
+		box-shadow: inset 0 0 0 1px var(--slab-line);
+		padding: 0.35rem;
+	}
+	/* The window already draws the outline; a second one on the inner block reads as a double border. */
+	.window :global(pre) {
+		box-shadow: none;
 	}
 	.window-bar {
 		display: flex;
 		align-items: center;
-		gap: 0.45rem;
-		padding: 0.5rem 0.6rem 0.8rem;
-	}
-	.window-bar span {
-		width: 0.7rem;
-		height: 0.7rem;
-		border-radius: 50%;
-		background: rgb(255 255 255 / 0.12);
+		justify-content: space-between;
+		padding: 0.55rem 0.6rem 0.4rem 0.9rem;
 	}
 	.window-bar em {
-		flex: 1;
-		text-align: center;
 		font-style: normal;
 		font-size: 0.8rem;
-		color: var(--text-3);
+		color: #a3a3a3;
 		font-family: var(--mono);
 	}
 	.copy {
-		padding: 0.3rem 0.7rem;
-		border-radius: 8px;
-		border: 1px solid rgb(255 255 255 / 0.1);
-		background: rgb(255 255 255 / 0.06);
-		color: var(--text-2);
+		padding: 0.32rem 0.8rem;
+		border-radius: 999px;
+		border: 0;
+		background: rgb(255 255 255 / 0.1);
+		color: #eaeaea;
 		font: inherit;
-		font-size: 0.78rem;
+		font-size: 0.8rem;
 		font-weight: 600;
 		cursor: pointer;
 		transition:
-			background 0.2s,
+			background 0.15s,
 			transform 0.15s;
 	}
 	.copy:hover {
-		background: rgb(255 255 255 / 0.12);
+		background: rgb(255 255 255 / 0.18);
 	}
 	.copy:active {
 		transform: scale(0.94);
 	}
 	.copy.done {
-		background: #7cf3ff;
-		color: #0b1030;
+		background: #fff;
+		color: #161616;
 	}
 
 	footer {
 		display: grid;
 		justify-items: center;
-		gap: 0.25rem;
+		gap: 0.4rem;
 		padding: 3rem 1.5rem 4rem;
-		border-top: 1px solid rgb(255 255 255 / 0.06);
-		color: var(--text-3);
-		font-size: 0.88rem;
+		border-top: 1px solid var(--line);
+		color: var(--text-2);
+		font-size: 0.92rem;
 	}
 	footer p {
-		margin: 0;
+		margin: 0.5rem 0 0;
+	}
+	footer a {
+		color: var(--text-1);
+		font-weight: 600;
+		text-decoration: none;
+	}
+	footer a:hover {
+		text-decoration: underline;
 	}
 
-	@media (max-width: 900px) {
-		.bento {
-			grid-template-columns: repeat(2, 1fr);
-		}
-	}
-	@media (max-width: 560px) {
-		.bento {
+	@media (max-width: 960px) {
+		.showcase {
 			grid-template-columns: 1fr;
 		}
-		.feature.wide {
-			grid-column: span 1;
+		.feature {
+			min-height: 0;
+			grid-template-columns: 1fr 1fr;
+			grid-template-rows: none;
+			align-items: center;
 		}
-		.hide-sm {
-			display: none;
+		.art {
+			padding: 1.5rem;
 		}
-		.links a {
-			padding: 0.4rem 0.55rem;
-			font-size: 0.85rem;
+		.text {
+			padding: 1.5rem 1.5rem 1.5rem 0;
+		}
+		.more,
+		.usage {
+			grid-template-columns: 1fr;
 		}
 	}
-	@media (prefers-reduced-motion: reduce) {
-		.blob {
-			animation: none;
+	@media (max-width: 640px) {
+		nav {
+			grid-template-columns: 1fr auto;
+		}
+		.links {
+			display: none;
+		}
+		.feature {
+			grid-template-columns: 1fr;
+		}
+		.text {
+			padding: 0 1.5rem 1.5rem;
 		}
 	}
 </style>

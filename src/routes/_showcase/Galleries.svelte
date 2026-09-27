@@ -12,7 +12,7 @@
 		type Shoes,
 		type ThemeName
 	} from '$lib/index.js';
-	import { reveal, spotlight } from './interactions.js';
+	import { reveal } from './interactions.js';
 
 	let body = $state(false);
 
@@ -92,31 +92,36 @@
 		...f,
 		theme: themeNames.includes(f.theme) ? f.theme : themeNames[0]
 	}));
+
+	const tint = (theme: ThemeName) => `color-mix(in srgb, ${THEMES[theme].accent} 16%, var(--bg))`;
 </script>
 
 <section id="moods" class="section">
 	<div class="section-head" {@attach reveal()}>
-		<span class="kicker">Moods</span>
 		<h2>{MOODS.length} moods, one smooth face.</h2>
-		<p>
-			Switch <code>mood</code> and every feature morphs into the new expression. Effects, hands and floating
-			speed follow along.
-		</p>
-		<div class="segmented" role="group" aria-label="Gallery mode">
-			<button class:active={!body} aria-pressed={!body} onclick={() => (body = false)}>Head</button>
-			<button class:active={body} aria-pressed={body} onclick={() => (body = true)}
-				>Full body</button
-			>
-			<span class="thumb" class:right={body} aria-hidden="true"></span>
+		<div>
+			<p>
+				Switch <code>mood</code> and every feature morphs into the new expression. Effects, hands and
+				floating speed follow along.
+			</p>
+			<div class="segmented" role="group" aria-label="Gallery mode">
+				<button class:active={!body} aria-pressed={!body} onclick={() => (body = false)}
+					>Head</button
+				>
+				<button class:active={body} aria-pressed={body} onclick={() => (body = true)}
+					>Full body</button
+				>
+				<span class="thumb" class:right={body} aria-hidden="true"></span>
+			</div>
 		</div>
 	</div>
 	<div class="grid" class:tall={body}>
 		{#each MOODS as m, i (m)}
-			<figure class="tile glass" {@attach reveal((i % 6) * 60)} {@attach spotlight}>
+			<figure class="tile" {@attach reveal((i % 6) * 50)}>
 				<Mascot
 					mood={m}
 					{body}
-					size={body ? 'min(104px, 24vw)' : 'min(124px, 25vw)'}
+					size={body ? 'min(96px, 22vw)' : 'min(116px, 24vw)'}
 					interactive={false}
 					lookAt="wander"
 					label="{m} mascot"
@@ -129,14 +134,15 @@
 
 <section id="family" class="section">
 	<div class="section-head" {@attach reveal()}>
-		<span class="kicker">Family</span>
-		<h2>Mix and match.</h2>
-		<p>Shapes, eyes, accessories, outfits and themes combine freely into a whole cast.</p>
+		<h2>Mix and match a whole cast.</h2>
+		<p>
+			Shapes, eyes, accessories, outfits and colorways combine freely. Hover one, it looks back.
+		</p>
 	</div>
-	<div class="family">
+	<div class="cast">
 		{#each family as m, i (m.name)}
-			<figure class="member" {@attach reveal(i * 90)}>
-				<div class="pedestal" style:--glow={THEMES[m.theme].accent}>
+			<figure class="member" style:--tint={tint(m.theme)} {@attach reveal(i * 70)}>
+				<div class="stage">
 					<Mascot
 						theme={m.theme}
 						shape={m.shape}
@@ -146,7 +152,7 @@
 						body={m.body}
 						outfit={m.outfit}
 						shoes={m.shoes}
-						size={m.body ? 118 : 150}
+						size={m.body ? 112 : 140}
 						lookAt="pointer"
 						label="{m.name}, a {m.theme} mascot"
 					/>
@@ -162,7 +168,6 @@
 
 <section id="fits" class="section">
 	<div class="section-head" {@attach reveal()}>
-		<span class="kicker">Fits</span>
 		<h2>Dressed up or dressed down.</h2>
 		<p>
 			The full body starts plain. Add an <code>outfit</code> and <code>shoes</code> when you want the
@@ -171,14 +176,14 @@
 	</div>
 	<div class="grid tall">
 		{#each fits as f, i (i)}
-			<figure class="tile glass" {@attach reveal((i % 6) * 60)} {@attach spotlight}>
+			<figure class="tile" {@attach reveal((i % 6) * 50)}>
 				<Mascot
 					theme={f.theme}
 					mood={f.mood}
 					body
 					outfit={f.outfit}
 					shoes={f.shoes}
-					size="min(104px, 24vw)"
+					size="min(96px, 22vw)"
 					interactive={false}
 					lookAt="wander"
 					label="mascot in {f.outfit} outfit with {f.shoes} shoes"
@@ -192,109 +197,100 @@
 <style>
 	.grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
-		gap: 0.9rem;
+		grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+		gap: 0.75rem;
 	}
 	.tile {
-		position: relative;
 		margin: 0;
-		padding: 1.2rem 0.5rem 0.9rem;
 		display: grid;
 		justify-items: center;
 		align-content: end;
-		gap: 0.4rem;
+		gap: 0.6rem;
 		min-height: 200px;
-		overflow: hidden;
+		padding: 1.25rem 0.5rem 1rem;
+		border-radius: 28px;
+		background: var(--surface);
 		transition:
-			transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
-			border-color 0.3s;
+			background 0.2s,
+			transform 0.3s var(--spring);
 	}
 	.grid.tall .tile {
-		min-height: 230px;
+		min-height: 240px;
 	}
-	.tile::before {
-		content: '';
-		position: absolute;
-		inset: 0;
-		background: radial-gradient(
-			220px circle at var(--mx, 50%) var(--my, 0%),
-			rgb(196 181 253 / 0.14),
-			transparent 60%
-		);
-		opacity: 0;
-		transition: opacity 0.3s;
-		pointer-events: none;
+	/* Seven columns split the thirteen moods into two even-looking rows instead of leaving an orphan. */
+	@media (min-width: 1100px) {
+		#moods .grid {
+			grid-template-columns: repeat(7, 1fr);
+		}
 	}
 	.tile:hover {
-		transform: translateY(-4px);
-		border-color: rgb(255 255 255 / 0.16);
-	}
-	.tile:hover::before {
-		opacity: 1;
+		background: var(--surface-2);
+		transform: translateY(-3px);
 	}
 	.tile figcaption {
-		font-size: 0.85rem;
+		font-size: 0.9rem;
 		font-weight: 600;
 		color: var(--text-2);
 	}
 
-	.family {
-		display: flex;
-		flex-wrap: wrap;
-		justify-content: center;
-		align-items: flex-end;
-		gap: clamp(1rem, 3vw, 2.5rem);
+	.cast {
+		display: grid;
+		grid-template-columns: repeat(5, minmax(0, 1fr));
+		gap: 0.75rem;
 	}
 	.member {
 		margin: 0;
 		display: grid;
-		justify-items: center;
-		gap: 0.8rem;
+		grid-template-rows: 1fr auto;
+		min-height: 320px;
+		padding: 1rem 1.25rem 1.25rem;
+		border-radius: 28px;
+		background: var(--tint);
+		transition: transform 0.35s var(--spring);
 	}
-	.pedestal {
-		position: relative;
+	.member:hover {
+		transform: translateY(-4px) rotate(-1deg);
+	}
+	.stage {
 		display: grid;
 		place-items: end center;
-	}
-	.pedestal::after {
-		content: '';
-		position: absolute;
-		z-index: -1;
-		bottom: -6px;
-		width: 80%;
-		height: 26px;
-		border-radius: 50%;
-		background: radial-gradient(
-			closest-side,
-			color-mix(in srgb, var(--glow) 45%, transparent),
-			transparent
-		);
+		padding-bottom: 1rem;
 	}
 	.member figcaption {
 		display: grid;
-		justify-items: center;
 		gap: 0.1rem;
 	}
 	.member strong {
-		font-size: 0.95rem;
+		font-size: 1.3rem;
+		letter-spacing: -0.03em;
 	}
 	.member span {
-		font-size: 0.78rem;
-		color: var(--text-3);
+		font-size: 0.86rem;
+		color: var(--text-2);
+	}
+
+	@media (max-width: 1100px) {
+		/* A swipeable rail instead of five squeezed cards. */
+		.cast {
+			grid-template-columns: none;
+			grid-auto-flow: column;
+			grid-auto-columns: minmax(220px, 1fr);
+			overflow-x: auto;
+			scroll-snap-type: x mandatory;
+			scrollbar-width: none;
+		}
+		.member {
+			scroll-snap-align: start;
+		}
 	}
 	@media (max-width: 520px) {
 		.grid {
-			grid-template-columns: repeat(3, 1fr);
-			gap: 0.6rem;
+			grid-template-columns: repeat(2, 1fr);
 		}
 		.tile,
 		.grid.tall .tile {
 			min-height: 0;
-			padding: 0.8rem 0.25rem 0.7rem;
-			border-radius: 18px;
-		}
-		.tile figcaption {
-			font-size: 0.78rem;
+			border-radius: 22px;
 		}
 	}
 </style>
