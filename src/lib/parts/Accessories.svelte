@@ -1,14 +1,25 @@
 <script lang="ts">
+	import { Tween } from 'svelte/motion';
+	import { backOut } from 'svelte/easing';
 	import { getMascot, svgRef } from '../context.js';
 	import { SPARKLE_PATH } from '../geometry.js';
 	import {
 		AUDIO_MOODS,
+		BAND_END_Y,
 		BLOOM_MOODS,
 		DROP_MOODS,
 		HOT_MOODS,
+		MONOCLE,
+		MONOCLE_DROP,
 		WILT_MOODS,
+		bandControlY,
+		chainPath,
+		contactShadows,
+		monocleAnchor,
+		monocleHook,
 		propellerSpin,
 		starPath,
+		templeLine,
 		type Accessory
 	} from './accessories.js';
 	import { MISPRINT } from './face.js';
@@ -31,7 +42,12 @@
 	// Glasses follow the gaze a bit less than the eyes so the eyes can roam inside the rims.
 	const gx = $derived(m.gazeX * 4.5);
 	const gy = $derived(m.gazeY * 3.5);
-	const visorHalf = $derived(Math.min(53, hw - 12));
+	const temple = $derived(templeLine(hw));
+
+	// The band rests just above the crown instead of arching high over it.
+	const bandCtrl = $derived(bandControlY(BAND_END_Y, t - 6));
+	const shineCtrl = $derived(bandControlY(BAND_END_Y - 2, t - 8));
+	const shadows = $derived(contactShadows(m.accessories, t, hw));
 
 	const beanieW = $derived(hw * 0.8 + 6);
 	const STAR = starPath(8);
@@ -45,6 +61,22 @@
 
 	const hot = $derived(HOT_MOODS.includes(m.mood));
 	const dropped = $derived(DROP_MOODS.includes(m.mood));
+	// Tweens may call `duration` after unmount, where reading the context would warn.
+	let instant = false;
+	$effect.pre(() => {
+		instant = m.reduced;
+	});
+	// Driven in JS rather than CSS so the chain, drawn outside the monocle, can follow its hook.
+	const drop = Tween.of(() => (dropped ? 1 : 0), {
+		duration: () => (instant ? 0 : 550),
+		easing: backOut
+	});
+	const chain = $derived(
+		chainPath(
+			(({ x, y }) => ({ x: x + gx, y: y + gy }))(monocleHook(drop.current)),
+			monocleAnchor(hw)
+		)
+	);
 	const wilt = $derived(WILT_MOODS.includes(m.mood));
 	const spin = $derived(propellerSpin(m.mood));
 	const capW = $derived(hw * 0.5 + 8);
@@ -99,17 +131,23 @@
 	{#if has('headphones')}
 		<path
 			class="band"
-			d="M{100 - hw - 2} 104C{100 - hw - 2} {t - 46} {100 + hw + 2} {t - 46} {100 + hw + 2} 104"
+			d="M{100 - hw - 2} {BAND_END_Y}C{100 - hw - 2} {bandCtrl} {100 + hw + 2} {bandCtrl} {100 +
+				hw +
+				2} {BAND_END_Y}"
 		/>
 		<path
 			class="band-pad"
 			pathLength="100"
-			d="M{100 - hw - 2} 104C{100 - hw - 2} {t - 46} {100 + hw + 2} {t - 46} {100 + hw + 2} 104"
+			d="M{100 - hw - 2} {BAND_END_Y}C{100 - hw - 2} {bandCtrl} {100 + hw + 2} {bandCtrl} {100 +
+				hw +
+				2} {BAND_END_Y}"
 		/>
 		<path
 			class="band-shine"
 			pathLength="100"
-			d="M{100 - hw - 2} 102C{100 - hw - 2} {t - 48} {100 + hw + 2} {t - 48} {100 + hw + 2} 102"
+			d="M{100 - hw - 2} {BAND_END_Y - 2}C{100 - hw - 2} {shineCtrl} {100 +
+				hw +
+				2} {shineCtrl} {100 + hw + 2} {BAND_END_Y - 2}"
 		/>
 	{/if}
 	{#if has('antenna')}
@@ -169,6 +207,21 @@
 		{/each}
 	{/if}
 {:else}
+	{#if shadows.length}
+		<g clip-path={ref('shell-clip')}>
+			<g class="contact" filter={ref('soft')}>
+				{#each shadows as sh, i (i)}
+					<ellipse
+						cx={sh.cx}
+						cy={sh.cy}
+						rx={sh.rx}
+						ry={sh.ry}
+						transform="rotate({sh.angle} {sh.cx} {sh.cy})"
+					/>
+				{/each}
+			</g>
+		</g>
+	{/if}
 	{#if has('mustache')}
 		<g transform="translate({100 + m.gazeX * 6} {107.5 + m.gazeY * 5 - m.talk * 2}) scale(0.82)">
 			<path
@@ -381,17 +434,28 @@
 				<circle class="rim" {cx} cy="96" r="16.5" />
 			{/each}
 			<path class="rim" d="M96 93Q100 89.5 104 93" />
-			<path class="rim temple" d="M63.5 94L{100 - visorHalf - 1} 91" />
-			<path class="rim temple" d="M136.5 94L{100 + visorHalf + 1} 91" />
+			<path class="rim temple" d="M{temple.x0} {temple.y0}L{temple.x1} {temple.y1}" />
+			<path class="rim temple" d="M{200 - temple.x0} {temple.y0}L{200 - temple.x1} {temple.y1}" />
 		</g>
 	{/if}
 	{#if has('monocle')}
+		{@const anchor = monocleAnchor(hw)}
+		<path class="chain" d={chain} />
+		<circle class="chain-pin" cx={anchor.x} cy={anchor.y} r="1.6" />
 		<g transform="translate({gx} {gy})">
-			<g class="monocle" class:dropped style:transform-origin="120px 96px">
-				<path class="chain" d="M131 107Q137 134 {100 + hw * 0.78} 152" />
-				<circle class="lens" cx="120" cy="96" r="15" />
+			<g
+				transform="translate({MONOCLE_DROP.x * drop.current} {MONOCLE_DROP.y *
+					drop.current}) rotate({MONOCLE_DROP.angle * drop.current} {MONOCLE.cx} {MONOCLE.cy})"
+			>
+				<circle class="lens" cx={MONOCLE.cx} cy={MONOCLE.cy} r={MONOCLE.r} />
 				<path class="lens-glint" d="M111 90L117 84M110 96L119 87" />
-				<circle class="monocle-rim" cx="120" cy="96" r="15" stroke={ref('gold')} />
+				<circle
+					class="monocle-rim"
+					cx={MONOCLE.cx}
+					cy={MONOCLE.cy}
+					r={MONOCLE.r}
+					stroke={ref('gold')}
+				/>
 			</g>
 		</g>
 	{/if}
@@ -915,13 +979,6 @@
 	}
 
 	/* monocle */
-	.monocle {
-		transform-box: view-box;
-		transition: transform 0.55s cubic-bezier(0.34, 1.5, 0.5, 1);
-	}
-	.monocle.dropped {
-		transform: translate(4px, 18px) rotate(24deg);
-	}
 	.monocle-rim {
 		fill: none;
 		stroke-width: 2.8;
@@ -932,6 +989,15 @@
 		stroke-width: 1.6;
 		stroke-linecap: round;
 		stroke-dasharray: 0.1 3.2;
+	}
+	.chain-pin {
+		fill: #f2a93a;
+	}
+
+	/* Contact shadows: inked like the shell's occlusion, lit from the top left. */
+	.contact {
+		fill: var(--c-visor);
+		opacity: 0.17;
 	}
 
 	@keyframes prop-spin {
