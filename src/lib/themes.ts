@@ -67,6 +67,60 @@ export const THEMES = {
 		eye: '#7dffd4',
 		cheek: '#ff6fa5',
 		accent: '#7dffd4'
+	},
+	mint: {
+		bodyLight: '#f4fcf8',
+		bodyMid: '#dcf3e8',
+		bodyDark: '#b1dcc7',
+		visor: '#0f2f28',
+		eye: '#0f2f28',
+		cheek: '#ff8f8f',
+		accent: '#ff6f61'
+	},
+	sunset: {
+		bodyLight: '#fff5ec',
+		bodyMid: '#ffe0c8',
+		bodyDark: '#f3b58c',
+		visor: '#3a1630',
+		eye: '#3a1630',
+		cheek: '#ff6f7d',
+		accent: '#ff2e88'
+	},
+	bubblegum: {
+		bodyLight: '#fff6fa',
+		bodyMid: '#ffdcea',
+		bodyDark: '#f4b2cc',
+		visor: '#1e1650',
+		eye: '#2b1f7a',
+		cheek: '#ff5c9a',
+		accent: '#1fc8ff'
+	},
+	forest: {
+		bodyLight: '#415c4a',
+		bodyMid: '#2c4234',
+		bodyDark: '#1a2a20',
+		visor: '#0a120d',
+		eye: '#f4ecd0',
+		cheek: '#ff8a65',
+		accent: '#ffb000'
+	},
+	midnight: {
+		bodyLight: '#34406e',
+		bodyMid: '#1f2850',
+		bodyDark: '#10152e',
+		visor: '#060816',
+		eye: '#ffe066',
+		cheek: '#ff8fb1',
+		accent: '#7c9cff'
+	},
+	shadow: {
+		bodyLight: '#2b2b2e',
+		bodyMid: '#18181a',
+		bodyDark: '#0a0a0b',
+		visor: '#000000',
+		eye: '#00e5ff',
+		cheek: '#ff4fd8',
+		accent: '#ff2bd6'
 	}
 } satisfies Record<string, ThemeColors>;
 
