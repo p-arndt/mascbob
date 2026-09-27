@@ -19,8 +19,8 @@ export type Shape = (typeof SHAPES)[number];
 export const EYE_STYLES = ['round', 'pill', 'wide', 'dot'] as const;
 export type EyeStyle = (typeof EYE_STYLES)[number];
 
-export const ACCESSORIES = ['ring', 'halo', 'antenna', 'ears', 'sprout', 'headphones'] as const;
-export type Accessory = (typeof ACCESSORIES)[number];
+export { ACCESSORIES, type Accessory } from './parts/accessories.js';
+export { OUTFITS, type Outfit } from './parts/body.js';
 
 export type Effect = 'sparkles' | 'waves' | 'dots' | 'zzz' | 'tear' | 'hearts';
 export type HandPose = 'rest' | 'up' | 'wave' | 'think';
