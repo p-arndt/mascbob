@@ -6,17 +6,23 @@
 		Mascot,
 		OUTFITS,
 		SHAPES,
+		SHOES,
 		type Outfit,
+		type Shoes,
 		type ThemeName
 	} from '$lib/index.js';
 
-	// Visual test bench: /lab?body=1&theme=mint&size=180&acc=ring,ears&outfit=scarf
+	// Visual test bench: /lab?body=1&theme=mint&size=180&acc=ring,ears&outfit=scarf&shoes=boots
 	const body = $derived(page.url.searchParams.get('body') !== '0');
 	const theme = $derived((page.url.searchParams.get('theme') ?? 'og') as ThemeName);
 	const size = $derived(Number(page.url.searchParams.get('size') ?? 150));
 	const outfitParam = $derived(page.url.searchParams.get('outfit') ?? '');
 	const outfit = $derived<Outfit | undefined>(
 		(OUTFITS as readonly string[]).includes(outfitParam) ? (outfitParam as Outfit) : undefined
+	);
+	const shoesParam = $derived(page.url.searchParams.get('shoes') ?? '');
+	const shoes = $derived<Shoes | undefined>(
+		(SHOES as readonly string[]).includes(shoesParam) ? (shoesParam as Shoes) : undefined
 	);
 	const acc = $derived(
 		(page.url.searchParams.get('acc') ?? '')
@@ -34,6 +40,7 @@
 				{mood}
 				{body}
 				{outfit}
+				{shoes}
 				{theme}
 				{size}
 				accessories={acc}
@@ -49,6 +56,7 @@
 				{shape}
 				{body}
 				{outfit}
+				{shoes}
 				{theme}
 				{size}
 				accessories={acc}

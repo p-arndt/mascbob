@@ -20,7 +20,7 @@ export const EYE_STYLES = ['round', 'pill', 'wide', 'dot'] as const;
 export type EyeStyle = (typeof EYE_STYLES)[number];
 
 export { ACCESSORIES, type Accessory } from './parts/accessories.js';
-export { OUTFITS, type Outfit } from './parts/body.js';
+export { OUTFITS, SHOES, type Outfit, type Shoes } from './parts/body.js';
 
 export type Effect = 'sparkles' | 'waves' | 'dots' | 'zzz' | 'tear' | 'hearts';
 export type HandPose = 'rest' | 'up' | 'wave' | 'think';

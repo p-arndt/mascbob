@@ -34,7 +34,7 @@
 		},
 		{
 			title: 'Head or full body',
-			text: `${SHAPES.length} head shapes, ${ACCESSORIES.length} accessories and an optional body with outfits.`,
+			text: `${SHAPES.length} head shapes, ${ACCESSORIES.length} accessories and an optional body with outfits and shoes.`,
 			icon: 'M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM5 21c0-4 3-7 7-7s7 3 7 7'
 		},
 		{
@@ -116,7 +116,7 @@
 	<title>mascott · an animated companion for Svelte</title>
 	<meta
 		name="description"
-		content="An animated, endlessly customizable SVG mascot for Svelte 5: moods, themes, full body, outfits and voice lip-sync."
+		content="An animated, endlessly customizable SVG mascot for Svelte 5: moods, themes, full body, outfits, shoes and voice lip-sync."
 	/>
 	<meta name="theme-color" content="#07071a" />
 </svelte:head>

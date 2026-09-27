@@ -3,7 +3,7 @@ export { MOOD_CONFIGS, moodConfig } from './moods.js';
 export { THEMES, resolveTheme, themeStyle } from './themes.js';
 export type { ThemeInput, ThemeName } from './themes.js';
 export { SHAPE_DEFS } from './geometry.js';
-export { MOODS, SHAPES, EYE_STYLES, ACCESSORIES, OUTFITS } from './types.js';
+export { MOODS, SHAPES, EYE_STYLES, ACCESSORIES, OUTFITS, SHOES } from './types.js';
 export type {
 	Accessory,
 	Effect,
@@ -17,5 +17,6 @@ export type {
 	Outfit,
 	Motion,
 	Shape,
+	Shoes,
 	ThemeColors
 } from './types.js';

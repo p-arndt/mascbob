@@ -3,13 +3,13 @@
 		ACCESSORIES,
 		MOODS,
 		Mascot,
-		OUTFITS,
 		THEMES,
 		type Accessory,
 		type EyeStyle,
 		type Mood,
 		type Outfit,
 		type Shape,
+		type Shoes,
 		type ThemeName
 	} from '$lib/index.js';
 	import { reveal, spotlight } from './interactions.js';
@@ -17,9 +17,6 @@
 	let body = $state(false);
 
 	const themeNames = Object.keys(THEMES) as ThemeName[];
-	// Outfits beyond 'none' may or may not exist yet, so take whatever the library ships.
-	const dressed = OUTFITS.filter((o) => o !== 'none');
-	const outfitAt = (i: number): Outfit => dressed[i % Math.max(dressed.length, 1)] ?? OUTFITS[0];
 	const has = (a: Accessory) => ACCESSORIES.includes(a);
 
 	type Member = {
@@ -31,6 +28,7 @@
 		mood: Mood;
 		body?: boolean;
 		outfit?: Outfit;
+		shoes?: Shoes;
 	};
 	const family: Member[] = (
 		[
@@ -43,7 +41,8 @@
 				accessories: ['sprout'],
 				mood: 'idle',
 				body: true,
-				outfit: outfitAt(0)
+				outfit: 'hoodie',
+				shoes: 'hightops'
 			},
 			{
 				name: 'Nova',
@@ -60,7 +59,7 @@
 				accessories: ['halo'],
 				mood: 'love',
 				body: true,
-				outfit: outfitAt(1)
+				outfit: 'bowtie'
 			},
 			{
 				name: 'Sol',
@@ -68,13 +67,30 @@
 				shape: 'pebble',
 				eyes: 'dot',
 				accessories: ['antenna'],
-				mood: 'wink'
+				mood: 'wink',
+				body: true,
+				shoes: 'boots'
 			}
 		] satisfies Member[]
 	).map((m) => ({
 		...m,
 		theme: themeNames.includes(m.theme) ? m.theme : themeNames[0],
 		accessories: m.accessories.filter(has)
+	}));
+
+	// Deliberately includes bare looks so it is obvious that gear is opt-in.
+	const fits: { theme: ThemeName; outfit: Outfit; shoes: Shoes; mood: Mood }[] = (
+		[
+			{ theme: 'og', outfit: 'none', shoes: 'none', mood: 'idle' },
+			{ theme: 'volt', outfit: 'puffer', shoes: 'sneakers', mood: 'happy' },
+			{ theme: 'noir', outfit: 'hoodie', shoes: 'hightops', mood: 'grumpy' },
+			{ theme: 'mocha', outfit: 'scarf', shoes: 'boots', mood: 'sleepy' },
+			{ theme: 'lilac', outfit: 'bowtie', shoes: 'none', mood: 'love' },
+			{ theme: 'ice', outfit: 'none', shoes: 'sneakers', mood: 'wink' }
+		] satisfies { theme: ThemeName; outfit: Outfit; shoes: Shoes; mood: Mood }[]
+	).map((f) => ({
+		...f,
+		theme: themeNames.includes(f.theme) ? f.theme : themeNames[0]
 	}));
 </script>
 
@@ -129,6 +145,7 @@
 						mood={m.mood}
 						body={m.body}
 						outfit={m.outfit}
+						shoes={m.shoes}
 						size={m.body ? 118 : 150}
 						lookAt="pointer"
 						label="{m.name}, a {m.theme} mascot"
@@ -138,6 +155,35 @@
 					<strong>{m.name}</strong>
 					<span>{m.theme} · {m.shape}</span>
 				</figcaption>
+			</figure>
+		{/each}
+	</div>
+</section>
+
+<section id="fits" class="section">
+	<div class="section-head" {@attach reveal()}>
+		<span class="kicker">Fits</span>
+		<h2>Dressed up or dressed down.</h2>
+		<p>
+			The full body starts plain. Add an <code>outfit</code> and <code>shoes</code> when you want the
+			extra swagger.
+		</p>
+	</div>
+	<div class="grid tall">
+		{#each fits as f, i (i)}
+			<figure class="tile glass" {@attach reveal((i % 6) * 60)} {@attach spotlight}>
+				<Mascot
+					theme={f.theme}
+					mood={f.mood}
+					body
+					outfit={f.outfit}
+					shoes={f.shoes}
+					size="min(104px, 24vw)"
+					interactive={false}
+					lookAt="wander"
+					label="mascot in {f.outfit} outfit with {f.shoes} shoes"
+				/>
+				<figcaption>{f.outfit} · {f.shoes}</figcaption>
 			</figure>
 		{/each}
 	</div>

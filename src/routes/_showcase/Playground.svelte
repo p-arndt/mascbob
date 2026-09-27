@@ -7,12 +7,14 @@
 		Mascot,
 		OUTFITS,
 		SHAPES,
+		SHOES,
 		THEMES,
 		type Accessory,
 		type EyeStyle,
 		type Mood,
 		type Outfit,
 		type Shape,
+		type Shoes,
 		type ThemeName
 	} from '$lib/index.js';
 	import Code, { plain, type Token } from './Code.svelte';
@@ -28,7 +30,8 @@
 	let eyes = $state<EyeStyle>('round');
 	let accessories = $state<Accessory[]>(['ring']);
 	let body = $state(true);
-	let outfit = $state<Outfit>(OUTFITS[0]);
+	let outfit = $state<Outfit>('puffer');
+	let shoes = $state<Shoes>('sneakers');
 	let hands = $state(true);
 	let float = $state(true);
 	let lookAt = $state<(typeof GAZES)[number]>('pointer');
@@ -86,6 +89,7 @@
 		shape = pick(SHAPES);
 		eyes = pick(EYE_STYLES);
 		outfit = pick(OUTFITS);
+		shoes = pick(SHOES);
 		// Zero to two accessories keeps the result charming instead of cluttered.
 		const pool = [...ACCESSORIES].sort(() => Math.random() - 0.5);
 		accessories = pool.slice(0, Math.floor(Math.random() * 3));
@@ -120,6 +124,7 @@
 				},
 				body && { name: 'body', value: '' },
 				body && outfit !== 'none' && { name: 'outfit', value: outfit },
+				body && shoes !== 'none' && { name: 'shoes', value: shoes },
 				!hands && { name: 'hands', value: 'false', expr: true },
 				!float && { name: 'float', value: 'false', expr: true },
 				lookAt !== 'pointer' && { name: 'lookAt', value: lookAt },
@@ -196,6 +201,7 @@
 				{accessories}
 				{body}
 				{outfit}
+				{shoes}
 				{hands}
 				{float}
 				{lookAt}
@@ -297,22 +303,40 @@
 			</div>
 		</fieldset>
 
-		<fieldset disabled={!body} class:off={!body}>
-			<legend>
-				Outfit
-				{#if !body}<span class="value">needs full body</span>{/if}
-			</legend>
-			<div class="chips">
-				{#each OUTFITS as o (o)}
-					<button
-						class="chip"
-						class:active={outfit === o}
-						aria-pressed={outfit === o}
-						onclick={() => (outfit = o)}>{o}</button
-					>
-				{/each}
-			</div>
-		</fieldset>
+		<div class="row">
+			<fieldset disabled={!body} class:off={!body}>
+				<legend>
+					Outfit
+					{#if !body}<span class="value">needs full body</span>{/if}
+				</legend>
+				<div class="chips">
+					{#each OUTFITS as o (o)}
+						<button
+							class="chip"
+							class:active={outfit === o}
+							aria-pressed={outfit === o}
+							onclick={() => (outfit = o)}>{o}</button
+						>
+					{/each}
+				</div>
+			</fieldset>
+			<fieldset disabled={!body} class:off={!body}>
+				<legend>
+					Shoes
+					{#if !body}<span class="value">needs full body</span>{/if}
+				</legend>
+				<div class="chips">
+					{#each SHOES as f (f)}
+						<button
+							class="chip"
+							class:active={shoes === f}
+							aria-pressed={shoes === f}
+							onclick={() => (shoes = f)}>{f}</button
+						>
+					{/each}
+				</div>
+			</fieldset>
+		</div>
 
 		<div class="row">
 			<fieldset>

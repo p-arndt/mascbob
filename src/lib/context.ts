@@ -1,6 +1,6 @@
 import { getContext, setContext } from 'svelte';
 import type { ShapeDef } from './geometry.js';
-import type { Accessory, EyeStyle, FaceParams, Mood, MoodConfig, Outfit } from './types.js';
+import type { Accessory, EyeStyle, FaceParams, Mood, MoodConfig, Outfit, Shoes } from './types.js';
 
 /**
  * Live state that `Mascot.svelte` shares with its parts. Every field is a
@@ -34,6 +34,7 @@ export interface MascotContext {
 	/** Full-body mode. */
 	readonly body: boolean;
 	readonly outfit: Outfit;
+	readonly shoes: Shoes;
 	/**
 	 * Degrees the whole figure currently rocks around its base (hover lean toward the
 	 * pointer plus wobbles from boops, mood changes and fidgets). Positive leans right.

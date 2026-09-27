@@ -4,6 +4,9 @@ import {
 	FOREARM,
 	HIP_Y,
 	OUTFITS,
+	SHOES,
+	legBottomY,
+	BODY_GROUND_Y,
 	TORSO_TOP,
 	torsoHalfWidth,
 	torsoPath,
@@ -103,11 +106,25 @@ describe('floatingHands', () => {
 });
 
 describe('OUTFITS', () => {
-	it('starts with the signature puffer and offers several outfits', () => {
-		expect(OUTFITS[0]).toBe('puffer');
-		expect(OUTFITS).toContain('none');
+	it('starts with the bare default and offers several outfits', () => {
+		expect(OUTFITS[0]).toBe('none');
+		expect(OUTFITS).toContain('puffer');
 		expect(OUTFITS.length).toBeGreaterThanOrEqual(4);
 		expect(new Set(OUTFITS).size).toBe(OUTFITS.length);
+	});
+});
+
+describe('SHOES', () => {
+	it('lists plain feet first, then the shoe styles', () => {
+		expect(SHOES).toEqual(['none', 'sneakers', 'hightops', 'boots']);
+	});
+
+	it('ends the legs inside the foot, higher for taller shoes', () => {
+		for (const shoes of SHOES) {
+			expect(legBottomY(shoes)).toBeLessThan(BODY_GROUND_Y);
+		}
+		expect(legBottomY('hightops')).toBeLessThan(legBottomY('sneakers'));
+		expect(legBottomY('sneakers')).toBeLessThan(legBottomY('none'));
 	});
 });
 

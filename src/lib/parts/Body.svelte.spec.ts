@@ -4,19 +4,23 @@ import Mascot from '../Mascot.svelte';
 import { BODY_VIEWBOX_HEIGHT } from './body.js';
 
 describe('Body', () => {
-	it('stands on legs and sneakers by default', async () => {
+	it('stands on plain feet by default', async () => {
 		const { container } = render(Mascot);
 		const svg = container.querySelector('svg');
 		expect(svg?.getAttribute('viewBox')).toBe(`0 0 200 ${BODY_VIEWBOX_HEIGHT}`);
 		expect(container.querySelectorAll('.leg')).toHaveLength(2);
-		expect(container.querySelectorAll('.sole')).toHaveLength(2);
+		expect(container.querySelectorAll('.foot-plain')).toHaveLength(2);
+		expect(container.querySelector('.sole')).toBeNull();
 		expect(container.querySelectorAll('.hand')).toHaveLength(2);
 		expect(container.querySelector('.stand')).not.toBeNull();
 		expect(container.querySelector('.float')).toBeNull();
 	});
 
-	it('wears the puffer collar unless another outfit is chosen', async () => {
-		expect(render(Mascot).container.querySelector('.puffer')).not.toBeNull();
+	it('wears no outfit unless one is chosen', async () => {
+		const bare = render(Mascot).container;
+		for (const part of ['.puffer', '.scarf', '.bow', '.hoodie', '.rib']) {
+			expect(bare.querySelector(part)).toBeNull();
+		}
 		const { container } = render(Mascot, { outfit: 'scarf' });
 		expect(container.querySelector('.scarf')).not.toBeNull();
 		expect(container.querySelector('.puffer')).toBeNull();
@@ -34,8 +38,25 @@ describe('Body', () => {
 		expect(container.querySelector('.fore.swing.wave')).not.toBeNull();
 	});
 
+	it.each([
+		['sneakers', '.shoe-sneakers'],
+		['hightops', '.shoe-hightops'],
+		['boots', '.shoe-boots']
+	] as const)('wears %s when asked', async (shoes, marker) => {
+		const { container } = render(Mascot, { shoes });
+		expect(container.querySelectorAll(`.foot ${marker}`)).toHaveLength(2);
+		expect(container.querySelector('.foot-plain')).toBeNull();
+		for (const other of ['.shoe-sneakers', '.shoe-hightops', '.shoe-boots']) {
+			if (other !== marker) expect(container.querySelector(other)).toBeNull();
+		}
+	});
+
 	it('taps a foot only in idle moods', async () => {
 		expect(render(Mascot, { mood: 'idle' }).container.querySelector('.foot.tap')).not.toBeNull();
 		expect(render(Mascot, { mood: 'sad' }).container.querySelector('.foot.tap')).toBeNull();
+		for (const shoes of ['none', 'boots'] as const) {
+			const { container } = render(Mascot, { mood: 'idle', shoes });
+			expect(container.querySelectorAll('.foot.tap')).toHaveLength(1);
+		}
 	});
 });

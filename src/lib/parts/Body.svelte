@@ -5,14 +5,15 @@
 		BODY_GROUND_Y,
 		COLLAR_H,
 		COLLAR_Y,
+		FOOT_SCALE,
 		FOREARM,
 		HIP_Y,
 		LEG_X,
 		SHOULDER_Y,
-		SNEAKER_H,
 		UPPER_ARM,
 		bodyPose,
 		coreBeat,
+		legBottomY,
 		shoulderX,
 		torsoHalfWidth,
 		torsoPath,
@@ -20,8 +21,8 @@
 	} from './body.js';
 
 	/**
-	 * Standing figure below the head: capsule torso, piston legs and chunky
-	 * sneakers. `feet` (legs and shoes) stays planted while the rest tilts, `back`
+	 * Standing figure below the head: capsule torso, piston legs and feet (plain
+	 * or in shoes). `feet` (legs and shoes) stays planted while the rest tilts, `back`
 	 * sits behind the head (hood, torso), `front` over it (collar/outfit, arms).
 	 */
 	let { layer }: { layer: 'feet' | 'back' | 'front' } = $props();
@@ -62,11 +63,12 @@
 	const collarHw = $derived(Math.min(m.shape.halfWidth, 56) + 7);
 	const shoulder = $derived(shoulderX(hw));
 	const outfit = $derived(m.outfit);
+	const shoes = $derived(m.shoes);
 	const beat = $derived(coreBeat(m.mood));
 	// Idle and chatty moods tap a foot; everything else stands still.
 	const tapping = $derived(m.mood === 'idle' || m.mood === 'talking' || m.mood === 'listening');
 	const legTop = HIP_Y - 10;
-	const legBottom = BODY_GROUND_Y - SNEAKER_H + 4;
+	const legBottom = $derived(legBottomY(shoes));
 </script>
 
 {#snippet arm(p: ArmAngles, swing: boolean)}
@@ -90,19 +92,64 @@
 	</g>
 {/snippet}
 
-<!-- Chunky high-top, drawn for the right foot with its toe pointing outward (+x). -->
-{#snippet sneaker()}
-	<rect class="sole" x="-16" y="-11" width="46" height="11" rx="5.5" />
-	<rect class="midsole" x="-12" y="-8" width="38" height="2" rx="1" />
-	<path
-		class="upper"
-		d="M-14 -11C-15 -22 -11 -29 -3 -29L8 -29C11 -22 18 -20 25 -17C30 -15 31 -12 30 -11Z"
-	/>
-	<path class="toe-cap" d="M17 -11C21 -14 27 -15 30 -11" />
-	<path class="stripe" d="M-7 -17C3 -15 13 -15 23 -13" />
-	<path class="laces" d="M3 -26H8M4 -23H10M5 -20H12" />
-	<rect class="heel-tab" x="-16" y="-27" width="5" height="10" rx="2" />
-	<ellipse class="opening" cx="2" cy="-29" rx="8" ry="2.2" />
+<!-- Feet are drawn for the right side with the toe pointing outward (+x), sole on y = 0 and the heel near x = -16. -->
+{#snippet plainFoot()}
+	<g class="foot-plain">
+		<path
+			class="bare"
+			d="M-14 -5C-16 -13 -11 -18 -3 -18C6 -18 11 -14 18 -12.5C25 -11 28 -7 27 -3.5C26 0 23 0 20 0H-9C-12 0 -13 -2 -14 -5Z"
+		/>
+		<path class="bare-shade" d="M-12 -3.2C-5 -1.6 13 -1.6 25 -3.4" />
+		<path class="bare-light" d="M-9 -14C-5 -15.6 1 -15.4 6 -13.6" />
+	</g>
+{/snippet}
+
+{#snippet sneaker(high: boolean)}
+	<g class={high ? 'shoe-hightops' : 'shoe-sneakers'}>
+		<rect class="sole" x="-16" y="-11" width="46" height="11" rx="5.5" />
+		<rect class="midsole" x="-12" y="-8" width="38" height="2" rx="1" />
+		{#if high}
+			<path
+				class="upper"
+				d="M-14 -11C-15 -26 -14 -38 -6 -38L7 -38C8 -28 12 -21 25 -17C30 -15 31 -12 30 -11Z"
+			/>
+			<rect class="ankle" x="-15.5" y="-42" width="24" height="7" rx="3.5" />
+			<path class="toe-cap" d="M17 -11C21 -14 27 -15 30 -11" />
+			<path class="stripe" d="M-7 -17C3 -15 13 -15 23 -13" />
+			<path class="laces" d="M2 -33H7M3 -29.5H8M3 -26H10M4 -22.5H12" />
+			<rect class="heel-tab" x="-16" y="-34" width="5" height="12" rx="2" />
+			<ellipse class="opening" cx="-3.5" cy="-42" rx="9" ry="2" />
+		{:else}
+			<path
+				class="upper"
+				d="M-14 -11C-15 -22 -11 -29 -3 -29L8 -29C11 -22 18 -20 25 -17C30 -15 31 -12 30 -11Z"
+			/>
+			<path class="toe-cap" d="M17 -11C21 -14 27 -15 30 -11" />
+			<path class="stripe" d="M-7 -17C3 -15 13 -15 23 -13" />
+			<path class="laces" d="M3 -26H8M4 -23H10M5 -20H12" />
+			<rect class="heel-tab" x="-16" y="-27" width="5" height="10" rx="2" />
+			<ellipse class="opening" cx="2" cy="-29" rx="8" ry="2.2" />
+		{/if}
+	</g>
+{/snippet}
+
+<!-- Chunky boot: dark rounded upper on a thick lug sole, with an accent pull tab at the heel. -->
+{#snippet boot()}
+	<g class="shoe-boots">
+		<rect class="boot-sole" x="-17" y="-13" width="49" height="13" rx="6" />
+		<path
+			class="lugs"
+			d="M-10 -1.2V-3.6M-3 -1.2V-3.6M4 -1.2V-3.6M11 -1.2V-3.6M18 -1.2V-3.6M25 -1.2V-3.6"
+		/>
+		<path
+			class="boot-upper"
+			d="M-15 -12C-16 -24 -14 -34 -6 -34L8 -34C9 -26 11 -22 18 -20C28 -18 32 -15 31 -12Z"
+		/>
+		<path class="welt" d="M-13 -13.5H29" />
+		<path class="boot-shine" d="M17 -18.5C22 -18.5 26 -17 28 -15" />
+		<rect class="pull-tab" x="-15.5" y="-42" width="6" height="9" rx="2.5" />
+		<rect class="cuff" x="-16" y="-37" width="26" height="6" rx="3" />
+	</g>
 {/snippet}
 
 {#if layer === 'feet'}
@@ -120,8 +167,14 @@
 			class:tap={side === 1 && tapping}
 			style:transform-origin="{x - side * 20}px {BODY_GROUND_Y - 2}px"
 		>
-			<g transform="translate({x} {BODY_GROUND_Y}) scale({side * 1.22} 1.22)">
-				{@render sneaker()}
+			<g transform="translate({x} {BODY_GROUND_Y}) scale({side * FOOT_SCALE} {FOOT_SCALE})">
+				{#if shoes === 'sneakers' || shoes === 'hightops'}
+					{@render sneaker(shoes === 'hightops')}
+				{:else if shoes === 'boots'}
+					{@render boot()}
+				{:else}
+					{@render plainFoot()}
+				{/if}
 			</g>
 		</g>
 	{/each}
@@ -282,8 +335,76 @@
 		opacity: 0.16;
 	}
 
+	.bare {
+		fill: var(--c-body-light);
+		stroke: var(--c-visor);
+		stroke-width: 1.2;
+		stroke-opacity: 0.14;
+	}
+	.bare-shade,
+	.bare-light {
+		fill: none;
+		stroke-linecap: round;
+	}
+	.bare-shade {
+		stroke: var(--c-visor);
+		stroke-width: 2.4;
+		opacity: 0.12;
+	}
+	.bare-light {
+		stroke: #fff;
+		stroke-width: 2;
+		opacity: 0.35;
+	}
+
 	.sole {
 		fill: var(--c-visor);
+	}
+	.ankle {
+		fill: var(--c-accent);
+		stroke: var(--c-visor);
+		stroke-width: 1.4;
+	}
+
+	.boot-sole {
+		fill: var(--c-body-dark);
+		stroke: var(--c-visor);
+		stroke-width: 1.4;
+	}
+	.lugs {
+		fill: none;
+		stroke: var(--c-visor);
+		stroke-width: 2;
+		stroke-linecap: round;
+		opacity: 0.5;
+	}
+	.boot-upper {
+		fill: var(--c-visor);
+		stroke: var(--c-visor);
+		stroke-width: 1.6;
+		stroke-linejoin: round;
+	}
+	.welt {
+		fill: none;
+		stroke: var(--c-body-light);
+		stroke-width: 1;
+		stroke-dasharray: 2 2.4;
+		opacity: 0.45;
+	}
+	.boot-shine {
+		fill: none;
+		stroke: #fff;
+		stroke-width: 1.8;
+		stroke-linecap: round;
+		opacity: 0.22;
+	}
+	.cuff {
+		fill: var(--c-body-mid);
+		stroke: var(--c-visor);
+		stroke-width: 1.4;
+	}
+	.pull-tab {
+		fill: var(--c-accent);
 	}
 	.midsole,
 	.stripe,

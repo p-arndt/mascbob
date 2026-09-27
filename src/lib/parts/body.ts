@@ -1,8 +1,12 @@
 import type { HandPose, Mood } from '../types.js';
 
-/** Outfits for the full-body figure. The puffer collar is the signature look. */
-export const OUTFITS = ['puffer', 'hoodie', 'scarf', 'bowtie', 'none'] as const;
+/** Outfits for the full-body figure. The bare shell is the default; everything else is opt-in. */
+export const OUTFITS = ['none', 'puffer', 'hoodie', 'scarf', 'bowtie'] as const;
 export type Outfit = (typeof OUTFITS)[number];
+
+/** Footwear for the full-body figure. `none` keeps plain rounded feet in the body colors. */
+export const SHOES = ['none', 'sneakers', 'hightops', 'boots'] as const;
+export type Shoes = (typeof SHOES)[number];
 
 /** Full-body mode draws in a 200×300 viewBox: the head keeps its 200×200 coordinates on top. */
 export const BODY_VIEWBOX_HEIGHT = 300;
@@ -21,6 +25,21 @@ export const FOREARM = 15;
 export const LEG_X = 17;
 /** Sneaker height from sole bottom to the top of the upper. */
 export const SNEAKER_H = 36;
+/** Feet are drawn in local units and scaled up by this much. */
+export const FOOT_SCALE = 1.22;
+
+/** Height of each foot variant from the ground to its top edge, in viewBox units. */
+const FOOT_HEIGHT: Record<Shoes, number> = {
+	none: 18 * FOOT_SCALE,
+	sneakers: 29 * FOOT_SCALE,
+	hightops: 42 * FOOT_SCALE,
+	boots: 38 * FOOT_SCALE
+};
+
+/** Where the leg ends: a few units inside the foot so no gap shows between them. */
+export function legBottomY(shoes: Shoes): number {
+	return BODY_GROUND_Y - (FOOT_HEIGHT[shoes] ?? FOOT_HEIGHT.none) + 5;
+}
 
 /** The torso stays compact under wide heads, otherwise it'd read as a barrel. */
 export function torsoHalfWidth(headHalfWidth: number): number {
