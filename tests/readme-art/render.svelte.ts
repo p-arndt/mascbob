@@ -148,6 +148,13 @@ it('renders the README art', async () => {
 	});
 	await commands.writeFile(`${OUT}/social.png`, dataUrl.split(',')[1], 'base64');
 
+	const icon = await frame({ mood: 'happy', body: false, hands: false }, { width: 64, height: 64 });
+	// Cropped to the head (x 52–148, y 36–172 of the 200×200 head space): at 16px every pixel counts.
+	await commands.writeFile(
+		'static/favicon.svg',
+		icon.svg.replace('viewBox="0 0 200 200"', 'viewBox="26 30 148 148"') + '\n'
+	);
+
 	const moods = await Promise.all(
 		(
 			[
