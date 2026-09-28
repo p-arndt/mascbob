@@ -3,7 +3,7 @@ import { commands } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
 import { MOODS, Mascot, THEMES } from '$lib/index.js';
 import type { ComponentProps } from 'svelte';
-import { snapshotSvg } from '../../src/routes/_showcase/exporter.js';
+import { snapshotSvg, svgToPng } from '../../src/routes/_showcase/exporter.js';
 
 type Props = ComponentProps<typeof Mascot>;
 type Frame = { props: Props; width: number; height: number; svg: string };
@@ -114,6 +114,39 @@ it('renders the README art', async () => {
 			heroStyle
 		)
 	);
+
+	// GitHub's social preview is 2:1 and shown as a still, so it gets its own static layout.
+	const social = { width: 1280, height: 640 };
+	const socialSvg =
+		`<svg xmlns="http://www.w3.org/2000/svg" width="${social.width}" height="${social.height}" viewBox="0 0 ${social.width} ${social.height}">` +
+		`<rect width="${social.width}" height="${social.height}" fill="${PAPER}"/>` +
+		`<g font-family="ui-rounded, 'SF Pro Rounded', system-ui, -apple-system, 'Segoe UI', sans-serif" fill="#1d1d1f">` +
+		`<text x="96" y="300" font-size="150" font-weight="800" letter-spacing="-6">mascbob</text>` +
+		`<text x="102" y="372" font-size="38" fill="#57534e">An animated SVG mascot for Svelte 5</text>` +
+		`<rect x="102" y="420" width="190" height="52" rx="26" fill="#ff5a1f"/>` +
+		`<text x="197" y="455" font-size="23" font-weight="700" fill="#fff" text-anchor="middle">${MOODS.length} moods</text>` +
+		`<rect x="308" y="420" width="226" height="52" rx="26" fill="#1d1d1f"/>` +
+		`<text x="421" y="455" font-size="23" font-weight="700" fill="#fff" text-anchor="middle">${Object.keys(THEMES).length} colorways</text>` +
+		`<rect x="550" y="422" width="170" height="48" rx="24" fill="none" stroke="#1d1d1f" stroke-width="3"/>` +
+		`<text x="635" y="455" font-size="23" font-weight="700" text-anchor="middle">0 deps</text>` +
+		`</g>` +
+		nest(
+			{
+				...hero[0],
+				svg: hero[0].svg.replace(/width="\d+" height="\d+"/, 'width="320" height="480"')
+			},
+			860,
+			80
+		) +
+		`</svg>\n`;
+	await commands.writeFile(`${OUT}/social.svg`, socialSvg);
+	const png = await svgToPng(socialSvg, social.width, social.height, 1);
+	const dataUrl = await new Promise<string>((resolve) => {
+		const reader = new FileReader();
+		reader.onload = () => resolve(reader.result as string);
+		reader.readAsDataURL(png);
+	});
+	await commands.writeFile(`${OUT}/social.png`, dataUrl.split(',')[1], 'base64');
 
 	const moods = await Promise.all(
 		(
