@@ -3,7 +3,8 @@
 Svelte 5 component library that ships `<Mascot>`, an animated SVG mascot with
 moods, themes, shapes, eye styles and accessories. The SvelteKit app in
 `src/routes` is the showcase and playground; only `src/lib` is published (via
-`svelte-package` into `dist/`).
+`svelte-package` into `dist/`). The showcase is fully prerendered (`adapter-static`); the
+`Dockerfile` serves it with static-web-server (`sws.toml`), so routes must not need a server.
 
 ## Layout
 

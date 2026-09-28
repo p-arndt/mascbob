@@ -1,0 +1,14 @@
+.git
+.gitignore
+.dockerignore
+Dockerfile*
+**/node_modules
+.svelte-kit/
+build/
+dist/
+.github/
+.claude/
+tests/
+*.log
+.env*
+.DS_Store
