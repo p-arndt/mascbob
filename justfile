@@ -3,6 +3,9 @@
 
 import '.just/common.just'
 import '.just/release.just'
+import '.just/docker.just'
+
+IMAGE := "mascbob"
 
 # List recipes
 default:

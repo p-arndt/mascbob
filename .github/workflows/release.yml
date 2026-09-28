@@ -1,9 +1,10 @@
 name: Release
 
-# Publishes the pushed tag to npm and creates the GitHub Release. The shared
-# workflows in p-arndt/.github have no npm pipeline yet, so this one is local;
-# it follows container-release.yml: stamp verifies the tag, the notes come from
-# the annotated tag, third-party actions are pinned to full commit SHAs.
+# Publishes the pushed tag to npm, pushes the showcase image to GHCR and creates
+# the GitHub Release. The shared workflows in p-arndt/.github have no npm
+# pipeline yet, so the npm part is local; it follows container-release.yml:
+# stamp verifies the tag, the notes come from the annotated tag, third-party
+# actions are pinned to full commit SHAs.
 #
 # npm auth: trusted publishing (OIDC) once it is configured for the package on
 # npmjs.com; until then an NPM_TOKEN secret. npm uses whichever is available.
@@ -23,6 +24,17 @@ concurrency:
 jobs:
   ci:
     uses: ./.github/workflows/ci.yml
+
+  # The showcase site as ghcr.io/p-arndt/mascbob. The GitHub Release comes from
+  # the publish job, so the shared workflow skips its own.
+  image:
+    needs: ci
+    uses: p-arndt/.github/.github/workflows/container-release.yml@v1
+    permissions:
+      contents: write
+      packages: write
+    with:
+      changelog: none
 
   publish:
     needs: ci
