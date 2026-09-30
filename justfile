@@ -5,7 +5,10 @@ import '.just/common.just'
 import '.just/release.just'
 import '.just/docker.just'
 
+set allow-duplicate-variables
+
 IMAGE := "mascbob"
+REGISTRY := "reg.allthing.eu"
 
 # List recipes
 default:
