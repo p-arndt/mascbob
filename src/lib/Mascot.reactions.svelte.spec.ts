@@ -57,7 +57,7 @@ describe('Mascot reactions', () => {
 
 	it('bursts its head into confetti when booped on while grumpy', async () => {
 		const { el, onreaction } = setup();
-		for (let i = 0; i < 14; i++) el.click();
+		for (let i = 0; i < 10; i++) el.click();
 		expect(onreaction).toHaveBeenLastCalledWith({ type: 'explode' });
 		await expect.element(el.querySelector('.blast') as SVGElement).toHaveClass('blasting');
 		const blasted = () =>

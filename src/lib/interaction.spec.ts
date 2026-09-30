@@ -181,8 +181,8 @@ describe('FlickDetector', () => {
 describe('TickleCounter', () => {
 	it('giggles after a few rapid boops and turns grumpy after a barrage', () => {
 		const tickle = new TickleCounter();
-		const levels = Array.from({ length: 9 }, (_, i) => tickle.boop(i * 150)?.level ?? null);
-		expect(levels).toEqual([null, null, null, 'giggle', null, null, null, null, 'grumpy']);
+		const levels = Array.from({ length: 7 }, (_, i) => tickle.boop(i * 150)?.level ?? null);
+		expect(levels).toEqual([null, null, null, 'giggle', null, null, 'grumpy']);
 	});
 
 	it('forgets slow boops', () => {
@@ -312,13 +312,13 @@ describe('ReactionController', () => {
 		const { controller, shown, events } = setup();
 		for (let i = 0; i < 4; i++) controller.boop(Date.now() + i * 100);
 		expect(shown.at(-1)).toEqual({ name: 'tickle', mood: 'happy' });
-		for (let i = 4; i < 9; i++) controller.boop(Date.now() + i * 100);
+		for (let i = 4; i < 7; i++) controller.boop(Date.now() + i * 100);
 		expect(shown.at(-1)).toEqual({ name: 'tickle', mood: 'grumpy' });
 		expect(events.map((e) => e.type)).toEqual(['tickle', 'tickle']);
 	});
 
 	const sulk = (controller: ReactionController) => {
-		for (let i = 0; i < 9; i++) controller.boop(Date.now() + i * 100);
+		for (let i = 0; i < 7; i++) controller.boop(Date.now() + i * 100);
 	};
 
 	it('blows its head after more boops while grumpy', () => {
