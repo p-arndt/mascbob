@@ -255,7 +255,7 @@ export interface TickleOptions {
 export class TickleCounter {
 	private times: number[] = [];
 
-	constructor(readonly options: TickleOptions = { window: 2200, giggleAt: 4, grumpyAt: 7 }) {}
+	constructor(readonly options: TickleOptions = { window: 1800, giggleAt: 3, grumpyAt: 5 }) {}
 
 	/** Registers a boop; returns the level it reached, if it just crossed one. */
 	boop(t: number): { level: 'giggle' | 'grumpy'; boops: number } | null {
@@ -329,7 +329,7 @@ export const REACTION_TIMING = {
 	giggle: 1100,
 	grumpy: 2600,
 	/** Boops on a grumpy mascot until its head bursts. */
-	boopsToExplode: 3,
+	boopsToExplode: 2,
 	/** The whole blast, fuse to head back in place; matches the `blast` keyframes in Mascot.svelte. */
 	explode: 2600,
 	/** Trembling and swelling before the head bursts; 25% of `explode`. */
