@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	GRAB_LIMITS,
+	headWarp,
 	legStretch,
 	legSwing,
 	pullHead,
@@ -151,49 +152,95 @@ describe('reachArm', () => {
 });
 
 describe('pullHead', () => {
-	const pivot: Point = { x: 100, y: 130 };
-	const from: Point = { x: 100, y: 80 };
+	const pivot: Point = { x: 100, y: 166 };
+	const from: Point = { x: 100, y: 66 };
+	const pulled = (dx: number, dy: number) =>
+		pullHead(pivot, from, { x: from.x + dx, y: from.y + dy });
 
 	it('does nothing without a pull', () => {
-		const r = pullHead(pivot, from, from);
-		expect(r.angle).toBeCloseTo(0);
-		expect(r.stretch).toBeCloseTo(1);
+		const p = pulled(0, 0);
+		expect(p.x).toBeCloseTo(0);
+		expect(p.y).toBeCloseTo(0);
 	});
 
-	it('bends clockwise when pulled toward +x, nearly one to one at first', () => {
-		const r = pullHead(pivot, from, around(pivot, 50, -90 + 10));
-		expect(r.angle).toBeGreaterThan(9.5);
-		expect(r.angle).toBeLessThan(10);
-		expect(r.stretch).toBeCloseTo(1);
+	it.each([
+		[1, 0],
+		[-1, 0],
+		[0, -1],
+		[0.7, -0.7],
+		[-0.7, 0.3]
+	])('follows a small pull toward (%d, %d) one to one', (x, y) => {
+		const p = pulled(x * 5, y * 5);
+		expect(p.x).toBeCloseTo(x * 5, 0);
+		expect(p.y).toBeCloseTo(y * 5, 0);
 	});
 
-	it('bends ever less the further it is pulled, never past the head limit', () => {
-		const at = (deg: number) => pullHead(pivot, from, around(pivot, 50, -90 + deg)).angle;
-		expect(at(40) - at(20)).toBeLessThan(at(20));
-		expect(at(170)).toBeLessThan(GRAB_LIMITS.head);
-		expect(at(-170)).toBeGreaterThan(-GRAB_LIMITS.head);
-		expect(at(90)).toBeGreaterThan(GRAB_LIMITS.head * 0.8);
+	it('follows sideways pulls sideways instead of turning them upward', () => {
+		const p = pulled(120, 0);
+		expect(p.x).toBeGreaterThan(80);
+		expect(Math.abs(p.y)).toBeLessThan(1);
 	});
 
-	it('stretches when pulled away from the neck and squashes when pushed in', () => {
-		expect(pullHead(pivot, from, { x: 100, y: 75 }).stretch).toBeCloseTo(1.1, 1);
-		expect(pullHead(pivot, from, { x: 100, y: 85 }).stretch).toBeCloseTo(0.9, 1);
+	it('resists more the further it is pulled, in every direction', () => {
+		const { head } = GRAB_LIMITS;
+		expect(pulled(1000, 0).x).toBeLessThanOrEqual(head.side * 100);
+		expect(pulled(-1000, 0).x).toBeGreaterThanOrEqual(-head.side * 100);
+		expect(pulled(0, -1000).y).toBeGreaterThanOrEqual(-head.out * 100);
+		expect(pulled(200, 0).x - pulled(100, 0).x).toBeLessThan(pulled(100, 0).x);
 	});
 
-	it('keeps stretching further out, but never past the limits', () => {
-		const [lo, hi] = GRAB_LIMITS.stretch;
-		const at = (y: number) => pullHead(pivot, from, { x: 100, y }).stretch;
-		expect(at(0)).toBeGreaterThan(at(40));
-		expect(at(-40)).toBeGreaterThan(at(0));
-		expect(at(-2000)).toBeLessThanOrEqual(hi);
-		expect(at(-2000)).toBeGreaterThan(hi - 0.01);
-		expect(at(pivot.y)).toBeGreaterThanOrEqual(lo);
+	it('never pushes the grabbed spot past the neck', () => {
+		expect(pulled(0, 1000).y).toBeLessThanOrEqual(GRAB_LIMITS.head.in * 100);
+		expect(pulled(0, 1000).y).toBeLessThan(pivot.y - from.y);
 	});
 
 	it('survives a grab right on the pivot', () => {
-		const r = pullHead(pivot, pivot, { x: 100, y: 100 });
-		expect(Number.isFinite(r.angle)).toBe(true);
-		expect(Number.isFinite(r.stretch)).toBe(true);
+		const p = pullHead(pivot, pivot, { x: 130, y: 100 });
+		expect(Number.isFinite(p.x)).toBe(true);
+		expect(Number.isFinite(p.y)).toBe(true);
+	});
+});
+
+describe('headWarp', () => {
+	const apply = ([a, b, c, d]: number[], p: Point): Point => ({
+		x: a * p.x + c * p.y,
+		y: b * p.x + d * p.y
+	});
+
+	it('is the identity without a pull', () => {
+		headWarp({ x: 10, y: -80 }, { x: 0, y: 0 }).forEach((v, i) =>
+			expect(v).toBeCloseTo([1, 0, 0, 1][i])
+		);
+	});
+
+	it('carries the grabbed spot along with the pull', () => {
+		const grab = { x: 20, y: -90 };
+		const pull = { x: 35, y: -12 };
+		const p = apply(headWarp(grab, pull), grab);
+		expect(p.x).toBeCloseTo(grab.x + pull.x);
+		expect(p.y).toBeCloseTo(grab.y + pull.y);
+	});
+
+	it('keeps the neck in place', () => {
+		const warp = headWarp({ x: 0, y: -100 }, { x: 40, y: -30 });
+		const neck = apply(warp, { x: 0, y: 0 });
+		expect(neck.x).toBeCloseTo(0);
+		expect(neck.y).toBeCloseTo(0);
+	});
+
+	it('turns rather than skews a head pulled sideways', () => {
+		const [a, b, , d] = headWarp({ x: 0, y: -100 }, { x: 60, y: 0 });
+		// A pure rotation has a = d and b = -c; a pure skew would leave a = 1 and b = 0.
+		expect(b).toBeGreaterThan(0.2);
+		expect(Math.abs(a - d)).toBeLessThan(0.1);
+	});
+
+	it('only stretches a head pulled straight out', () => {
+		const [a, b, c, d] = headWarp({ x: 0, y: -100 }, { x: 0, y: -50 });
+		expect(a).toBeCloseTo(1);
+		expect(b).toBeCloseTo(0);
+		expect(c).toBeCloseTo(0);
+		expect(d).toBeCloseTo(1.5);
 	});
 });
 

@@ -32,12 +32,16 @@ function setup(reactions?: ReactionsInput) {
 			})
 		);
 	};
-	/** Degrees the head currently bends on its neck. */
-	const angle = () => {
-		const turn = head.parentElement!.getAttribute('transform') ?? '';
-		return Number(/rotate\(([-\d.e]+)/.exec(turn)?.[1] ?? NaN);
+	/** The head's warp around the neck, as `matrix(a b c d)` entries. */
+	const warp = () => {
+		const t = head.parentElement!.parentElement!.getAttribute('transform') ?? '';
+		return (/matrix\(([^)]*)\)/.exec(t)?.[1] ?? '').split(' ').map(Number);
 	};
-	return { el, head, at, angle, onreaction, onboop };
+	/** How far the warp shifts a spot 100 units above the neck sideways (positive: right). */
+	const angle = () => -warp()[2] * 100;
+	/** How much the warp stretches the head upward from the neck. */
+	const stretch = () => warp()[3];
+	return { el, head, at, angle, stretch, onreaction, onboop };
 }
 
 /** Grabs the top of the head and pulls it to the right. */
@@ -51,9 +55,7 @@ async function pullRight(at: (type: string, x: number, y: number) => void) {
 
 describe('Mascot grab', () => {
 	it('stretches the head like taffy when pulled far away from the neck', async () => {
-		const { head, at } = setup();
-		const scaleY = () =>
-			Number(/scale\([-\d.e]+ ([-\d.e]+)\)/.exec(head.getAttribute('transform') ?? '')?.[1]);
+		const { at, stretch: scaleY } = setup();
 		expect(scaleY()).toBeCloseTo(1, 1);
 		// The pop-in scales the whole figure, which would skew where the grab lands.
 		await new Promise((r) => setTimeout(r, 700));
@@ -68,10 +70,14 @@ describe('Mascot grab', () => {
 	});
 
 	it('bends the head toward the pointer and springs back when let go', async () => {
-		const { at, angle, onreaction } = setup();
+		const { at, angle, stretch, onreaction } = setup();
+		// The pop-in scales the whole figure, which would skew where the grab lands.
+		await new Promise((r) => setTimeout(r, 700));
 		await pullRight(at);
 		expect(onreaction).toHaveBeenCalledWith({ type: 'grab', part: 'head' });
-		expect(angle()).toBeGreaterThan(15);
+		await expect.poll(angle).toBeGreaterThan(30);
+		// Pulled sideways, it leans sideways rather than stretching upward.
+		expect(stretch()).toBeLessThan(1.1);
 		at('pointerup', 160, 78);
 		await expect.poll(() => Math.abs(angle()), { timeout: 4000 }).toBeLessThan(0.5);
 	});

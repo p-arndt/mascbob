@@ -15,7 +15,16 @@
 	import { moodConfig } from './moods.js';
 	import { createBabble } from './speech.js';
 	import { aimAt, saccade } from './gaze.js';
-	import { RELEASE_SPRING, drag, pullHead, tune, type GrabPart } from './grab.js';
+	import {
+		RELEASE_SPRING,
+		drag,
+		headWarp,
+		pullHead,
+		swing,
+		tune,
+		type GrabPart,
+		type Point
+	} from './grab.js';
 	import {
 		ReactionController,
 		resolveReactions,
@@ -175,7 +184,9 @@
 	/** 0..1; mouth opening of a yawn. */
 	const yawnMouth = new Tween(0);
 	/** Head bend (degrees) and stretch while pulled; loose, so letting go rings out as a jelly wobble. */
-	const headPull = new Spring({ angle: 0, stretch: 1 }, RELEASE_SPRING);
+	const headPull = new Spring({ x: 0, y: 0 }, RELEASE_SPRING);
+	/** Where the head was grabbed, relative to the neck; the pull warps the head around it. */
+	let headGrab = $state<Point>({ x: 0, y: -100 });
 
 	let root = $state<HTMLElement>();
 	// Offscreen mascots pause their timers, pointer tracking and CSS loops: a page full of them stays smooth.
@@ -269,7 +280,8 @@
 	$effect(() => {
 		headTurn.target = reduced
 			? 0
-			: (hovered ? pointerX * 5 : 0) + reactionLean + idleTurn + gestureTurn;
+			: // A held head must not turn under the pointer, or the grabbed spot would slide away.
+				(hovered && !grabbing ? pointerX * 5 : 0) + reactionLean + idleTurn + gestureTurn;
 	});
 
 	let hopId = 0;
@@ -595,14 +607,15 @@
 		const pivot = { x: 100, y: neckY };
 		drag(e, {
 			frame: () => tiltFrame,
-			start: () => {
+			start: (from) => {
 				if (!grab('head')) return false;
 				tune(headPull, true);
+				headGrab = { x: from.x - pivot.x, y: from.y - pivot.y };
 			},
 			move: (to, from) => headPull.set(pullHead(pivot, from, to), { instant: reduced }),
 			end: () => {
 				tune(headPull, false);
-				headPull.set({ angle: 0, stretch: 1 }, { instant: reduced });
+				headPull.set({ x: 0, y: 0 }, { instant: reduced });
 				release();
 			}
 		});
@@ -743,8 +756,15 @@
 	const headSx = $derived(body ? 1 + (hsx - 1) * 0.7 : hsx);
 	const headSy = $derived(body ? 1 + (hsy - 1) * 0.7 : hsy);
 	const pull = $derived(headPull.current);
+	const warp = $derived(headWarp(headGrab, pull).join(' '));
+	/** Degrees the pull swings the grabbed spot around the neck, for the torso and dangling parts. */
+	const pullTurn = $derived(
+		pull.x || pull.y
+			? swing({ x: 0, y: 0 }, headGrab, { x: headGrab.x + pull.x, y: headGrab.y + pull.y })
+			: 0
+	);
 	// The torso follows a pulled head a little, like a neck tugging at its shoulders.
-	const torsoTurn = $derived(headTurn.current * 0.45 + pull.angle * 0.25);
+	const torsoTurn = $derived(headTurn.current * 0.45 + pullTurn * 0.25);
 	// In full-body mode the legs take some of the squash so the head doesn't sink into the torso.
 	const figureSquash = $derived(
 		body
@@ -817,7 +837,7 @@
 			return fig;
 		},
 		get lean() {
-			return rock + headTurn.current + headDrag + pull.angle;
+			return rock + headTurn.current + headDrag + pullTurn;
 		},
 		get hop() {
 			return hop.current;
@@ -929,29 +949,29 @@
 									<Body layer="back" />
 								</g>
 							{/if}
-							<g
-								transform="rotate({headTurn.current +
-									headDrag +
-									pull.angle} 100 {neckY}) translate(0 {headDrop})"
-							>
-								<!-- svelte-ignore a11y_no_static_element_interactions -->
+							<!-- A pulled head warps around the neck, so the grabbed spot stays under the pointer. -->
+							<g transform="translate(100 {neckY}) matrix({warp} 0 0) translate(-100 {-neckY})">
 								<g
-									class="head"
-									class:grabbable={canGrab}
-									data-grab="head"
-									transform="translate(100 {head.bottom + headY}) scale({(headSx * headScale) /
-										Math.sqrt(pull.stretch)} {headSy *
-										headScale *
-										pull.stretch}) translate(-100 {-head.bottom})"
-									onpointerdown={grabHead}
+									transform="rotate({headTurn.current +
+										headDrag} 100 {neckY}) translate(0 {headDrop})"
 								>
-									<g class="blast" class:blasting={reaction?.name === 'explode'}>
-										<g class="breathe" class:lift={body}>
-											<Accessories layer="back" />
-											<Shell />
-											<Face />
-											<Accessories layer="front" />
-											{@render accessory?.({ top: t, halfWidth: hw })}
+									<!-- svelte-ignore a11y_no_static_element_interactions -->
+									<g
+										class="head"
+										class:grabbable={canGrab}
+										data-grab="head"
+										transform="translate(100 {head.bottom + headY}) scale({headSx *
+											headScale} {headSy * headScale}) translate(-100 {-head.bottom})"
+										onpointerdown={grabHead}
+									>
+										<g class="blast" class:blasting={reaction?.name === 'explode'}>
+											<g class="breathe" class:lift={body}>
+												<Accessories layer="back" />
+												<Shell />
+												<Face />
+												<Accessories layer="front" />
+												{@render accessory?.({ top: t, halfWidth: hw })}
+											</g>
 										</g>
 									</g>
 								</g>
