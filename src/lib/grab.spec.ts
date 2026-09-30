@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
 	GRAB_LIMITS,
-	headWarp,
+	DEFAULT_GRAB,
+	headPose,
+	resolveGrab,
+	type HeadPose,
 	legStretch,
 	legSwing,
 	pullHead,
@@ -152,10 +155,9 @@ describe('reachArm', () => {
 });
 
 describe('pullHead', () => {
-	const pivot: Point = { x: 100, y: 166 };
-	const from: Point = { x: 100, y: 66 };
-	const pulled = (dx: number, dy: number) =>
-		pullHead(pivot, from, { x: from.x + dx, y: from.y + dy });
+	const from: Point = { x: 100, y: 60 };
+	const pulled = (dx: number, dy: number, follow?: number) =>
+		pullHead(from, { x: from.x + dx, y: from.y + dy }, follow);
 
 	it('does nothing without a pull', () => {
 		const p = pulled(0, 0);
@@ -167,80 +169,97 @@ describe('pullHead', () => {
 		[1, 0],
 		[-1, 0],
 		[0, -1],
-		[0.7, -0.7],
-		[-0.7, 0.3]
+		[0.7, -0.7]
 	])('follows a small pull toward (%d, %d) one to one', (x, y) => {
 		const p = pulled(x * 5, y * 5);
 		expect(p.x).toBeCloseTo(x * 5, 0);
 		expect(p.y).toBeCloseTo(y * 5, 0);
 	});
 
-	it('follows sideways pulls sideways instead of turning them upward', () => {
-		const p = pulled(120, 0);
-		expect(p.x).toBeGreaterThan(80);
-		expect(Math.abs(p.y)).toBeLessThan(1);
-	});
-
-	it('resists more the further it is pulled, in every direction', () => {
+	it('goes far up and sideways but barely down into the body', () => {
 		const { head } = GRAB_LIMITS;
-		expect(pulled(1000, 0).x).toBeLessThanOrEqual(head.side * 100);
-		expect(pulled(-1000, 0).x).toBeGreaterThanOrEqual(-head.side * 100);
-		expect(pulled(0, -1000).y).toBeGreaterThanOrEqual(-head.out * 100);
+		expect(pulled(1000, 0).x).toBeLessThanOrEqual(head.side);
+		expect(pulled(1000, 0).x).toBeGreaterThan(head.side * 0.99);
+		expect(pulled(0, -1000).y).toBeGreaterThanOrEqual(-head.up);
+		expect(pulled(0, 1000).y).toBeLessThanOrEqual(head.down);
 		expect(pulled(200, 0).x - pulled(100, 0).x).toBeLessThan(pulled(100, 0).x);
 	});
 
-	it('never pushes the grabbed spot past the neck', () => {
-		expect(pulled(0, 1000).y).toBeLessThanOrEqual(GRAB_LIMITS.head.in * 100);
-		expect(pulled(0, 1000).y).toBeLessThan(pivot.y - from.y);
-	});
-
-	it('survives a grab right on the pivot', () => {
-		const p = pullHead(pivot, pivot, { x: 130, y: 100 });
-		expect(Number.isFinite(p.x)).toBe(true);
-		expect(Number.isFinite(p.y)).toBe(true);
+	it('only goes part of the way with a lower follow', () => {
+		expect(pulled(40, -20, 0.5).x).toBeCloseTo(pulled(40, -20).x / 2);
+		expect(pulled(40, -20, 0).y).toBeCloseTo(0);
 	});
 });
 
-describe('headWarp', () => {
-	const apply = ([a, b, c, d]: number[], p: Point): Point => ({
-		x: a * p.x + c * p.y,
-		y: b * p.x + d * p.y
+describe('headPose', () => {
+	const base: Point = { x: 100, y: 172 };
+	const grab: Point = { x: 100, y: 72 };
+	/** Where the pose takes a point, following the transform order documented on `HeadPose`. */
+	const place = (p: HeadPose, q: Point): Point => {
+		const sx = (q.x - base.x) * p.sx;
+		const sy = (q.y - base.y) * p.sy;
+		const r = (p.tilt * Math.PI) / 180;
+		return {
+			x: base.x + sx * Math.cos(r) - sy * Math.sin(r) + p.x,
+			y: base.y + sx * Math.sin(r) + sy * Math.cos(r) + p.y
+		};
+	};
+
+	it('leaves the head alone without a pull', () => {
+		expect(headPose(grab, base, { x: 0, y: 0 })).toEqual({
+			x: 0,
+			y: 0,
+			tilt: 0,
+			sx: 1,
+			sy: 1
+		});
 	});
 
-	it('is the identity without a pull', () => {
-		headWarp({ x: 10, y: -80 }, { x: 0, y: 0 }).forEach((v, i) =>
-			expect(v).toBeCloseTo([1, 0, 0, 1][i])
-		);
+	it.each([
+		[40, 0],
+		[-60, -30],
+		[0, -80],
+		[0, 12],
+		[25, 10]
+	])('keeps the grabbed spot under a pull of (%d, %d)', (x, y) => {
+		const pose = headPose(grab, base, { x, y });
+		const at = place(pose, grab);
+		expect(at.x).toBeCloseTo(grab.x + x);
+		expect(at.y).toBeCloseTo(grab.y + y);
 	});
 
-	it('carries the grabbed spot along with the pull', () => {
-		const grab = { x: 20, y: -90 };
-		const pull = { x: 35, y: -12 };
-		const p = apply(headWarp(grab, pull), grab);
-		expect(p.x).toBeCloseTo(grab.x + pull.x);
-		expect(p.y).toBeCloseTo(grab.y + pull.y);
+	it('tilts into a sideways pull without stretching', () => {
+		const right = headPose(grab, base, { x: 50, y: 0 });
+		expect(right.tilt).toBeGreaterThan(10);
+		expect(right.sy).toBe(1);
+		expect(headPose(grab, base, { x: -50, y: 0 }).tilt).toBeCloseTo(-right.tilt);
 	});
 
-	it('keeps the neck in place', () => {
-		const warp = headWarp({ x: 0, y: -100 }, { x: 40, y: -30 });
-		const neck = apply(warp, { x: 0, y: 0 });
-		expect(neck.x).toBeCloseTo(0);
-		expect(neck.y).toBeCloseTo(0);
+	it('stretches a little when pulled up and squashes when pushed down, keeping its volume', () => {
+		const up = headPose(grab, base, { x: 0, y: -80 });
+		expect(up.sy).toBeGreaterThan(1.1);
+		expect(up.sy).toBeLessThan(1.25);
+		expect(up.sx * Math.sqrt(up.sy)).toBeCloseTo(1);
+		const down = headPose(grab, base, { x: 0, y: 12 });
+		expect(down.sy).toBeLessThan(0.9);
+		expect(down.sx).toBeGreaterThan(1);
 	});
 
-	it('turns rather than skews a head pulled sideways', () => {
-		const [a, b, , d] = headWarp({ x: 0, y: -100 }, { x: 60, y: 0 });
-		// A pure rotation has a = d and b = -c; a pure skew would leave a = 1 and b = 0.
-		expect(b).toBeGreaterThan(0.2);
-		expect(Math.abs(a - d)).toBeLessThan(0.1);
+	it('lifts the head off its seat when pulled up, onto a neck', () => {
+		expect(headPose(grab, base, { x: 0, y: -80 }).y).toBeLessThan(-20);
+	});
+});
+
+describe('resolveGrab', () => {
+	it('defaults both to 1', () => {
+		expect(resolveGrab(undefined)).toEqual(DEFAULT_GRAB);
+		expect(resolveGrab({})).toEqual({ follow: 1, lean: 1 });
 	});
 
-	it('only stretches a head pulled straight out', () => {
-		const [a, b, c, d] = headWarp({ x: 0, y: -100 }, { x: 0, y: -50 });
-		expect(a).toBeCloseTo(1);
-		expect(b).toBeCloseTo(0);
-		expect(c).toBeCloseTo(0);
-		expect(d).toBeCloseTo(1.5);
+	it('clamps follow to 0..1 and lean to 0..3', () => {
+		expect(resolveGrab({ follow: 2, lean: 9 })).toEqual({ follow: 1, lean: 3 });
+		expect(resolveGrab({ follow: -1, lean: -1 })).toEqual({ follow: 0, lean: 0 });
+		expect(resolveGrab({ follow: 0.4 })).toEqual({ follow: 0.4, lean: 1 });
 	});
 });
 

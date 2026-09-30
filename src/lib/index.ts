@@ -7,8 +7,8 @@ export { BUILD_DEFS } from './parts/body.js';
 export type { BuildDef } from './parts/body.js';
 export { REACTIONS, DEFAULT_REACTIONS, resolveReactions } from './interaction.js';
 export type { Reaction, ReactionEvent, ReactionsInput } from './interaction.js';
-export { GRAB_PARTS } from './grab.js';
-export type { GrabPart } from './grab.js';
+export { GRAB_PARTS, DEFAULT_GRAB, resolveGrab } from './grab.js';
+export type { GrabOptions, GrabPart } from './grab.js';
 export { MOODS, SHAPES, EYE_STYLES, ACCESSORIES, OUTFITS, SHOES, BUILDS } from './types.js';
 export type {
 	Accessory,

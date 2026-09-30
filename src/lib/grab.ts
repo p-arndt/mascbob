@@ -11,11 +11,8 @@ export interface Point {
 }
 
 export const GRAB_LIMITS = {
-	/**
-	 * How far the grabbed point of the head follows the pointer, in multiples of its distance
-	 * from the neck: pulled out, pushed in toward the neck, and sideways.
-	 */
-	head: { out: 1, in: 0.35, side: 1.3 },
+	/** ViewBox units the grabbed spot of the head follows the pointer: sideways, up and down. */
+	head: { side: 90, up: 120, down: 14 },
 	/** How many times its own length an arm stretches at most. */
 	arm: 2.6,
 	/** Degrees a leg swings outward, and inward across the other one. */
@@ -100,61 +97,76 @@ export function reachArm(
 	return { a1: prev.a1 + wrap(pick.a1 - prev.a1), a2: pick.a2, stretch };
 }
 
-/**
- * Where the grabbed point of the head goes when pulled from `from` to `to`, as an offset
- * from `from`: it follows the pointer in any direction, one to one at first, then with
- * rubbery resistance. Pushing toward the neck (`pivot`) gives in least, so the head never
- * folds over onto itself.
- */
-export function pullHead(pivot: Point, from: Point, to: Point): Point {
-	const ux = from.x - pivot.x;
-	const uy = from.y - pivot.y;
-	// A grab close to the neck would otherwise turn every pixel into a huge deformation.
-	const r = Math.max(Math.hypot(ux, uy), 50);
-	const len = Math.hypot(ux, uy) || 1;
-	// Unit vectors along the neck-to-grab line and across it.
-	const ax = ux / len;
-	const ay = uy / len;
-	const dx = to.x - from.x;
-	const dy = to.y - from.y;
-	const { head } = GRAB_LIMITS;
-	const along = rubber2(dx * ax + dy * ay, head.in * r, head.out * r);
-	const across = rubber(-dx * ay + dy * ax, head.side * r);
-	return { x: along * ax - across * ay, y: along * ay + across * ax };
+/** How a grabbed figure responds to being pulled; see the `grab` prop. */
+export interface GrabOptions {
+	/** 0..1, how far a grabbed head follows the pointer. 1 keeps the grabbed spot under it. */
+	follow?: number;
+	/** How far the figure leans into a pull: 0 keeps it upright, 2 leans twice as far. */
+	lean?: number;
 }
 
-/** Share of the pull's swing around the neck that turns the head rigidly; the rest bends it. */
-const HEAD_TURN = 0.6;
+export const DEFAULT_GRAB: Required<GrabOptions> = { follow: 1, lean: 1 };
+
+/** Fills in defaults and clamps `follow` to 0..1 and `lean` to 0..3. */
+export function resolveGrab(input: GrabOptions | undefined): Required<GrabOptions> {
+	const num = (v: number | undefined, fallback: number) =>
+		typeof v === 'number' && Number.isFinite(v) ? v : fallback;
+	return {
+		follow: clamp(num(input?.follow, DEFAULT_GRAB.follow), 0, 1),
+		lean: clamp(num(input?.lean, DEFAULT_GRAB.lean), 0, 3)
+	};
+}
 
 /**
- * The linear map, anchored at the neck, that carries the grab offset `grab` (from the neck)
- * along by `pull`, so the grabbed spot stays under the pointer. Most of a swing around the
- * neck turns the head as a whole and only the remainder shears or stretches it: a pure
- * shear would slant the face like a parallelogram. The neck always holds.
- * Returned as SVG `matrix(a b c d 0 0)` entries.
+ * Where the grabbed spot of the head goes when pulled from `from` to `to`, as an offset
+ * from `from`: one to one at first, then with rubbery resistance. Up and to the sides it
+ * goes far on a stretching neck; down it barely gives, since the body is in the way.
+ * `follow` below 1 makes the head stiffer: it only goes that fraction of the way.
  */
-export function headWarp(grab: Point, pull: Point): [number, number, number, number] {
-	const q = grab.x ** 2 + grab.y ** 2 || 1;
-	const to = { x: grab.x + pull.x, y: grab.y + pull.y };
-	const r = (swing({ x: 0, y: 0 }, grab, to) * HEAD_TURN * Math.PI) / 180;
+export function pullHead(from: Point, to: Point, follow = 1): Point {
+	const { head } = GRAB_LIMITS;
+	return {
+		x: rubber(to.x - from.x, head.side) * follow,
+		y: rubber2(to.y - from.y, head.up, head.down) * follow
+	};
+}
+
+/**
+ * A pulled head: moved by (`x`, `y`) on its neck, tilted `tilt` degrees around its base and
+ * scaled by `sx`/`sy` from it. Apply as
+ * `translate(x y) rotate(tilt bx by) translate(bx by) scale(sx sy) translate(-bx -by)`.
+ */
+export interface HeadPose {
+	x: number;
+	y: number;
+	tilt: number;
+	sx: number;
+	sy: number;
+}
+
+/**
+ * How a head with its base at `base`, grabbed at `grab`, carries the pull `pull`. It stays
+ * a head: it tilts into the pull, stretches a little when pulled up and squashes when pushed
+ * down, and otherwise moves as a whole on its neck, so the face never skews. The move is
+ * solved so the grabbed spot lands exactly at `grab + pull`.
+ */
+export function headPose(grab: Point, base: Point, pull: Point): HeadPose {
+	const tilt = rubber(pull.x * 0.35, 28);
+	const sy = pull.y < 0 ? 1 + rubber(-pull.y / 250, 0.25) : 1 - rubber(pull.y / 60, 0.15);
+	// Squash and stretch keep the head's volume.
+	const sx = 1 / Math.sqrt(sy);
+	const gx = (grab.x - base.x) * sx;
+	const gy = (grab.y - base.y) * sy;
+	const r = (tilt * Math.PI) / 180;
 	const cos = Math.cos(r);
 	const sin = Math.sin(r);
-	// Where the turn alone would take the grabbed spot; the rank-one term covers the rest.
-	const gx = grab.x * cos - grab.y * sin;
-	const gy = grab.x * sin + grab.y * cos;
-	const dx = to.x - gx;
-	const dy = to.y - gy;
-	// (I + d·gᵀ/|g|²)·R, with g the turned grab offset; |g| equals |grab|.
-	const m11 = 1 + (dx * gx) / q;
-	const m12 = (dx * gy) / q;
-	const m21 = (dy * gx) / q;
-	const m22 = 1 + (dy * gy) / q;
-	return [
-		m11 * cos + m12 * sin,
-		m21 * cos + m22 * sin,
-		-m11 * sin + m12 * cos,
-		-m21 * sin + m22 * cos
-	];
+	return {
+		x: grab.x - base.x + pull.x - (gx * cos - gy * sin),
+		y: grab.y - base.y + pull.y - (gx * sin + gy * cos),
+		tilt,
+		sx,
+		sy
+	};
 }
 
 /**

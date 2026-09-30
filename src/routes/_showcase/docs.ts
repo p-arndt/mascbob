@@ -118,6 +118,13 @@ export const PROPS: PropDoc[] = [
 			'Pointer reactions. `true` enables the defaults, a list enables exactly those, an object toggles single ones, e.g. `{ grab: false }`.'
 	},
 	{
+		name: 'grab',
+		type: '{ follow?: number; lean?: number }',
+		default: '{ follow: 1, lean: 1 }',
+		description:
+			'How the `grab` reaction feels: `follow` (0..1) is how far a grabbed head follows the pointer, `lean` (0..3) how far the figure leans into a pull.'
+	},
+	{
 		name: 'onreaction',
 		type: '(event: ReactionEvent) => void',
 		default: '–',

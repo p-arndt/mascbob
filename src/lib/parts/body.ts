@@ -290,17 +290,24 @@ export function torsoOuterWidth(hw: number, b: BuildDef = STANDARD): number {
 	return hw * Math.max(t.shoulder, t.belly, t.hip);
 }
 
-/** Lower half of the capsule: sides from shoulder over the belly to the hips, rounded bottom. */
+/**
+ * Lower half of the capsule: sides from shoulder over the belly to the hips, rounded bottom.
+ * The head normally hides the top; the shoulders are rounded for when it is pulled up off it.
+ */
 export function torsoPath(hw: number, b: BuildDef = STANDARD): string {
 	const t = b.torso;
 	const top = b.torsoTop;
+	const round = Math.min(hw * t.shoulder * 0.4, 16);
+	const shoulders = (l: number, r: number) =>
+		`M${l} ${top + round}Q${l} ${top} ${l + round} ${top}L${r - round} ${top}Q${r} ${top} ${r} ${top + round}`;
 	const hip = b.hipY;
 	const end = hip - t.round;
 	if (t.shoulder === 1 && t.belly === 1 && t.hip === 1) {
 		const l = 100 - hw;
 		const r = 100 + hw;
 		return (
-			`M${l} ${top}L${r} ${top}L${r} ${end}` +
+			shoulders(l, r) +
+			`L${r} ${end}` +
 			`C${r} ${hip - (t.round * 4) / 13} ${100 + hw * t.base} ${hip} 100 ${hip}` +
 			`C${100 - hw * t.base} ${hip} ${l} ${hip - (t.round * 4) / 13} ${l} ${end}Z`
 		);
@@ -318,10 +325,10 @@ export function torsoPath(hw: number, b: BuildDef = STANDARD): string {
 			`C${100 + k * m} ${t.bellyY + lower} ${100 + k * h} ${end - lower} ${100 + k * h} ${end}`,
 		up:
 			`C${100 + k * h} ${end - lower} ${100 + k * m} ${t.bellyY + lower} ${100 + k * m} ${t.bellyY}` +
-			`C${100 + k * m} ${t.bellyY - upper} ${100 + k * s} ${top + upper} ${100 + k * s} ${top}`
+			`C${100 + k * m} ${t.bellyY - upper} ${100 + k * s} ${top + upper} ${100 + k * s} ${top + round}`
 	});
 	return (
-		`M${100 - s} ${top}L${100 + s} ${top}` +
+		shoulders(100 - s, 100 + s) +
 		side(1).down +
 		`C${100 + h} ${hip - (t.round * 4) / 13} ${100 + h * t.base} ${hip} 100 ${hip}` +
 		`C${100 - h * t.base} ${hip} ${100 - h} ${hip - (t.round * 4) / 13} ${100 - h} ${end}` +

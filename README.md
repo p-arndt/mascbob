@@ -106,30 +106,31 @@ every option or to build your own pickers:
 import { MOODS, SHAPES, EYE_STYLES, ACCESSORIES, OUTFITS, SHOES, BUILDS, THEMES } from 'mascbob';
 ```
 
-| Prop          | Type                                                                                                           | Default    |
-| ------------- | -------------------------------------------------------------------------------------------------------------- | ---------- |
-| `mood`        | one of `MOODS`                                                                                                 | `idle`     |
-| `theme`       | a key of `THEMES`, or `{ base?, bodyLight, bodyMid, bodyDark, visor, eye, cheek, accent }`                     | `og`       |
-| `shape`       | one of `SHAPES` (head silhouette)                                                                              | `capsule`  |
-| `eyes`        | one of `EYE_STYLES`                                                                                            | `round`    |
-| `accessories` | array of `ACCESSORIES`                                                                                         | `[]`       |
-| `body`        | full figure with arms and legs, 2:3 (`size` is the width); `false` shows just the head                         | `true`     |
-| `outfit`      | one of `OUTFITS`; only visible with `body`                                                                     | `none`     |
-| `shoes`       | one of `SHOES`; only visible with `body`                                                                       | `none`     |
-| `build`       | one of `BUILDS` (`standard`, `chubby`, `lanky`, `chibi`, `blob`); only visible with `body`                     | `standard` |
-| `hands`       | floating hands that gesture with the mood (head-only mode)                                                     | `true`     |
-| `lookAt`      | `pointer` `wander` `none` or `{ x, y }` in -1..1                                                               | `pointer`  |
-| `level`       | mouth opening 0..1 while `talking` (e.g. mic amplitude); omit for automatic lip movement                       | –          |
-| `size`        | px number or any CSS length                                                                                    | `160`      |
-| `float`       | idle hover animation (head-only mode; the full figure stands)                                                  | `true`     |
-| `effects`     | particles around the head: mood effects (sparkles, hearts, zzz) and boop bursts                                | `true`     |
-| `motion`      | `auto` (respects `prefers-reduced-motion`), `full`, `reduced`                                                  | `auto`     |
-| `interactive` | render as a button that reacts to clicks                                                                       | `true`     |
-| `reactions`   | pointer reactions: `true` (defaults), `false`, a list of `REACTIONS`, or `{ shy: true, bored: false }`         | `true`     |
-| `label`       | accessible name                                                                                                | `Mascbob`  |
-| `onboop`      | click/tap handler                                                                                              | –          |
-| `onreaction`  | called with a `ReactionEvent` (`pet`, `startle`, `dizzy`, `shy`, `tickle`, `explode`, `grab`, `bored`, `wake`) | –          |
-| `accessory`   | snippet `({ top, halfWidth })` drawing custom SVG in the head's 200×200 viewBox                                | –          |
+| Prop          | Type                                                                                                           | Default                  |
+| ------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| `mood`        | one of `MOODS`                                                                                                 | `idle`                   |
+| `theme`       | a key of `THEMES`, or `{ base?, bodyLight, bodyMid, bodyDark, visor, eye, cheek, accent }`                     | `og`                     |
+| `shape`       | one of `SHAPES` (head silhouette)                                                                              | `capsule`                |
+| `eyes`        | one of `EYE_STYLES`                                                                                            | `round`                  |
+| `accessories` | array of `ACCESSORIES`                                                                                         | `[]`                     |
+| `body`        | full figure with arms and legs, 2:3 (`size` is the width); `false` shows just the head                         | `true`                   |
+| `outfit`      | one of `OUTFITS`; only visible with `body`                                                                     | `none`                   |
+| `shoes`       | one of `SHOES`; only visible with `body`                                                                       | `none`                   |
+| `build`       | one of `BUILDS` (`standard`, `chubby`, `lanky`, `chibi`, `blob`); only visible with `body`                     | `standard`               |
+| `hands`       | floating hands that gesture with the mood (head-only mode)                                                     | `true`                   |
+| `lookAt`      | `pointer` `wander` `none` or `{ x, y }` in -1..1                                                               | `pointer`                |
+| `level`       | mouth opening 0..1 while `talking` (e.g. mic amplitude); omit for automatic lip movement                       | –                        |
+| `size`        | px number or any CSS length                                                                                    | `160`                    |
+| `float`       | idle hover animation (head-only mode; the full figure stands)                                                  | `true`                   |
+| `effects`     | particles around the head: mood effects (sparkles, hearts, zzz) and boop bursts                                | `true`                   |
+| `motion`      | `auto` (respects `prefers-reduced-motion`), `full`, `reduced`                                                  | `auto`                   |
+| `interactive` | render as a button that reacts to clicks                                                                       | `true`                   |
+| `reactions`   | pointer reactions: `true` (defaults), `false`, a list of `REACTIONS`, or `{ shy: true, bored: false }`         | `true`                   |
+| `grab`        | how grabbing feels: `{ follow, lean }`, `follow` 0..1 (how far the head follows), `lean` 0..3 (body lean)      | `{ follow: 1, lean: 1 }` |
+| `label`       | accessible name                                                                                                | `Mascbob`                |
+| `onboop`      | click/tap handler                                                                                              | –                        |
+| `onreaction`  | called with a `ReactionEvent` (`pet`, `startle`, `dizzy`, `shy`, `tickle`, `explode`, `grab`, `bored`, `wake`) | –                        |
+| `accessory`   | snippet `({ top, halfWidth })` drawing custom SVG in the head's 200×200 viewBox                                | –                        |
 
 ## Styling with CSS
 

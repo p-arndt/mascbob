@@ -18,10 +18,11 @@
 	import {
 		RELEASE_SPRING,
 		drag,
-		headWarp,
+		headPose,
 		pullHead,
-		swing,
+		resolveGrab,
 		tune,
+		type GrabOptions,
 		type GrabPart,
 		type Point
 	} from './grab.js';
@@ -76,6 +77,11 @@
 		 */
 		reactions?: ReactionsInput;
 		/**
+		 * How the `grab` reaction feels: `follow` (0..1) is how far a grabbed head follows the
+		 * pointer, `lean` how far the figure leans into a pull (0 keeps it upright). Both default to 1.
+		 */
+		grab?: GrabOptions;
+		/**
 		 * Fires when a reaction triggers: `pet` (hearts), `startle`, `dizzy`, `shy`, `tickle`,
 		 * `explode`, `bored`, `wake`, `grab` (a part was grabbed).
 		 */
@@ -106,6 +112,7 @@
 		label = 'Mascbob',
 		onboop,
 		reactions = true,
+		grab: grabOptions,
 		onreaction,
 		accessory,
 		class: className = ''
@@ -185,8 +192,8 @@
 	const yawnMouth = new Tween(0);
 	/** Head bend (degrees) and stretch while pulled; loose, so letting go rings out as a jelly wobble. */
 	const headPull = new Spring({ x: 0, y: 0 }, RELEASE_SPRING);
-	/** Where the head was grabbed, relative to the neck; the pull warps the head around it. */
-	let headGrab = $state<Point>({ x: 0, y: -100 });
+	/** Where the head was grabbed; the pull is solved so this spot stays under the pointer. */
+	let headGrab = $state<Point>({ x: 100, y: 60 });
 
 	let root = $state<HTMLElement>();
 	// Offscreen mascots pause their timers, pointer tracking and CSS loops: a page full of them stays smooth.
@@ -611,7 +618,8 @@
 		if (instant) return;
 		tugFrom ??= x;
 		clearTimeout(wobbleTimer);
-		wobble.target = clamp((x - tugFrom) * 0.05, -5, 5);
+		const { lean } = grabFeel;
+		wobble.target = clamp((x - tugFrom) * 0.05 * lean, -5 * lean, 5 * lean);
 	}
 
 	function release() {
@@ -626,15 +634,14 @@
 	let tiltFrame = $state<SVGGElement>();
 	function grabHead(e: PointerEvent) {
 		if (!canGrab) return;
-		const pivot = { x: 100, y: neckY };
 		drag(e, {
 			frame: () => tiltFrame,
 			start: (from) => {
 				if (!grab('head')) return false;
 				tune(headPull, true);
-				headGrab = { x: from.x - pivot.x, y: from.y - pivot.y };
+				headGrab = from;
 			},
-			move: (to, from) => headPull.set(pullHead(pivot, from, to), { instant: reduced }),
+			move: (to, from) => headPull.set(pullHead(from, to, grabFeel.follow), { instant: reduced }),
 			end: () => {
 				tune(headPull, false);
 				headPull.set({ x: 0, y: 0 }, { instant: reduced });
@@ -676,6 +683,7 @@
 	});
 	const reactionFlags = $derived(resolveReactions(reactions));
 	const canGrab = $derived(interactive && reactionFlags.grab);
+	const grabFeel = $derived(resolveGrab(grabOptions));
 	// Reactions need `interactive`; without it nothing could wake a dozing figure.
 	const NO_REACTIONS = resolveReactions(false);
 	$effect(() => {
@@ -780,15 +788,15 @@
 	const headSx = $derived(body ? 1 + (hsx - 1) * 0.7 : hsx);
 	const headSy = $derived(body ? 1 + (hsy - 1) * 0.7 : hsy);
 	const pull = $derived(headPull.current);
-	const warp = $derived(headWarp(headGrab, pull).join(' '));
-	/** Degrees the pull swings the grabbed spot around the neck, for the torso and dangling parts. */
-	const pullTurn = $derived(
-		pull.x || pull.y
-			? swing({ x: 0, y: 0 }, headGrab, { x: headGrab.x + pull.x, y: headGrab.y + pull.y })
-			: 0
-	);
+	const headBase = $derived({ x: 100, y: head.bottom + headY });
+	const pose = $derived(headPose(headGrab, headBase, pull));
+	const pullTurn = $derived(pose.tilt);
+	// A neck shows once the head is pulled off its seat: from inside the torso up into the head.
+	const neckTop = $derived({ x: 100 + pose.x, y: headBase.y - 16 + pose.y });
+	const neckOut = $derived(Math.hypot(pose.x, pose.y));
+	const neckWidth = $derived(Math.min(hw * 0.6, 32) / Math.sqrt(1 + neckOut / 60));
 	// The torso follows a pulled head a little, like a neck tugging at its shoulders.
-	const torsoTurn = $derived(headTurn.current * 0.45 + pullTurn * 0.25);
+	const torsoTurn = $derived(headTurn.current * 0.45 + pullTurn * 0.25 * grabFeel.lean);
 	// In full-body mode the legs take some of the squash so the head doesn't sink into the torso.
 	const figureSquash = $derived(
 		body
@@ -973,8 +981,23 @@
 									<Body layer="back" />
 								</g>
 							{/if}
-							<!-- A pulled head warps around the neck, so the grabbed spot stays under the pointer. -->
-							<g transform="translate(100 {neckY}) matrix({warp} 0 0) translate(-100 {-neckY})">
+							{#if body && neckOut > 0.5}
+								<path
+									class="neck-edge"
+									d="M100 {fig.torsoTop + 14}L{neckTop.x} {neckTop.y}"
+									stroke-width={neckWidth + 1.6}
+								/>
+								<path
+									class="neck"
+									d="M100 {fig.torsoTop + 14}L{neckTop.x} {neckTop.y}"
+									stroke-width={neckWidth}
+								/>
+							{/if}
+							<!-- A pulled head moves as a whole on its neck and only tilts and squashes a little,
+							     so the face never skews. -->
+							<g
+								transform="translate({pose.x} {pose.y}) rotate({pose.tilt} {headBase.x} {headBase.y}) translate({headBase.x} {headBase.y}) scale({pose.sx} {pose.sy}) translate({-headBase.x} {-headBase.y})"
+							>
 								<g
 									transform="rotate({headTurn.current +
 										headDrag} 100 {neckY}) translate(0 {headDrop})"
@@ -1094,6 +1117,18 @@
 	button.mascbob {
 		cursor: pointer;
 		border-radius: 50%;
+	}
+	.neck,
+	.neck-edge {
+		fill: none;
+		stroke-linecap: round;
+	}
+	.neck {
+		stroke: var(--c-body-mid);
+	}
+	.neck-edge {
+		stroke: var(--c-visor);
+		opacity: 0.14;
 	}
 	.grabbable {
 		cursor: grab;
