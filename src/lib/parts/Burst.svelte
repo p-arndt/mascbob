@@ -2,9 +2,12 @@
 	import { untrack } from 'svelte';
 	import { getMascot } from '../context.js';
 	import { HEART_PATH, SPARKLE_PATH } from '../geometry.js';
-	import { BURST_LIFETIME, boopBurst, confettiPop, type Particle } from './effects.js';
+	import { boopBurst, confettiPop, headBlast, type Particle } from './effects.js';
 
-	/** One-shot particle bursts: on every boop, and a confetti pop when the mood turns happy. */
+	/**
+	 * One-shot particle bursts: on every boop, a confetti pop when the mood turns happy, and
+	 * the head blast when it explodes.
+	 */
 	const m = getMascot();
 
 	interface Shot {
@@ -21,29 +24,37 @@
 	function spawn(particles: Particle[], ring: boolean) {
 		const id = nextId++;
 		shots.push({ id, particles, ring });
+		const lifetime = Math.max(...particles.map((p) => p.delay + p.duration));
 		const timer = setTimeout(() => {
 			timers = timers.filter((t) => t !== timer);
 			shots = shots.filter((s) => s.id !== id);
-		}, BURST_LIFETIME + 150);
+		}, lifetime + 150);
 		timers.push(timer);
 	}
 
 	let lastBoops = m.boops;
 	let lastMood = m.mood;
+	let lastReaction = m.reaction;
 	const CHEERFUL = ['happy', 'love'];
 
 	$effect(() => {
 		const boops = m.boops;
 		const mood = m.mood;
+		const reaction = m.reaction;
 		const reduced = m.reduced;
 		untrack(() => {
 			const booped = boops > lastBoops;
 			const cheered = CHEERFUL.includes(mood) && !CHEERFUL.includes(lastMood);
+			const blasted = reaction === 'explode' && lastReaction !== 'explode';
 			lastBoops = boops;
 			lastMood = mood;
+			lastReaction = reaction;
 			if (reduced) return;
+			if (blasted) spawn(headBlast(m.shape), true);
+			// No head to pop stars out of while it is blown apart.
+			else if (reaction === 'explode') return;
 			// A boop switches the mood to happy too; one celebration is enough.
-			if (booped) spawn(boopBurst(m.shape), true);
+			else if (booped) spawn(boopBurst(m.shape), true);
 			else if (cheered) spawn(confettiPop(m.shape), false);
 		});
 	});
@@ -138,6 +149,11 @@
 	}
 	.tone-light {
 		fill: #fff;
+	}
+	.tone-body {
+		fill: var(--c-body-mid);
+		stroke: var(--c-visor);
+		stroke-width: 0.08;
 	}
 	.shock {
 		fill: none;

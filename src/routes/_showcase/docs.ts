@@ -140,6 +140,8 @@ export const REACTION_DOCS: Record<string, string> = {
 	dizzy: 'Circle around it twice. Emits `{ type: "dizzy", direction }`.',
 	shy: 'Get really close. Emits `{ type: "shy" }`.',
 	tickle: 'Boop it again and again. Emits `{ type: "tickle", level, boops }`.',
+	explode:
+		'Keep booping once it is grumpy and its head bursts into confetti. Needs `tickle`. Emits `explode`.',
 	bored: 'Leave the mouse alone for 20 s. Emits `bored`, then `wake` when you come back.'
 };
 

@@ -53,8 +53,9 @@ pnpm add mascbob
 ```
 
 It reacts to the pointer: its head tilts toward the cursor, stroke over its head to pet it, circle around it to make it dizzy,
-boop it over and over to tickle it, or leave it alone until it gets bored. `follow`, `pet`,
-`dizzy`, `tickle` and `bored` are on by default; `startle` and `shy` are opt-in:
+boop it over and over to tickle it (keep going once it's grumpy and its head bursts into confetti),
+or leave it alone until it gets bored. `follow`, `pet`, `dizzy`, `tickle`, `explode` and `bored` are on by
+default; `startle` and `shy` are opt-in:
 
 ```svelte
 <Mascot reactions={['pet', 'shy', 'startle']} onreaction={(e) => console.log(e.type)} />
@@ -125,7 +126,7 @@ import { MOODS, SHAPES, EYE_STYLES, ACCESSORIES, OUTFITS, SHOES, BUILDS, THEMES 
 | `reactions`   | pointer reactions: `true` (defaults), `false`, a list of `REACTIONS`, or `{ shy: true, bored: false }` | `true`     |
 | `label`       | accessible name                                                                                        | `Mascbob`  |
 | `onboop`      | click/tap handler                                                                                      | –          |
-| `onreaction`  | called with a `ReactionEvent` (`pet`, `startle`, `dizzy`, `shy`, `tickle`, `bored`, `wake`)            | –          |
+| `onreaction`  | called with a `ReactionEvent` (`pet`, `startle`, `dizzy`, `shy`, `tickle`, `explode`, `bored`, `wake`) | –          |
 | `accessory`   | snippet `({ top, halfWidth })` drawing custom SVG in the head's 200×200 viewBox                        | –          |
 
 ## Styling with CSS

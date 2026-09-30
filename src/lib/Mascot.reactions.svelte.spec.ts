@@ -55,6 +55,17 @@ describe('Mascot reactions', () => {
 		expect(onreaction).not.toHaveBeenCalled();
 	});
 
+	it('bursts its head into confetti when booped on while grumpy', async () => {
+		const { el, onreaction } = setup();
+		for (let i = 0; i < 14; i++) el.click();
+		expect(onreaction).toHaveBeenLastCalledWith({ type: 'explode' });
+		await expect.element(el.querySelector('.blast') as SVGElement).toHaveClass('blasting');
+		expect(el.querySelectorAll('.pp').length).toBeGreaterThanOrEqual(34);
+		await expect
+			.element(el.querySelector('.blast') as SVGElement, { timeout: 3000 })
+			.not.toHaveClass('blasting');
+	});
+
 	it('turns all reactions off with false', async () => {
 		const { el, onreaction } = setup(false);
 		await petHead(el, 8);

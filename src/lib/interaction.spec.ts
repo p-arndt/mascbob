@@ -317,6 +317,34 @@ describe('ReactionController', () => {
 		expect(events.map((e) => e.type)).toEqual(['tickle', 'tickle']);
 	});
 
+	const sulk = (controller: ReactionController) => {
+		for (let i = 0; i < 9; i++) controller.boop(Date.now() + i * 100);
+	};
+
+	it('blows its head after more boops while grumpy', () => {
+		const { controller, shown, events, host } = setup();
+		sulk(controller);
+		for (let i = 1; i < REACTION_TIMING.boopsToExplode; i++) controller.boop();
+		expect(shown.at(-1)).toEqual({ name: 'tickle', mood: 'grumpy' });
+		controller.boop();
+		expect(shown.at(-1)).toEqual({ name: 'explode', mood: 'surprised' });
+		expect(events.at(-1)).toEqual({ type: 'explode' });
+		expect(host.jump).toHaveBeenCalled();
+		// Boops while blown apart neither extend nor restart it.
+		controller.boop();
+		vi.advanceTimersByTime(REACTION_TIMING.explode);
+		expect(shown.at(-1)).toBeNull();
+		expect(events.filter((e) => e.type === 'explode')).toHaveLength(1);
+	});
+
+	it('only sulks longer when explode is disabled', () => {
+		const { controller, shown, events } = setup({ explode: false });
+		sulk(controller);
+		for (let i = 0; i < 12; i++) controller.boop();
+		expect(shown.at(-1)).toEqual({ name: 'tickle', mood: 'grumpy' });
+		expect(events.map((e) => e.type)).toEqual(['tickle', 'tickle']);
+	});
+
 	it('drops everything on destroy', () => {
 		const { controller, shown, at } = setup();
 		pet(at, 4);

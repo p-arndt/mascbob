@@ -159,6 +159,7 @@
 		dizzy: 'circle around it twice',
 		shy: 'get really close',
 		tickle: 'boop it again and again',
+		explode: 'keep booping once it is grumpy',
 		bored: 'leave the mouse alone for 20 s'
 	};
 
@@ -181,6 +182,8 @@
 				return 'feeling shy';
 			case 'tickle':
 				return e.level === 'giggle' ? 'giggles' : 'had enough';
+			case 'explode':
+				return 'boom!';
 			case 'bored':
 				return 'bored';
 			case 'wake':

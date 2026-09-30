@@ -869,12 +869,14 @@
 									transform="translate(100 {head.bottom + headY}) scale({headSx *
 										headScale} {headSy * headScale}) translate(-100 {-head.bottom})"
 								>
-									<g class="breathe" class:lift={body}>
-										<Accessories layer="back" />
-										<Shell />
-										<Face />
-										<Accessories layer="front" />
-										{@render accessory?.({ top: t, halfWidth: hw })}
+									<g class="blast" class:blasting={reaction?.name === 'explode'}>
+										<g class="breathe" class:lift={body}>
+											<Accessories layer="back" />
+											<Shell />
+											<Face />
+											<Accessories layer="front" />
+											{@render accessory?.({ top: t, halfWidth: hw })}
+										</g>
 									</g>
 								</g>
 							</g>
@@ -1000,6 +1002,7 @@
 
 	/* Transform-origin in SVG only means something relative to the element's own box. */
 	.float,
+	.blast,
 	.breathe,
 	.shadow,
 	.contact,
@@ -1034,6 +1037,11 @@
 	.breathe.lift {
 		animation-name: breathe-lift;
 	}
+	/* Swells, bursts (the confetti in Burst.svelte takes over), then pops back in; the length
+	   matches REACTION_TIMING.explode. */
+	.blasting {
+		animation: blast 1.7s linear both;
+	}
 	.no-float .float,
 	.no-float .shadow,
 	.no-float .contact,
@@ -1054,6 +1062,32 @@
 			opacity: 0;
 		}
 		40% {
+			opacity: 1;
+		}
+	}
+	@keyframes blast {
+		0% {
+			transform: scale(1);
+			opacity: 1;
+			animation-timing-function: cubic-bezier(0.3, 0, 0.7, 1);
+		}
+		7% {
+			transform: scale(1.18, 1.14);
+			opacity: 1;
+			animation-timing-function: cubic-bezier(0.6, 0, 1, 0.6);
+		}
+		10% {
+			transform: scale(1.35);
+			opacity: 0;
+		}
+		72% {
+			transform: scale(0.2);
+			opacity: 0;
+			animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+		}
+		88%,
+		100% {
+			transform: scale(1);
 			opacity: 1;
 		}
 	}

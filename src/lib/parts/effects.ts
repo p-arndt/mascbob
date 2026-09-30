@@ -1,5 +1,5 @@
 export type ParticleKind = 'star' | 'heart' | 'confetti' | 'dot';
-export type ParticleTone = 'accent' | 'cheek' | 'eye' | 'light';
+export type ParticleTone = 'accent' | 'cheek' | 'eye' | 'light' | 'body';
 
 /**
  * One particle of a one-shot burst. It starts at (`x`, `y`), drifts `dx`
@@ -82,6 +82,7 @@ export const BURST_LIFETIME = 1100;
 
 interface HeadBox {
 	top: number;
+	bottom: number;
 	halfWidth: number;
 }
 
@@ -121,6 +122,30 @@ export function confettiPop(head: HeadBox, rng?: () => number): Particle[] {
 		size: [3.5, 5.5],
 		duration: [800, 1000],
 		stagger: 90,
+		rng
+	});
+}
+
+/** Longest a particle from `headBlast` can live. */
+export const BLAST_LIFETIME = 1600;
+
+/** The head bursting: confetti and shell chips thrown all around from where the head was. */
+export function headBlast(head: HeadBox, rng?: () => number): Particle[] {
+	const cy = (head.top + head.bottom) / 2;
+	return burst({
+		cx: 100,
+		cy,
+		rx: head.halfWidth * 0.6,
+		ry: (head.bottom - head.top) * 0.3,
+		count: 34,
+		kinds: ['confetti', 'confetti', 'dot', 'star', 'confetti', 'heart'],
+		tones: ['accent', 'cheek', 'eye', 'light', 'body'],
+		arc: [-Math.PI * 1.5, Math.PI * 0.5],
+		reach: [36, 70],
+		gravity: [50, 80],
+		size: [4, 8],
+		duration: [1000, 1450],
+		stagger: 120,
 		rng
 	});
 }

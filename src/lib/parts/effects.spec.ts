@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { SHAPE_DEFS } from '../geometry.js';
 import {
+	BLAST_LIFETIME,
 	BURST_LIFETIME,
 	LOOPS,
 	WAVE_PERIOD,
 	boopBurst,
 	burst,
 	confettiPop,
+	headBlast,
 	mulberry32,
 	waveDelay
 } from './effects.js';
@@ -66,6 +68,15 @@ describe('presets', () => {
 			}
 		});
 	}
+
+	it('blasts all around the head within its lifetime', () => {
+		for (const shape of Object.values(SHAPE_DEFS)) {
+			const ps = headBlast(shape, mulberry32(4));
+			expect(ps.some((p) => p.dx < -20)).toBe(true);
+			expect(ps.some((p) => p.dx > 20)).toBe(true);
+			for (const p of ps) expect(p.delay + p.duration).toBeLessThanOrEqual(BLAST_LIFETIME);
+		}
+	});
 
 	it('uses the theme tones only', () => {
 		const tones = new Set(boopBurst(SHAPE_DEFS.orb, mulberry32(9)).map((p) => p.tone));

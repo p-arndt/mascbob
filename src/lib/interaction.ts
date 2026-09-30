@@ -9,17 +9,34 @@ import type { Mood } from './types.js';
  * - `dizzy`: circling the pointer around it twice makes its eyes roll and it wobble.
  * - `shy`: when the pointer gets very close it gets coy and leans away (until petted).
  * - `tickle`: rapid boops make it giggle; too many make it grumpy.
+ * - `explode`: booping on while it is grumpy makes its head burst into confetti and pop back.
  * - `bored`: left alone for a long while it yawns, droops and dozes off (only while `mood` is
  *   `idle`) and wakes up on the next interaction.
  */
 /** Degrees the head tilts toward a far-away pointer with `follow`. */
 export const FOLLOW_TILT = 7;
 
-export const REACTIONS = ['follow', 'pet', 'startle', 'dizzy', 'shy', 'tickle', 'bored'] as const;
+export const REACTIONS = [
+	'follow',
+	'pet',
+	'startle',
+	'dizzy',
+	'shy',
+	'tickle',
+	'explode',
+	'bored'
+] as const;
 export type Reaction = (typeof REACTIONS)[number];
 
 /** Startle and shy change the figure on their own accord, so they are opt-in. */
-export const DEFAULT_REACTIONS: readonly Reaction[] = ['follow', 'pet', 'dizzy', 'tickle', 'bored'];
+export const DEFAULT_REACTIONS: readonly Reaction[] = [
+	'follow',
+	'pet',
+	'dizzy',
+	'tickle',
+	'explode',
+	'bored'
+];
 
 /**
  * `true` enables the defaults, `false` disables all, a list enables exactly those,
@@ -33,6 +50,7 @@ export type ReactionEvent =
 	| { type: 'dizzy'; direction: 1 | -1 }
 	| { type: 'shy' }
 	| { type: 'tickle'; level: 'giggle' | 'grumpy'; boops: number }
+	| { type: 'explode' }
 	| { type: 'bored' }
 	| { type: 'wake' };
 
@@ -310,6 +328,10 @@ export const REACTION_TIMING = {
 	dizzy: 1800,
 	giggle: 1100,
 	grumpy: 2600,
+	/** Boops on a grumpy mascot until its head bursts. */
+	boopsToExplode: 5,
+	/** The whole blast, head gone and back; matches the `blast` keyframes in Mascot.svelte. */
+	explode: 1700,
 	wake: 650
 } as const;
 
@@ -398,6 +420,7 @@ export class ReactionController {
 	private circle = new CircleDetector();
 	private flick = new FlickDetector();
 	private tickle = new TickleCounter();
+	private sulkBoops = 0;
 
 	private transient: ReactionState | null = null;
 	private transientTimer: ReturnType<typeof setTimeout> | undefined;
@@ -545,14 +568,18 @@ export class ReactionController {
 
 	boop(t = this.now()): void {
 		this.activity(t);
-		if (!this.flags.tickle) return;
-		const hit = this.tickle.boop(t);
-		if (!hit) {
-			// Boops don't cheer a grumpy mascot up, they prolong the sulk.
-			if (this.transient?.mood === 'grumpy') this.show(this.transient, REACTION_TIMING.grumpy);
+		if (!this.flags.tickle || this.transient?.name === 'explode') return;
+		if (this.transient?.mood === 'grumpy') {
+			// Boops don't cheer a grumpy mascot up, they prolong the sulk until it blows.
+			this.sulkBoops++;
+			if (this.flags.explode && this.sulkBoops >= REACTION_TIMING.boopsToExplode) this.explode();
+			else this.show(this.transient, REACTION_TIMING.grumpy);
 			return;
 		}
+		const hit = this.tickle.boop(t);
+		if (!hit) return;
 		if (hit.level === 'grumpy') {
+			this.sulkBoops = 0;
 			this.show({ name: 'tickle', mood: 'grumpy' }, REACTION_TIMING.grumpy);
 			this.host.wobble(-4);
 		} else {
@@ -576,6 +603,7 @@ export class ReactionController {
 		this.circle.reset();
 		this.flick.reset();
 		this.tickle.reset();
+		this.sulkBoops = 0;
 		this.setLean(0);
 		if (this.stage !== 'attentive') this.rouse();
 		this.refresh();
@@ -631,6 +659,14 @@ export class ReactionController {
 			this.host.look(Math.cos(a) * 0.9 * fade, Math.sin(a) * 0.7 * fade);
 			if (step % 4 === 0) this.host.wobble((step % 8 === 0 ? 6 : -6) * fade);
 		}, 80);
+	}
+
+	private explode() {
+		this.sulkBoops = 0;
+		this.tickle.reset();
+		this.show({ name: 'explode', mood: 'surprised' }, REACTION_TIMING.explode);
+		this.host.jump(8, 90);
+		this.host.emit({ type: 'explode' });
 	}
 
 	private shimmy() {
