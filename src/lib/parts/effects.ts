@@ -127,27 +127,42 @@ export function confettiPop(head: HeadBox, rng?: () => number): Particle[] {
 }
 
 /** Longest a particle from `headBlast` can live. */
-export const BLAST_LIFETIME = 1600;
+export const BLAST_LIFETIME = 2200;
 
-/** The head bursting: confetti and shell chips thrown all around from where the head was. */
+/** The head bursting: pieces flung all around, plus confetti thrown high that rains back down. */
 export function headBlast(head: HeadBox, rng?: () => number): Particle[] {
 	const cy = (head.top + head.bottom) / 2;
-	return burst({
-		cx: 100,
-		cy,
-		rx: head.halfWidth * 0.6,
-		ry: (head.bottom - head.top) * 0.3,
-		count: 34,
-		kinds: ['confetti', 'confetti', 'dot', 'star', 'confetti', 'heart'],
-		tones: ['accent', 'cheek', 'eye', 'light', 'body'],
-		arc: [-Math.PI * 1.5, Math.PI * 0.5],
-		reach: [36, 70],
-		gravity: [50, 80],
-		size: [4, 8],
-		duration: [1000, 1450],
-		stagger: 120,
-		rng
-	});
+	const common = { cx: 100, cy, rng };
+	return [
+		...burst({
+			...common,
+			rx: head.halfWidth * 0.3,
+			ry: (head.bottom - head.top) * 0.15,
+			count: 44,
+			kinds: ['confetti', 'confetti', 'dot', 'star', 'confetti', 'heart'],
+			tones: ['accent', 'cheek', 'eye', 'light', 'body'],
+			arc: [-Math.PI * 1.5, Math.PI * 0.5],
+			reach: [22, 95],
+			gravity: [60, 110],
+			size: [6, 11],
+			duration: [1200, 1700],
+			stagger: 60
+		}),
+		...burst({
+			...common,
+			rx: head.halfWidth * 0.3,
+			ry: 8,
+			count: 20,
+			kinds: ['confetti', 'confetti', 'dot'],
+			tones: ['accent', 'cheek', 'eye', 'light'],
+			arc: [-Math.PI * 0.85, -Math.PI * 0.15],
+			reach: [55, 95],
+			gravity: [120, 160],
+			size: [5, 7.5],
+			duration: [1700, 2000],
+			stagger: 200
+		})
+	];
 }
 
 /** Deterministic PRNG for tests and reproducible bursts. */

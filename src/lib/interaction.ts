@@ -330,8 +330,10 @@ export const REACTION_TIMING = {
 	grumpy: 2600,
 	/** Boops on a grumpy mascot until its head bursts. */
 	boopsToExplode: 5,
-	/** The whole blast, head gone and back; matches the `blast` keyframes in Mascot.svelte. */
-	explode: 1700,
+	/** The whole blast, fuse to head back in place; matches the `blast` keyframes in Mascot.svelte. */
+	explode: 2600,
+	/** Trembling and swelling before the head bursts; 25% of `explode`. */
+	explodeFuse: 650,
 	wake: 650
 } as const;
 
@@ -421,6 +423,7 @@ export class ReactionController {
 	private flick = new FlickDetector();
 	private tickle = new TickleCounter();
 	private sulkBoops = 0;
+	private blastTimer: ReturnType<typeof setTimeout> | undefined;
 
 	private transient: ReactionState | null = null;
 	private transientTimer: ReturnType<typeof setTimeout> | undefined;
@@ -594,9 +597,11 @@ export class ReactionController {
 		clearTimeout(this.transientTimer);
 		clearTimeout(this.petTimer);
 		clearTimeout(this.idleTimer);
+		clearTimeout(this.blastTimer);
 		clearInterval(this.rollTimer);
 		clearInterval(this.shimmyTimer);
 		this.transientTimer = this.petTimer = this.idleTimer = this.rollTimer = undefined;
+		this.blastTimer = undefined;
 		this.transient = null;
 		this.petting = this.shy = this.bored = this.holdsGaze = false;
 		this.pet.reset();
@@ -665,8 +670,14 @@ export class ReactionController {
 		this.sulkBoops = 0;
 		this.tickle.reset();
 		this.show({ name: 'explode', mood: 'surprised' }, REACTION_TIMING.explode);
-		this.host.jump(8, 90);
 		this.host.emit({ type: 'explode' });
+		clearTimeout(this.blastTimer);
+		// The recoil lands with the bang, not when the fuse starts.
+		this.blastTimer = setTimeout(() => {
+			this.blastTimer = undefined;
+			this.host.jump(10, 90);
+			this.host.wobble(this.random() < 0.5 ? -6 : 6);
+		}, REACTION_TIMING.explodeFuse);
 	}
 
 	private shimmy() {

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { getMascot } from '../context.js';
+	import { REACTION_TIMING } from '../interaction.js';
 	import { HEART_PATH, SPARKLE_PATH } from '../geometry.js';
 	import { boopBurst, confettiPop, headBlast, type Particle } from './effects.js';
 
@@ -50,7 +51,14 @@
 			lastMood = mood;
 			lastReaction = reaction;
 			if (reduced) return;
-			if (blasted) spawn(headBlast(m.shape), true);
+			if (blasted) {
+				// The head only bursts once its fuse has burnt down.
+				const timer = setTimeout(() => {
+					timers = timers.filter((t) => t !== timer);
+					spawn(headBlast(m.shape), true);
+				}, REACTION_TIMING.explodeFuse);
+				timers.push(timer);
+			}
 			// No head to pop stars out of while it is blown apart.
 			else if (reaction === 'explode') return;
 			// A boop switches the mood to happy too; one celebration is enough.

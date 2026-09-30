@@ -60,9 +60,13 @@ describe('Mascot reactions', () => {
 		for (let i = 0; i < 14; i++) el.click();
 		expect(onreaction).toHaveBeenLastCalledWith({ type: 'explode' });
 		await expect.element(el.querySelector('.blast') as SVGElement).toHaveClass('blasting');
-		expect(el.querySelectorAll('.pp').length).toBeGreaterThanOrEqual(34);
+		const blasted = () =>
+			[...el.querySelectorAll('.shot')].some((s) => s.querySelectorAll('.pp').length >= 64);
+		// The confetti only flies once the fuse has burnt down.
+		expect(blasted()).toBe(false);
+		await expect.poll(blasted).toBe(true);
 		await expect
-			.element(el.querySelector('.blast') as SVGElement, { timeout: 3000 })
+			.element(el.querySelector('.blast') as SVGElement, { timeout: 4000 })
 			.not.toHaveClass('blasting');
 	});
 

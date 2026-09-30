@@ -1037,10 +1037,10 @@
 	.breathe.lift {
 		animation-name: breathe-lift;
 	}
-	/* Swells, bursts (the confetti in Burst.svelte takes over), then pops back in; the length
-	   matches REACTION_TIMING.explode. */
+	/* Trembles and swells while the fuse burns (the first 25%, REACTION_TIMING.explodeFuse), bursts
+	   (Burst.svelte throws the confetti), then pops back in; the length is REACTION_TIMING.explode. */
 	.blasting {
-		animation: blast 1.7s linear both;
+		animation: blast 2.6s linear both;
 	}
 	.no-float .float,
 	.no-float .shadow,
@@ -1067,25 +1067,39 @@
 	}
 	@keyframes blast {
 		0% {
-			transform: scale(1);
+			transform: scale(1) rotate(0deg);
 			opacity: 1;
-			animation-timing-function: cubic-bezier(0.3, 0, 0.7, 1);
 		}
-		7% {
-			transform: scale(1.18, 1.14);
+		4% {
+			transform: scale(1.02) rotate(-2deg);
+		}
+		8% {
+			transform: scale(1.04) rotate(2deg);
+		}
+		12% {
+			transform: scale(1.07) rotate(-3deg);
+		}
+		16% {
+			transform: scale(1.1) rotate(3deg);
+		}
+		20% {
+			transform: scale(1.14, 1.1) rotate(-4deg);
+		}
+		23% {
+			transform: scale(1.2, 1.14) rotate(0deg);
 			opacity: 1;
 			animation-timing-function: cubic-bezier(0.6, 0, 1, 0.6);
 		}
-		10% {
-			transform: scale(1.35);
+		26% {
+			transform: scale(1.4);
 			opacity: 0;
 		}
-		72% {
-			transform: scale(0.2);
+		70% {
+			transform: scale(0.15);
 			opacity: 0;
 			animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
 		}
-		88%,
+		86%,
 		100% {
 			transform: scale(1);
 			opacity: 1;
