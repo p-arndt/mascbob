@@ -43,10 +43,22 @@ function setup(reactions?: ReactionsInput, grab?: GrabOptions) {
 		const [, sy] = num(/scale\(([-\d.e]+) ([-\d.e]+)\)/);
 		return { x, y, tilt, sy };
 	};
+	/** The upper body's bend at the hips: rotation and scale of everything above the legs. */
+	const bend = () => {
+		const t = head.parentElement!.parentElement!.parentElement!.getAttribute('transform') ?? '';
+		const [angle] = (/rotate\(([-\d.e]+)/.exec(t)?.slice(1) ?? []).map(Number);
+		const [sx, sy] = (/scale\(([-\d.e]+) ([-\d.e]+)\)/.exec(t)?.slice(1) ?? []).map(Number);
+		return { angle, sx, sy };
+	};
+	/** Degrees the whole figure, legs included, rocks on its feet. */
+	const rock = () => {
+		const g = el.querySelector('.stand > g');
+		return Number(/rotate\(([-\d.e]+)/.exec(g?.getAttribute('transform') ?? '')?.[1] ?? NaN);
+	};
 	/** Degrees the head tilts into a pull (positive: right). */
 	const angle = () => pose().tilt;
 	const stretch = () => pose().sy;
-	return { el, head, at, pose, angle, stretch, onreaction, onboop };
+	return { el, head, at, pose, angle, stretch, bend, rock, onreaction, onboop };
 }
 
 /** Grabs the top of the head and pulls it to the right. */
@@ -95,14 +107,12 @@ describe('Mascot grab', () => {
 		await expect.poll(() => Math.abs(angle()), { timeout: 4000 }).toBeLessThan(0.5);
 	});
 
-	it('leans the whole figure after a pull and rights it again on release', async () => {
-		const { el, at } = setup();
-		const rock = el.querySelector('.stand > g') as SVGGElement;
-		const lean = () =>
-			Number(/rotate\(([-\d.e]+)/.exec(rock.getAttribute('transform') ?? '')?.[1] ?? NaN);
+	it('bends the upper body after a pull and rights it again on release', async () => {
+		const { el, at, bend, rock } = setup();
+		const lean = () => bend().angle;
 		const squash = () =>
 			/scale\(([-\d.e]+) ([-\d.e]+)\)/
-				.exec(rock.firstElementChild?.getAttribute('transform') ?? '')
+				.exec(el.querySelector('.stand > g')?.firstElementChild?.getAttribute('transform') ?? '')
 				?.slice(1)
 				.map(Number) ?? [NaN, NaN];
 		await new Promise((r) => setTimeout(r, 700));
@@ -132,6 +142,8 @@ describe('Mascot grab', () => {
 		expect(Math.min(...widths)).toBeGreaterThan(0.998);
 		expect(squash()[0]).toBeCloseTo(1, 2);
 		await expect.poll(lean).toBeGreaterThan(1);
+		// Only the upper body goes along; the legs stay planted.
+		expect(Math.abs(rock())).toBeLessThan(0.5);
 		at('pointerup', 160, 60);
 		await expect.poll(() => Math.abs(lean()), { timeout: 4000 }).toBeLessThan(0.3);
 	});
@@ -168,9 +180,7 @@ describe('Mascot grab', () => {
 
 	it('tunes how far the head follows and the figure leans with the grab prop', async () => {
 		const stiff = setup(undefined, { follow: 0, lean: 0 });
-		const rock = stiff.el.querySelector('.stand > g') as SVGGElement;
-		const lean = () =>
-			Number(/rotate\(([-\d.e]+)/.exec(rock.getAttribute('transform') ?? '')?.[1] ?? NaN);
+		const lean = () => stiff.bend().angle;
 		await new Promise((r) => setTimeout(r, 700));
 		await pullRight(stiff.at);
 		window.dispatchEvent(
@@ -182,5 +192,34 @@ describe('Mascot grab', () => {
 		expect(Math.abs(stiff.pose().x)).toBeLessThan(0.5);
 		expect(Math.abs(stiff.angle())).toBeLessThan(0.5);
 		expect(Math.abs(lean())).toBeLessThan(0.5);
+	});
+
+	it('pulls the upper body along after the head, leaving the legs planted', async () => {
+		const { el, at, bend, rock } = setup();
+		await new Promise((r) => setTimeout(r, 700));
+		const rect = el.getBoundingClientRect();
+		const toWindow = (x: number, y: number) =>
+			window.dispatchEvent(
+				new PointerEvent('pointermove', {
+					pointerId: 1,
+					pointerType: 'mouse',
+					clientX: rect.left + (x / 200) * rect.width,
+					clientY: rect.top + (y / 300) * rect.height
+				})
+			);
+		at('pointerdown', 100, 60);
+		for (let k = 1; k <= 10; k++) {
+			at('pointermove', 100 + k * 10, 60 - k * 10);
+			toWindow(100 + k * 10, 60 - k * 10);
+			await frame();
+		}
+		// The torso bends at the hips toward the pointer and stretches up with the head.
+		await expect.poll(() => bend().angle).toBeGreaterThan(7);
+		await expect.poll(() => bend().sy).toBeGreaterThan(1.05);
+		expect(bend().sx).toBeLessThan(1);
+		expect(Math.abs(rock())).toBeLessThan(0.5);
+		at('pointerup', 200, -40);
+		await expect.poll(() => Math.abs(bend().angle), { timeout: 4000 }).toBeLessThan(0.3);
+		await expect.poll(() => bend().sy, { timeout: 4000 }).toBeCloseTo(1, 2);
 	});
 });

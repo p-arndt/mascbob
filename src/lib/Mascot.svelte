@@ -21,6 +21,7 @@
 		headPose,
 		pullHead,
 		resolveGrab,
+		rubber,
 		tune,
 		type GrabOptions,
 		type GrabPart,
@@ -611,21 +612,33 @@
 		return true;
 	}
 
-	/** Where the pointer was, in viewBox x, when the held part was first pulled. */
-	let tugFrom: number | null = null;
-	/** The whole figure leans after a pull, like something light being tugged off balance. */
-	function tug(x: number) {
+	/** Where the pointer was, in viewBox units, when the held part was first pulled. */
+	let tugFrom: Point | null = null;
+	/**
+	 * Upper body bend at the hips (degrees) and stretch up from them while a part is pulled.
+	 * The legs stay planted; loose enough that the torso trails the pull and sways after it.
+	 */
+	const bend = new Spring({ angle: 0, stretch: 1 }, RELEASE_SPRING);
+	/** The upper body goes along with a pull, like something light being tugged off balance. */
+	function tug(x: number, y: number) {
 		if (instant) return;
-		tugFrom ??= x;
-		clearTimeout(wobbleTimer);
+		if (!tugFrom) {
+			tugFrom = { x, y };
+			bend.stiffness = 0.14;
+			bend.damping = 0.5;
+		}
 		const { lean } = grabFeel;
-		wobble.target = clamp((x - tugFrom) * 0.05 * lean, -5 * lean, 5 * lean);
+		bend.target = {
+			angle: rubber((x - tugFrom.x) * 0.12, 14) * lean,
+			stretch: 1 + rubber((Math.max(tugFrom.y - y, 0) / 300) * lean, 0.2)
+		};
 	}
 
 	function release() {
 		grabbing = null;
-		// Let go, the lean rings out on the wobble spring like the figure regaining its balance.
-		if (tugFrom !== null) wobble.target = 0;
+		// Let go, the bend rings out on a loose spring, like the figure regaining its balance.
+		tune(bend, false);
+		bend.set({ angle: 0, stretch: 1 }, { instant });
 		tugFrom = null;
 		// Short enough that a later keyboard boop isn't eaten if the click never came.
 		swallowClickUntil = performance.now() + 300;
@@ -715,7 +728,7 @@
 			// Dragging a part around in circles must not count as circling or petting.
 			if (grabbing) {
 				reactor.activity();
-				tug(sample.x);
+				tug(sample.x, sample.y);
 			} else reactor.pointer(sample);
 		};
 		const leave = () => reactor.leave();
@@ -752,6 +765,7 @@
 	const groundY = $derived(body ? fig.groundY + 1 : head.bottom + 14);
 	// With a body, the whole figure leans around its hips instead of the head's center.
 	const tiltPivot = $derived(body ? `100 ${fig.hipY}` : '100 110');
+	const bendY = $derived(body ? fig.hipY : 110);
 	// Lean and wobble rock from the base (the soles with a body), like something standing.
 	const rockPivot = $derived(body ? `100 ${fig.groundY}` : `100 ${head.bottom}`);
 	const rock = $derived(wobble.current);
@@ -796,7 +810,7 @@
 	const neckOut = $derived(Math.hypot(pose.x, pose.y));
 	const neckWidth = $derived(Math.min(hw * 0.6, 32) / Math.sqrt(1 + neckOut / 60));
 	// The torso follows a pulled head a little, like a neck tugging at its shoulders.
-	const torsoTurn = $derived(headTurn.current * 0.45 + pullTurn * 0.25 * grabFeel.lean);
+	const torsoTurn = $derived(headTurn.current * 0.45 + pullTurn * 0.5 * grabFeel.lean);
 	// In full-body mode the legs take some of the squash so the head doesn't sink into the torso.
 	const figureSquash = $derived(
 		body
@@ -869,7 +883,7 @@
 			return fig;
 		},
 		get lean() {
-			return rock + headTurn.current + headDrag + pullTurn;
+			return rock + bend.current.angle + headTurn.current + headDrag + pullTurn;
 		},
 		get hop() {
 			return hop.current;
@@ -974,7 +988,13 @@
 						{#if body}
 							<Body layer="feet" />
 						{/if}
-						<g bind:this={tiltFrame} transform="rotate({f.tilt} {tiltPivot})">
+						<!-- Everything above the legs: tilts with the mood and bends at the hips when pulled. -->
+						<g
+							bind:this={tiltFrame}
+							transform="rotate({f.tilt +
+								bend.current.angle} {tiltPivot}) translate(100 {bendY}) scale({1 /
+								Math.sqrt(bend.current.stretch)} {bend.current.stretch}) translate(-100 {-bendY})"
+						>
 							{#if body}
 								<!-- The torso turns a little with the head so no torso corner peeks out behind it. -->
 								<g transform="rotate({torsoTurn} 100 {fig.hipY})">
