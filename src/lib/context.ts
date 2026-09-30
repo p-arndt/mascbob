@@ -1,5 +1,6 @@
 import { getContext, setContext } from 'svelte';
 import type { ShapeDef } from './geometry.js';
+import type { GrabPart } from './grab.js';
 import type { Reaction } from './interaction.js';
 import type { BuildDef } from './parts/body.js';
 import type { Accessory, EyeStyle, FaceParams, Mood, MoodConfig, Outfit, Shoes } from './types.js';
@@ -61,6 +62,19 @@ export interface MascotContext {
 	 * add detail, e.g. spiral eyes while `dizzy` or hands over the eyes while `shy`.
 	 */
 	readonly reaction: Reaction | null;
+	/** Part currently held and pulled by the pointer, or null. */
+	readonly grabbing: GrabPart | null;
+	/** Whether parts may be grabbed at all (`interactive` with the `grab` reaction on). */
+	readonly canGrab: boolean;
+	/**
+	 * A part calls this once its drag passes the click threshold; false means grabbing is off
+	 * or another part is already held, and the part should not follow the pointer.
+	 */
+	grab(part: GrabPart): boolean;
+	/** The held part was let go; it springs back on its own. */
+	release(): void;
+	/** How far a foot is lifted off the ground, 0..1 (-1 left, 1 right), so its contact shadow fades. */
+	footLift(side: -1 | 1, lift: number): void;
 }
 
 const KEY = Symbol('mascbob');

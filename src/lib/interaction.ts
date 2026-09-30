@@ -1,3 +1,4 @@
+import type { GrabPart } from './grab.js';
 import type { Mood } from './types.js';
 
 /**
@@ -12,6 +13,7 @@ import type { Mood } from './types.js';
  * - `explode`: booping on while it is grumpy makes its head burst into confetti and pop back.
  * - `bored`: left alone for a long while it yawns, droops and dozes off (only while `mood` is
  *   `idle`) and wakes up on the next interaction.
+ * - `grab`: hold the head, an arm or a leg and pull it around; it springs back when let go.
  */
 /** Degrees the head tilts toward a far-away pointer with `follow`. */
 export const FOLLOW_TILT = 7;
@@ -24,7 +26,8 @@ export const REACTIONS = [
 	'shy',
 	'tickle',
 	'explode',
-	'bored'
+	'bored',
+	'grab'
 ] as const;
 export type Reaction = (typeof REACTIONS)[number];
 
@@ -35,7 +38,8 @@ export const DEFAULT_REACTIONS: readonly Reaction[] = [
 	'dizzy',
 	'tickle',
 	'explode',
-	'bored'
+	'bored',
+	'grab'
 ];
 
 /**
@@ -52,7 +56,8 @@ export type ReactionEvent =
 	| { type: 'tickle'; level: 'giggle' | 'grumpy'; boops: number }
 	| { type: 'explode' }
 	| { type: 'bored' }
-	| { type: 'wake' };
+	| { type: 'wake' }
+	| { type: 'grab'; part: GrabPart };
 
 export type ReactionFlags = Readonly<Record<Reaction, boolean>>;
 

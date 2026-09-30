@@ -160,6 +160,7 @@
 		shy: 'get really close',
 		tickle: 'boop it again and again',
 		explode: 'keep booping once it is grumpy',
+		grab: 'pull its head, arms or legs',
 		bored: 'leave the mouse alone for 20 s'
 	};
 
@@ -184,6 +185,8 @@
 				return e.level === 'giggle' ? 'giggles' : 'had enough';
 			case 'explode':
 				return 'boom!';
+			case 'grab':
+				return `grabbed its ${e.part.split('-').reverse().join(' ')}`;
 			case 'bored':
 				return 'bored';
 			case 'wake':

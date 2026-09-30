@@ -42,6 +42,11 @@ describe('resolveReactions', () => {
 		expect(flags.bored).toBe(false);
 		expect(flags.pet).toBe(true);
 	});
+
+	it('lets parts be grabbed by default', () => {
+		expect(resolveReactions(undefined).grab).toBe(true);
+		expect(resolveReactions({ grab: false }).grab).toBe(false);
+	});
 });
 
 /** Moves back and forth between `from` and `to`, one sample every 16 ms at `speed` units/ms. */

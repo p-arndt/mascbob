@@ -15,6 +15,7 @@
 	import { moodConfig } from './moods.js';
 	import { createBabble } from './speech.js';
 	import { aimAt, saccade } from './gaze.js';
+	import { drag, pullHead, type GrabPart } from './grab.js';
 	import {
 		ReactionController,
 		resolveReactions,
@@ -59,13 +60,16 @@
 		label?: string;
 		onboop?: () => void;
 		/**
-		 * Pointer reactions (needs `interactive`): `follow`, `pet`, `dizzy`, `tickle` and `bored`
-		 * are on by default, `startle` and `shy` are opt-in. `true` = defaults, `false` = none,
+		 * Pointer reactions (needs `interactive`): `follow`, `pet`, `dizzy`, `tickle`, `explode`,
+		 * `bored` and `grab` are on by default, `startle` and `shy` are opt-in. `true` = defaults, `false` = none,
 		 * a list enables exactly those, an object like `{ shy: true, bored: false }` toggles
 		 * individual ones on top of the defaults. Reactions only override `mood` briefly.
 		 */
 		reactions?: ReactionsInput;
-		/** Fires when a reaction triggers: `pet` (hearts), `startle`, `dizzy`, `shy`, `tickle`, `bored`, `wake`. */
+		/**
+		 * Fires when a reaction triggers: `pet` (hearts), `startle`, `dizzy`, `shy`, `tickle`,
+		 * `explode`, `bored`, `wake`, `grab` (a part was grabbed).
+		 */
 		onreaction?: (event: ReactionEvent) => void;
 		/** Custom SVG drawn on top of the head, in the head's 200×200 coordinates. */
 		accessory?: Snippet<[{ top: number; halfWidth: number }]>;
@@ -170,6 +174,8 @@
 	const sag = new Tween(0);
 	/** 0..1; mouth opening of a yawn. */
 	const yawnMouth = new Tween(0);
+	/** Head bend (degrees) and stretch while pulled; loose, so letting go rings out as a jelly wobble. */
+	const headPull = new Spring({ angle: 0, stretch: 1 }, { stiffness: 0.12, damping: 0.25 });
 
 	let root = $state<HTMLElement>();
 	// Offscreen mascots pause their timers, pointer tracking and CSS loops: a page full of them stays smooth.
@@ -561,7 +567,48 @@
 	let boopTimer: ReturnType<typeof setTimeout> | undefined;
 	$effect(() => () => clearTimeout(boopTimer));
 
+	let grabbing = $state<GrabPart | null>(null);
+	// The click that ends a drag still lands on the button; it must not count as a boop.
+	let swallowClickUntil = 0;
+	/** How far each foot is lifted off the ground, 0..1, keyed by side (-1 left, 1 right). */
+	let footLifts = $state<Record<number, number>>({ [-1]: 0, [1]: 0 });
+
+	function grab(part: GrabPart): boolean {
+		if (!canGrab || grabbing) return false;
+		grabbing = part;
+		pressed = false;
+		swallowClickUntil = Infinity;
+		reactor.activity();
+		onreaction?.({ type: 'grab', part });
+		return true;
+	}
+
+	function release() {
+		grabbing = null;
+		// Short enough that a later keyboard boop isn't eaten if the click never came.
+		swallowClickUntil = performance.now() + 300;
+	}
+
+	let tiltFrame = $state<SVGGElement>();
+	function grabHead(e: PointerEvent) {
+		if (!canGrab) return;
+		const pivot = { x: 100, y: neckY };
+		drag(e, {
+			frame: () => tiltFrame,
+			start: () => grab('head'),
+			move: (to, from) => headPull.set(pullHead(pivot, from, to), { instant: true }),
+			end: () => {
+				headPull.set({ angle: 0, stretch: 1 }, { instant: reduced });
+				release();
+			}
+		});
+	}
+
 	function boop() {
+		if (performance.now() < swallowClickUntil) {
+			swallowClickUntil = 0;
+			return;
+		}
 		if (!reduced) {
 			// Stretch on take-off; `jump` squashes again on landing.
 			// Pressing was the crouch, so it takes off right away.
@@ -589,6 +636,7 @@
 		idle: idleCue
 	});
 	const reactionFlags = $derived(resolveReactions(reactions));
+	const canGrab = $derived(interactive && reactionFlags.grab);
 	// Reactions need `interactive`; without it nothing could wake a dozing figure.
 	const NO_REACTIONS = resolveReactions(false);
 	$effect(() => {
@@ -617,7 +665,9 @@
 			sample.t = e.timeStamp;
 			sample.hovering = e.pointerType !== 'touch';
 			sample.pressed = pressed;
-			reactor.pointer(sample);
+			// Dragging a part around in circles must not count as circling or petting.
+			if (grabbing) reactor.activity();
+			else reactor.pointer(sample);
 		};
 		const leave = () => reactor.leave();
 		const opts = { passive: true } as const;
@@ -688,6 +738,9 @@
 	const hsy = $derived(headSquish.current.y * (1 + f.stretch));
 	const headSx = $derived(body ? 1 + (hsx - 1) * 0.7 : hsx);
 	const headSy = $derived(body ? 1 + (hsy - 1) * 0.7 : hsy);
+	const pull = $derived(headPull.current);
+	// The torso follows a pulled head a little, like a neck tugging at its shoulders.
+	const torsoTurn = $derived(headTurn.current * 0.45 + pull.angle * 0.25);
 	// In full-body mode the legs take some of the squash so the head doesn't sink into the torso.
 	const figureSquash = $derived(
 		body
@@ -760,7 +813,7 @@
 			return fig;
 		},
 		get lean() {
-			return rock + headTurn.current + headDrag;
+			return rock + headTurn.current + headDrag + pull.angle;
 		},
 		get hop() {
 			return hop.current;
@@ -779,6 +832,17 @@
 		},
 		get reaction() {
 			return reaction?.name ?? null;
+		},
+		get grabbing() {
+			return grabbing;
+		},
+		get canGrab() {
+			return canGrab;
+		},
+		grab,
+		release,
+		footLift(side, lift) {
+			footLifts[side] = clamp(lift, 0, 1);
 		}
 	});
 </script>
@@ -836,6 +900,7 @@
 						rx={footContact.rx}
 						ry="2.2"
 						fill={ref('ground-shadow')}
+						opacity={1 - footLifts[side]}
 					/>
 				{/each}
 			</g>
@@ -853,21 +918,28 @@
 						{#if body}
 							<Body layer="feet" />
 						{/if}
-						<g transform="rotate({f.tilt} {tiltPivot})">
+						<g bind:this={tiltFrame} transform="rotate({f.tilt} {tiltPivot})">
 							{#if body}
 								<!-- The torso turns a little with the head so no torso corner peeks out behind it. -->
-								<g transform="rotate({headTurn.current * 0.45} 100 {fig.hipY})">
+								<g transform="rotate({torsoTurn} 100 {fig.hipY})">
 									<Body layer="back" />
 								</g>
 							{/if}
 							<g
 								transform="rotate({headTurn.current +
-									headDrag} 100 {neckY}) translate(0 {headDrop})"
+									headDrag +
+									pull.angle} 100 {neckY}) translate(0 {headDrop})"
 							>
+								<!-- svelte-ignore a11y_no_static_element_interactions -->
 								<g
 									class="head"
-									transform="translate(100 {head.bottom + headY}) scale({headSx *
-										headScale} {headSy * headScale}) translate(-100 {-head.bottom})"
+									class:grabbable={canGrab}
+									data-grab="head"
+									transform="translate(100 {head.bottom + headY}) scale({(headSx * headScale) /
+										Math.sqrt(pull.stretch)} {headSy *
+										headScale *
+										pull.stretch}) translate(-100 {-head.bottom})"
+									onpointerdown={grabHead}
 								>
 									<g class="blast" class:blasting={reaction?.name === 'explode'}>
 										<g class="breathe" class:lift={body}>
@@ -881,7 +953,7 @@
 								</g>
 							</g>
 							{#if body}
-								<g transform="rotate({headTurn.current * 0.45} 100 {fig.hipY})">
+								<g transform="rotate({torsoTurn} 100 {fig.hipY})">
 									<Body layer="front" />
 								</g>
 							{:else if hands}
@@ -906,6 +978,7 @@
 		class:still={reduced}
 		class:paused={!onscreen}
 		class:no-float={!float || standing}
+		class:grabbing={grabbing !== null}
 		aria-label={label}
 		data-mood={activeMood}
 		{style}
@@ -923,6 +996,7 @@
 			pointerX = 0;
 		}}
 		onpointerdown={() => {
+			swallowClickUntil = 0;
 			pressed = true;
 			reactor.activity();
 		}}
@@ -972,6 +1046,14 @@
 	button.mascbob {
 		cursor: pointer;
 		border-radius: 50%;
+	}
+	.grabbable {
+		cursor: grab;
+		touch-action: none;
+	}
+	.grabbing,
+	.grabbing :global(*) {
+		cursor: grabbing;
 	}
 	button.mascbob:focus-visible {
 		outline: 2px solid var(--c-accent);

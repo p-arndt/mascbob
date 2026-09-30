@@ -172,4 +172,110 @@ describe('Body', () => {
 			expect(container.querySelectorAll('.foot.tap')).toHaveLength(2);
 		}
 	});
+
+	describe('grab', () => {
+		const pointer = (el: Element, type: string, x: number, y: number) =>
+			el.dispatchEvent(
+				new PointerEvent(type, {
+					pointerId: 1,
+					bubbles: true,
+					clientX: x,
+					clientY: y,
+					button: 0,
+					pointerType: 'mouse'
+				})
+			);
+		/** Presses at the center of `target` and drags `el` by (dx, dy) client pixels. */
+		const pull = (el: Element, target: Element, dx: number, dy: number) => {
+			const r = target.getBoundingClientRect();
+			const x = r.left + r.width / 2;
+			const y = r.top + r.height / 2;
+			pointer(el, 'pointerdown', x, y);
+			pointer(el, 'pointermove', x + dx / 2, y + dy / 2);
+			pointer(el, 'pointermove', x + dx, y + dy);
+			return () => pointer(el, 'pointerup', x + dx, y + dy);
+		};
+		const rotation = (el: Element | null | undefined) =>
+			Number(/rotate\((-?[\d.e-]+)/.exec(el?.getAttribute('transform') ?? '')?.[1] ?? NaN);
+		const shoulderAngle = (container: HTMLElement, part: string) =>
+			rotation(container.querySelector(`[data-grab="${part}"] > g`));
+		const legAngle = (container: HTMLElement, part: string) =>
+			rotation(container.querySelector(`[data-grab="${part}"]`));
+
+		it('pulls an arm to the pointer and lets it spring back', async () => {
+			const { container } = render(Mascot, { motion: 'full', size: 200 });
+			const arm = container.querySelector('[data-grab="arm-left"]')!;
+			expect(arm.classList.contains('grabbable')).toBe(true);
+			await expect.poll(() => shoulderAngle(container, 'arm-left')).toBeCloseTo(16, 0);
+			const rest = shoulderAngle(container, 'arm-left');
+			const right = shoulderAngle(container, 'arm-right');
+			const release = pull(arm, arm.querySelector('.hand')!, -60, -70);
+			await expect.poll(() => shoulderAngle(container, 'arm-left')).toBeGreaterThan(rest + 40);
+			expect(arm.classList.contains('held')).toBe(true);
+			expect(shoulderAngle(container, 'arm-right')).toBeCloseTo(right, 0);
+			release();
+			await expect.poll(() => arm.classList.contains('held')).toBe(false);
+			await expect
+				.poll(() => shoulderAngle(container, 'arm-left'), { timeout: 5000 })
+				.toBeCloseTo(rest, 0);
+		});
+
+		it('pulls the mirrored right arm in its own frame', async () => {
+			const { container } = render(Mascot, { motion: 'full', size: 200 });
+			const arm = container.querySelector('[data-grab="arm-right"]')!;
+			await expect.poll(() => shoulderAngle(container, 'arm-right')).toBeCloseTo(16, 0);
+			const release = pull(arm, arm.querySelector('.hand')!, 60, -70);
+			// Outward is +x on screen for the right arm, which is a raised angle in left-arm math.
+			await expect.poll(() => shoulderAngle(container, 'arm-right')).toBeGreaterThan(56);
+			release();
+		});
+
+		it('swings a leg with its foot around the hip and lets it spring back', async () => {
+			const { container } = render(Mascot, { motion: 'full', size: 200 });
+			const legs = container.querySelectorAll('[data-grab="leg-left"]');
+			// Collar rim, leg and shoe all swing together.
+			expect(legs).toHaveLength(3);
+			const leg = legs[1];
+			const release = pull(leg, leg.querySelector('.leg')!, -50, 0);
+			await expect.poll(() => legAngle(container, 'leg-left')).toBeGreaterThan(10);
+			for (const el of legs) expect(rotation(el)).toBe(legAngle(container, 'leg-left'));
+			expect(legAngle(container, 'leg-right')).toBe(0);
+			release();
+			await expect
+				.poll(() => Math.abs(legAngle(container, 'leg-left')), { timeout: 5000 })
+				.toBeLessThan(0.5);
+		});
+
+		it('stops the foot tap while its leg is held', async () => {
+			const { container } = render(Mascot, { motion: 'full', size: 200, mood: 'idle' });
+			expect(container.querySelectorAll('.foot.tap')).toHaveLength(2);
+			const leg = container.querySelectorAll('[data-grab="leg-right"]')[1];
+			const release = pull(leg, leg.querySelector('.leg')!, 50, 0);
+			await expect.poll(() => container.querySelectorAll('.foot.tap')).toHaveLength(0);
+			release();
+			await expect.poll(() => container.querySelectorAll('.foot.tap')).toHaveLength(2);
+		});
+
+		it('leaves arms and legs alone when grabbing is off', async () => {
+			const { container } = render(Mascot, {
+				motion: 'full',
+				size: 200,
+				reactions: { grab: false }
+			});
+			const arm = container.querySelector('[data-grab="arm-left"]')!;
+			expect(arm.classList.contains('grabbable')).toBe(false);
+			await expect.poll(() => shoulderAngle(container, 'arm-left')).toBeCloseTo(16, 0);
+			const releaseArm = pull(arm, arm.querySelector('.hand')!, -60, -70);
+			await new Promise((r) => setTimeout(r, 300));
+			// Only the press lift raises the arm; a grab would swing it far past that.
+			expect(shoulderAngle(container, 'arm-left')).toBeLessThan(16 + 25);
+			expect(arm.classList.contains('held')).toBe(false);
+			releaseArm();
+			const leg = container.querySelectorAll('[data-grab="leg-left"]')[1];
+			const releaseLeg = pull(leg, leg.querySelector('.leg')!, -50, 0);
+			await new Promise((r) => setTimeout(r, 200));
+			releaseLeg();
+			expect(legAngle(container, 'leg-left')).toBe(0);
+		});
+	});
 });

@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { Spring } from 'svelte/motion';
 	import { getMascot, svgRef } from '../context.js';
+	import { clamp } from '../geometry.js';
+	import { drag, legSwing, reachArm, type Point } from '../grab.js';
 	import {
 		COLLAR_H,
 		COLLAR_Y,
@@ -53,8 +55,57 @@
 		flail.target = 0;
 	});
 	const lift = $derived(flail.current * 34 + (m.pressed ? 18 : 0));
-	const left = $derived({ a1: arms.current.la1 + lift, a2: arms.current.la2 });
-	const right = $derived({ a1: arms.current.ra1 + lift, a2: arms.current.ra2 });
+
+	type Side = 'left' | 'right';
+	/** IK angles of an arm held by the pointer; it shows exactly these, no pose, flail or swing. */
+	const heldArm = $state<Record<Side, ArmAngles | null>>({ left: null, right: null });
+	// A let-go arm keeps its offset from the pose in its own loose spring, so it wobbles back
+	// like jelly without disturbing the pose spring or the other arm.
+	const pull: Record<Side, Spring<ArmAngles>> = {
+		left: new Spring({ a1: 0, a2: 0 }, { stiffness: 0.1, damping: 0.2 }),
+		right: new Spring({ a1: 0, a2: 0 }, { stiffness: 0.1, damping: 0.2 })
+	};
+	const posed = (side: Side): ArmAngles =>
+		side === 'left'
+			? { a1: arms.current.la1 + lift, a2: arms.current.la2 }
+			: { a1: arms.current.ra1 + lift, a2: arms.current.ra2 };
+	const shown = (side: Side): ArmAngles => {
+		const p = posed(side);
+		return heldArm[side] ?? { a1: p.a1 + pull[side].current.a1, a2: p.a2 + pull[side].current.a2 };
+	};
+	const left = $derived(shown('left'));
+	const right = $derived(shown('right'));
+	/** The `.arm` groups: both arms use left-arm math inside them, the right one is mirrored. */
+	const armFrames: Record<Side, SVGGElement | undefined> = $state({
+		left: undefined,
+		right: undefined
+	});
+
+	function grabArm(e: PointerEvent, side: Side) {
+		drag(e, {
+			frame: () => armFrames[side],
+			start: () => m.grab(side === 'left' ? 'arm-left' : 'arm-right'),
+			move: (to) => {
+				// Aim the hand's center, not the wrist, so the hand ends up under the pointer.
+				heldArm[side] = reachArm(
+					to,
+					{ x: shoulder, y: b.shoulderY + arms.current.drop },
+					b.upperArm,
+					b.forearm + 1,
+					heldArm[side] ?? shown(side)
+				);
+			},
+			end: () => {
+				const held = heldArm[side];
+				heldArm[side] = null;
+				m.release();
+				if (!held) return;
+				const p = posed(side);
+				pull[side].set({ a1: held.a1 - p.a1, a2: held.a2 - p.a2 }, { instant: true });
+				pull[side].set({ a1: 0, a2: 0 }, { instant: m.reduced });
+			}
+		});
+	}
 
 	const b = $derived(m.build);
 	const hw = $derived(torsoHalfWidth(m.shape.halfWidth, b));
@@ -81,6 +132,55 @@
 	const legTop = $derived(b.hipY - 10);
 	const legHw = $derived(b.legWidth / 2);
 	const legBottom = $derived(legBottomY(shoes, b));
+	const hip = (side: number): Point => ({ x: 100 + side * b.legX, y: legTop + legHw });
+	/** Swing of each leg (with its foot) around the hip, `rotate()` degrees; index 0 is the left leg. */
+	const legAngles = [
+		new Spring(0, { stiffness: 0.12, damping: 0.25 }),
+		new Spring(0, { stiffness: 0.12, damping: 0.25 })
+	];
+	const legAngle = (side: number) => legAngles[side < 0 ? 0 : 1];
+	let heldLeg = $state(0);
+	/** Wraps the whole feet layer without being swung itself, so drag points stay put. */
+	let feetFrame: SVGGElement | undefined = $state();
+
+	function turn(p: Point, pivot: Point, deg: number): Point {
+		const r = (deg * Math.PI) / 180;
+		const dx = p.x - pivot.x;
+		const dy = p.y - pivot.y;
+		return {
+			x: pivot.x + dx * Math.cos(r) - dy * Math.sin(r),
+			y: pivot.y + dx * Math.sin(r) + dy * Math.cos(r)
+		};
+	}
+
+	function grabLeg(e: PointerEvent, side: -1 | 1) {
+		const spring = legAngle(side);
+		// Where the grabbed point sits on the unswung leg, so catching a leg mid-bounce doesn't snap it.
+		let rest: Point | null = null;
+		drag(e, {
+			frame: () => feetFrame,
+			start: (from) => {
+				if (!m.grab(side < 0 ? 'leg-left' : 'leg-right')) return false;
+				heldLeg = side;
+				rest = turn(from, hip(side), -spring.current);
+			},
+			move: (to) => {
+				if (rest) spring.set(legSwing(hip(side), rest, to, side), { instant: true });
+			},
+			end: () => {
+				heldLeg = 0;
+				spring.set(0, { instant: m.reduced });
+				m.release();
+			}
+		});
+	}
+
+	// A swung-out foot leaves the ground; Mascot fades its contact shadow.
+	$effect(() => {
+		for (const side of [-1, 1] as const) {
+			m.footLift(side, clamp(Math.abs(legAngle(side).current) / 25, 0, 1));
+		}
+	});
 	const shortsBottom = $derived(shortsBottomY(shoes, b));
 	const tieY = (dy: number) => COLLAR_Y + 25 + dy * v;
 	const tieBlade = $derived(
@@ -272,7 +372,7 @@
 			<!-- Both passes run the same animation from mount, so they stay in lockstep. -->
 			<g
 				class="foot"
-				class:tap={side === 1 && tapping}
+				class:tap={side === 1 && tapping && heldLeg !== side}
 				style:transform-origin="{x}px {b.groundY - (FOOT_COLLAR[shoes] ?? 0) * b.footScale}px"
 			>
 				<g transform="translate({x} {b.groundY}) scale({side * b.footScale} {b.footScale})">
@@ -303,11 +403,7 @@
 			</g>
 		{/snippet}
 
-		{#each [-1, 1] as side (side)}
-			{@render foot(side, true)}
-		{/each}
-
-		{#each [-1, 1] as side (side)}
+		{#snippet leg(side: number)}
 			<g transform="translate({100 + side * b.legX} 0)">
 				<rect
 					class="leg"
@@ -354,12 +450,40 @@
 					fill={ref('leg-ao')}
 				/>
 			</g>
-		{/each}
+		{/snippet}
+		<!-- A leg and both passes of its foot swing as one around the hip; the swing sits on a
+		     wrapper because `.foot` has its own CSS transform for the tap. -->
+		{#snippet swung(side: -1 | 1, part: 'rim' | 'leg' | 'shoe')}
+			{@const pivot = hip(side)}
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<g
+				transform="rotate({legAngle(side).current} {pivot.x} {pivot.y})"
+				class:grabbable={m.canGrab}
+				data-grab={side < 0 ? 'leg-left' : 'leg-right'}
+				onpointerdown={(e) => grabLeg(e, side)}
+			>
+				{#if part === 'leg'}
+					{@render leg(side)}
+				{:else}
+					{@render foot(side, part === 'rim')}
+				{/if}
+			</g>
+		{/snippet}
 
-		<!-- Each foot is centered on its leg: the leg steps into the collar instead of standing on the shoe. -->
-		{#each [-1, 1] as side (side)}
-			{@render foot(side, false)}
-		{/each}
+		<g bind:this={feetFrame}>
+			{#each [-1, 1] as const as side (side)}
+				{@render swung(side, 'rim')}
+			{/each}
+
+			{#each [-1, 1] as const as side (side)}
+				{@render swung(side, 'leg')}
+			{/each}
+
+			<!-- Each foot is centered on its leg: the leg steps into the collar instead of standing on the shoe. -->
+			{#each [-1, 1] as const as side (side)}
+				{@render swung(side, 'shoe')}
+			{/each}
+		</g>
 	{/if}
 {:else if layer === 'back'}
 	<defs>
@@ -619,12 +743,28 @@
 		class:short={outfit === 'jersey'}
 		class:fidget={m.hovered}
 	>
-		<g class="arm">
-			{@render arm(left, pose.swingArm !== 'right')}
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<g
+			class="arm"
+			class:held={heldArm.left !== null}
+			class:grabbable={m.canGrab}
+			data-grab="arm-left"
+			bind:this={armFrames.left}
+			onpointerdown={(e) => grabArm(e, 'left')}
+		>
+			{@render arm(left, pose.swingArm !== 'right' && !heldArm.left)}
 		</g>
 		<g transform="translate(200 0) scale(-1 1)">
-			<g class="arm arm-r">
-				{@render arm(right, pose.swingArm !== 'left')}
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<g
+				class="arm arm-r"
+				class:held={heldArm.right !== null}
+				class:grabbable={m.canGrab}
+				data-grab="arm-right"
+				bind:this={armFrames.right}
+				onpointerdown={(e) => grabArm(e, 'right')}
+			>
+				{@render arm(right, pose.swingArm !== 'left' && !heldArm.right)}
 			</g>
 		</g>
 	</g>
@@ -796,6 +936,10 @@
 	 */
 	.foot {
 		transform-box: view-box;
+	}
+	.grabbable {
+		cursor: grab;
+		touch-action: none;
 	}
 	.foot.tap {
 		animation: tap 4.6s ease-in-out infinite;
@@ -1066,7 +1210,7 @@
 	.fore.swing.gesture {
 		animation: gesture 1.1s ease-in-out infinite alternate;
 	}
-	.fidget .hand {
+	.fidget .arm:not(.held) .hand {
 		transform-box: fill-box;
 		transform-origin: center;
 		animation: fidget 0.5s ease-in-out 2;
