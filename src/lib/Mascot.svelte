@@ -1037,10 +1037,11 @@
 	.breathe.lift {
 		animation-name: breathe-lift;
 	}
-	/* Swells, bursts (the confetti in Burst.svelte takes over), then pops back in; the length
-	   matches REACTION_TIMING.explode. */
+	/* Trembles and swells while the fuse burns (the first 25%, REACTION_TIMING.explodeFuse), bursts
+	   (Burst.svelte takes over with the debris), then pops back in; the length is
+	   REACTION_TIMING.explode. */
 	.blasting {
-		animation: blast 1.7s linear both;
+		animation: blast 2.8s linear both;
 	}
 	.no-float .float,
 	.no-float .shadow,
@@ -1067,28 +1068,61 @@
 	}
 	@keyframes blast {
 		0% {
-			transform: scale(1);
-			opacity: 1;
-			animation-timing-function: cubic-bezier(0.3, 0, 0.7, 1);
+			transform: scale(1) rotate(0deg);
+			filter: brightness(1);
 		}
-		7% {
-			transform: scale(1.18, 1.14);
+		3% {
+			transform: scale(1.02) rotate(-2deg);
+		}
+		6% {
+			transform: scale(1.03) rotate(2deg);
+		}
+		9% {
+			transform: scale(1.05) rotate(-3deg);
+		}
+		12% {
+			transform: scale(1.07) rotate(3deg);
+		}
+		15% {
+			transform: scale(1.1) rotate(-4deg);
+		}
+		18% {
+			transform: scale(1.13) rotate(4deg);
+		}
+		21% {
+			transform: scale(1.17, 1.12) rotate(-5deg);
+		}
+		23.5% {
+			transform: scale(1.24, 1.18) rotate(0deg);
 			opacity: 1;
+			filter: brightness(1.35) saturate(1.4);
 			animation-timing-function: cubic-bezier(0.6, 0, 1, 0.6);
 		}
-		10% {
-			transform: scale(1.35);
+		25.5% {
+			transform: scale(1.55);
 			opacity: 0;
+			filter: brightness(2);
 		}
-		72% {
-			transform: scale(0.2);
+		68% {
+			transform: scale(0.1);
 			opacity: 0;
-			animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+			filter: brightness(1);
+			animation-timing-function: cubic-bezier(0.3, 0, 0.5, 1.4);
 		}
-		88%,
+		78% {
+			transform: scale(1.15, 0.88);
+			opacity: 1;
+		}
+		84% {
+			transform: scale(0.93, 1.07);
+		}
+		90% {
+			transform: scale(1.03, 0.98);
+		}
 		100% {
 			transform: scale(1);
 			opacity: 1;
+			filter: brightness(1);
 		}
 	}
 	@keyframes shift {
