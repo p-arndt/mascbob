@@ -36,4 +36,31 @@ moods, themes, shapes, eye styles and accessories. The SvelteKit app in
 ## Checks and releases
 
 - `just ci` is the check command (svelte-check, prettier + eslint, tests, package build with publint).
-- `just release` (stamp) owns the version in `package.json`; never edit it by hand.
+- `just release` (stamp) owns the version in `package.json` and `CHANGELOG.md`; never edit
+  either by hand. The release renders the notes into `CHANGELOG.md` and the annotated tag, and
+  CI publishes the tag's notes as the GitHub Release.
+
+## Release notes
+
+Every user-facing change gets a note, committed with the change itself:
+`just note <added|changed|deprecated|removed|fixed|security> "…"` writes a fragment under
+`.stamp/changelog/`. `.stamp.yml` makes a release fail when nothing was noted, and notes are
+never drafted from commits.
+
+- Write for people using `<Mascot>`, not for people reading the diff: what they can now do,
+  what behaves differently, what no longer breaks. One or two plain sentences.
+- Name the prop, event or value involved (`explode`, `onreaction`, `theme="og"`) so readers can
+  find it in the README.
+- `changed` and `removed` say what to do instead when it affects existing code.
+- No internals (file names, class names, refactors, tests, CI). Showcase-only, docs-only and
+  build changes get no note.
+- One note per change; a follow-up tweak to an unreleased feature updates that feature's
+  fragment instead of adding a second one.
+
+For example:
+
+```text
+added    New `explode` reaction: keep booping the mascot once it is grumpy and its head
+         bursts into confetti. It fires `onreaction` with `{ type: "explode" }`.
+fixed    Eyes no longer jump when `mood` changes while the mascot is blinking.
+```

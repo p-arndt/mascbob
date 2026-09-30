@@ -3,8 +3,12 @@ name: Release
 # Publishes the pushed tag to npm, pushes the showcase image to GHCR and creates
 # the GitHub Release. The shared workflows in p-arndt/.github have no npm
 # pipeline yet, so the npm part is local; it follows container-release.yml:
-# stamp verifies the tag, the notes come from the annotated tag, third-party
-# actions are pinned to full commit SHAs.
+# stamp verifies the tag, third-party actions are pinned to full commit SHAs.
+#
+# Release notes: `stamp release` renders the .stamp/changelog fragments into
+# CHANGELOG.md and into the annotated tag's message; the stamp action reads
+# that message back and the GitHub Release publishes it verbatim. Nothing is
+# generated here.
 #
 # npm auth: trusted publishing (OIDC) once it is configured for the package on
 # npmjs.com; until then an NPM_TOKEN secret. npm uses whichever is available.

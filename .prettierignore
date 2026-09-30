@@ -13,3 +13,6 @@ bun.lockb
 
 # Generated README art (`just readme-art`)
 /.github/assets/
+
+# Rendered by stamp on release
+/CHANGELOG.md

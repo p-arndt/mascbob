@@ -1,0 +1,7 @@
+# Only the changelog is configured; everything else is stamp's default
+# (package.json#version, tag v{{version}}, releases from main).
+changelog:
+  # A release needs hand-written notes: no drafting from commits, and the
+  # preflight fails when nothing was noted.
+  fallback: none
+  require: true
