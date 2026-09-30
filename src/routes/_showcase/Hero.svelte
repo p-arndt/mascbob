@@ -93,9 +93,11 @@
 
 	const BOOP_LINES = ['Hehe!', 'Boop!', 'Again!', 'That tickles.', '*beep*'];
 	let bubbleTimer: ReturnType<typeof setTimeout> | undefined;
+	const BOOP_SKIPS: Mood[] = ['talking', 'grumpy', 'sad'];
 	function boop() {
 		touch();
-		mood = pick(MOODS.filter((m) => m !== mood && m !== 'talking'));
+		// Sulking is the tickle reaction's answer to too many boops; a random pick would muddle it.
+		mood = pick(MOODS.filter((m) => m !== mood && !BOOP_SKIPS.includes(m)));
 		bubble = pick(BOOP_LINES);
 		clearTimeout(bubbleTimer);
 		bubbleTimer = setTimeout(() => (bubble = null), 1400);
