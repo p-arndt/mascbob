@@ -2,7 +2,16 @@
 	import { Spring } from 'svelte/motion';
 	import { getMascot, svgRef } from '../context.js';
 	import { clamp } from '../geometry.js';
-	import { drag, legSwing, reachArm, type Point } from '../grab.js';
+	import {
+		RELEASE_SPRING,
+		drag,
+		legStretch,
+		legSwing,
+		reachArm,
+		tune,
+		type ArmReach,
+		type Point
+	} from '../grab.js';
 	import {
 		COLLAR_H,
 		COLLAR_Y,
@@ -57,24 +66,38 @@
 	const lift = $derived(flail.current * 34 + (m.pressed ? 18 : 0));
 
 	type Side = 'left' | 'right';
-	/** IK angles of an arm held by the pointer; it shows exactly these, no pose, flail or swing. */
-	const heldArm = $state<Record<Side, ArmAngles | null>>({ left: null, right: null });
-	// A let-go arm keeps its offset from the pose in its own loose spring, so it wobbles back
-	// like jelly without disturbing the pose spring or the other arm.
-	const pull: Record<Side, Spring<ArmAngles>> = {
-		left: new Spring({ a1: 0, a2: 0 }, { stiffness: 0.1, damping: 0.2 }),
-		right: new Spring({ a1: 0, a2: 0 }, { stiffness: 0.1, damping: 0.2 })
+	/** Where the pointer wants an arm it holds; null while the arm is free. */
+	const heldArm = $state<Record<Side, ArmReach | null>>({ left: null, right: null });
+	// Each arm's offset from its pose (stretch as the amount past 1) lives in its own spring:
+	// stiff while held, so the arm tracks the pointer smoothly, loose once let go, so it snaps
+	// back like rubber, all without disturbing the pose spring or the other arm.
+	const offset: Record<Side, Spring<ArmReach>> = {
+		left: new Spring({ a1: 0, a2: 0, stretch: 0 }, RELEASE_SPRING),
+		right: new Spring({ a1: 0, a2: 0, stretch: 0 }, RELEASE_SPRING)
 	};
 	const posed = (side: Side): ArmAngles =>
 		side === 'left'
 			? { a1: arms.current.la1 + lift, a2: arms.current.la2 }
 			: { a1: arms.current.ra1 + lift, a2: arms.current.ra2 };
-	const shown = (side: Side): ArmAngles => {
+	const shown = (side: Side): ArmReach => {
 		const p = posed(side);
-		return heldArm[side] ?? { a1: p.a1 + pull[side].current.a1, a2: p.a2 + pull[side].current.a2 };
+		const o = offset[side].current;
+		// The snap back overshoots into a brief squash, but never folds the arm up entirely.
+		return { a1: p.a1 + o.a1, a2: p.a2 + o.a2, stretch: Math.max(1 + o.stretch, 0.6) };
 	};
 	const left = $derived(shown('left'));
 	const right = $derived(shown('right'));
+	$effect(() => {
+		for (const side of ['left', 'right'] as const) {
+			const held = heldArm[side];
+			if (!held) continue;
+			const p = posed(side);
+			offset[side].set(
+				{ a1: held.a1 - p.a1, a2: held.a2 - p.a2, stretch: held.stretch - 1 },
+				{ instant: m.reduced }
+			);
+		}
+	});
 	/** The `.arm` groups: both arms use left-arm math inside them, the right one is mirrored. */
 	const armFrames: Record<Side, SVGGElement | undefined> = $state({
 		left: undefined,
@@ -84,7 +107,10 @@
 	function grabArm(e: PointerEvent, side: Side) {
 		drag(e, {
 			frame: () => armFrames[side],
-			start: () => m.grab(side === 'left' ? 'arm-left' : 'arm-right'),
+			start: () => {
+				if (!m.grab(side === 'left' ? 'arm-left' : 'arm-right')) return false;
+				tune(offset[side], true);
+			},
 			move: (to) => {
 				// Aim the hand's center, not the wrist, so the hand ends up under the pointer.
 				heldArm[side] = reachArm(
@@ -96,13 +122,10 @@
 				);
 			},
 			end: () => {
-				const held = heldArm[side];
 				heldArm[side] = null;
+				tune(offset[side], false);
+				offset[side].set({ a1: 0, a2: 0, stretch: 0 }, { instant: m.reduced });
 				m.release();
-				if (!held) return;
-				const p = posed(side);
-				pull[side].set({ a1: held.a1 - p.a1, a2: held.a2 - p.a2 }, { instant: true });
-				pull[side].set({ a1: 0, a2: 0 }, { instant: m.reduced });
 			}
 		});
 	}
@@ -133,12 +156,15 @@
 	const legHw = $derived(b.legWidth / 2);
 	const legBottom = $derived(legBottomY(shoes, b));
 	const hip = (side: number): Point => ({ x: 100 + side * b.legX, y: legTop + legHw });
-	/** Swing of each leg (with its foot) around the hip, `rotate()` degrees; index 0 is the left leg. */
-	const legAngles = [
-		new Spring(0, { stiffness: 0.12, damping: 0.25 }),
-		new Spring(0, { stiffness: 0.12, damping: 0.25 })
+	/**
+	 * Swing of each leg (with its foot) around the hip in `rotate()` degrees, and how many
+	 * units it is stretched along its length; index 0 is the left leg.
+	 */
+	const legPulls = [
+		new Spring({ angle: 0, grow: 0 }, RELEASE_SPRING),
+		new Spring({ angle: 0, grow: 0 }, RELEASE_SPRING)
 	];
-	const legAngle = (side: number) => legAngles[side < 0 ? 0 : 1];
+	const legPull = (side: number) => legPulls[side < 0 ? 0 : 1];
 	let heldLeg = $state(0);
 	/** Wraps the whole feet layer without being swung itself, so drag points stay put. */
 	let feetFrame: SVGGElement | undefined = $state();
@@ -154,7 +180,7 @@
 	}
 
 	function grabLeg(e: PointerEvent, side: -1 | 1) {
-		const spring = legAngle(side);
+		const spring = legPull(side);
 		// Where the grabbed point sits on the unswung leg, so catching a leg mid-bounce doesn't snap it.
 		let rest: Point | null = null;
 		drag(e, {
@@ -162,23 +188,31 @@
 			start: (from) => {
 				if (!m.grab(side < 0 ? 'leg-left' : 'leg-right')) return false;
 				heldLeg = side;
-				rest = turn(from, hip(side), -spring.current);
+				tune(spring, true);
+				rest = turn(from, hip(side), -spring.current.angle);
 			},
 			move: (to) => {
-				if (rest) spring.set(legSwing(hip(side), rest, to, side), { instant: true });
+				if (!rest) return;
+				const pivot = hip(side);
+				spring.set(
+					{ angle: legSwing(pivot, rest, to, side), grow: legStretch(pivot, rest, to) },
+					{ instant: m.reduced }
+				);
 			},
 			end: () => {
 				heldLeg = 0;
-				spring.set(0, { instant: m.reduced });
+				tune(spring, false);
+				spring.set({ angle: 0, grow: 0 }, { instant: m.reduced });
 				m.release();
 			}
 		});
 	}
 
-	// A swung-out foot leaves the ground; Mascot fades its contact shadow.
+	// A swung-out or stretched foot leaves the ground; Mascot fades its contact shadow.
 	$effect(() => {
 		for (const side of [-1, 1] as const) {
-			m.footLift(side, clamp(Math.abs(legAngle(side).current) / 25, 0, 1));
+			const { angle, grow } = legPull(side).current;
+			m.footLift(side, clamp(Math.max(Math.abs(angle) / 25, Math.abs(grow) / 20), 0, 1));
 		}
 	});
 	const shortsBottom = $derived(shortsBottomY(shoes, b));
@@ -191,14 +225,20 @@
 	const capeHem = $derived(Math.min(b.hipY + 18, b.groundY - 4));
 </script>
 
-{#snippet arm(p: ArmAngles, swing: boolean)}
-	<g transform="translate({shoulder} {b.shoulderY + arms.current.drop}) rotate({p.a1})">
-		<path class="tube-edge" d="M0 0V{b.upperArm}" />
-		<path class="tube upper-arm" d="M0 0V{b.upperArm}" />
+{#snippet arm(p: ArmReach, swing: boolean)}
+	{@const upper = b.upperArm * p.stretch}
+	{@const fore = b.forearm * p.stretch}
+	<!-- A stretched arm thins out, like pulled rubber keeping its volume; the hand keeps its size. -->
+	<g
+		transform="translate({shoulder} {b.shoulderY + arms.current.drop}) rotate({p.a1})"
+		style:--arm="{b.armWidth / Math.sqrt(p.stretch)}px"
+	>
+		<path class="tube-edge" d="M0 0V{upper}" />
+		<path class="tube upper-arm" d="M0 0V{upper}" />
 		{#if outfit === 'jersey'}
-			<path class="sleeve-band" d="M{-b.armWidth / 2} {b.upperArm - 8}H{b.armWidth / 2}" />
+			<path class="sleeve-band" d="M{-b.armWidth / 2} {upper - 8}H{b.armWidth / 2}" />
 		{/if}
-		<g transform="translate(0 {b.upperArm}) rotate({p.a2})">
+		<g transform="translate(0 {upper}) rotate({p.a2})">
 			<g
 				class="fore"
 				class:swing
@@ -206,9 +246,9 @@
 				class:cheer={pose.swing === 'cheer'}
 				class:gesture={pose.swing === 'gesture'}
 			>
-				<path class="tube-edge" d="M0 0V{b.forearm}" />
-				<path class="tube" d="M0 0V{b.forearm}" />
-				<circle class="hand" cy={b.forearm + 1} r={(b.armWidth * 8) / 14} />
+				<path class="tube-edge" d="M0 0V{fore}" />
+				<path class="tube" d="M0 0V{fore}" />
+				<circle class="hand" cy={fore + 1} r={(b.armWidth * 8) / 14} />
 			</g>
 		</g>
 		<circle class="joint" r={b.armWidth / 2 + 0.5} />
@@ -404,19 +444,23 @@
 		{/snippet}
 
 		{#snippet leg(side: number)}
+			{@const grow = legPull(side).current.grow}
+			<!-- Like the arms, a stretched leg thins out. -->
+			{@const legHw =
+				(b.legWidth / 2) * Math.sqrt((legBottom - legTop) / Math.max(legBottom - legTop + grow, 8))}
 			<g transform="translate({100 + side * b.legX} 0)">
 				<rect
 					class="leg"
 					x={-legHw}
 					y={legTop}
 					width={legHw * 2}
-					height={legBottom - legTop}
+					height={Math.max(legBottom - legTop + grow, 8)}
 					rx={legHw}
 				/>
 				<rect
 					class="knee"
 					x={-legHw - 0.5}
-					y={(legTop + legBottom) / 2}
+					y={(legTop + legBottom + grow) / 2}
 					width={legHw * 2 + 1}
 					height="2.6"
 					rx="1.3"
@@ -457,7 +501,7 @@
 			{@const pivot = hip(side)}
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<g
-				transform="rotate({legAngle(side).current} {pivot.x} {pivot.y})"
+				transform="rotate({legPull(side).current.angle} {pivot.x} {pivot.y})"
 				class:grabbable={m.canGrab}
 				data-grab={side < 0 ? 'leg-left' : 'leg-right'}
 				onpointerdown={(e) => grabLeg(e, side)}
@@ -465,7 +509,10 @@
 				{#if part === 'leg'}
 					{@render leg(side)}
 				{:else}
-					{@render foot(side, part === 'rim')}
+					<!-- The leg points straight down in here, so stretching it pushes the foot along y. -->
+					<g transform="translate(0 {legPull(side).current.grow})">
+						{@render foot(side, part === 'rim')}
+					</g>
 				{/if}
 			</g>
 		{/snippet}

@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { GRAB_LIMITS, legSwing, pullHead, reachArm, swing, type Point } from './grab.js';
+import {
+	GRAB_LIMITS,
+	legStretch,
+	legSwing,
+	pullHead,
+	reachArm,
+	rubber,
+	swing,
+	type Point
+} from './grab.js';
 import { limbEnd, type ArmAngles } from './parts/body.js';
 
 const O: Point = { x: 0, y: 0 };
@@ -80,6 +89,21 @@ describe('reachArm', () => {
 		}
 	);
 
+	it('does not stretch an arm that can reach', () => {
+		for (const target of reachable) {
+			expect(reachArm(target, SHOULDER, UPPER, FORE, REST).stretch).toBe(1);
+		}
+	});
+
+	it('stretches like rubber past its reach: one to one at first, then ever less', () => {
+		const reach = UPPER + FORE;
+		const at = (d: number) => reachArm(around(SHOULDER, d, 90), SHOULDER, UPPER, FORE, REST);
+		expect(at(reach + 2).stretch * reach).toBeCloseTo(reach + 2, 0);
+		expect(at(reach * 2).stretch).toBeGreaterThan(1.6);
+		expect(at(reach * 2).stretch).toBeLessThan(2);
+		expect(at(reach * 50).stretch).toBeLessThanOrEqual(GRAB_LIMITS.arm);
+	});
+
 	it('keeps the bend direction of prev while bent', () => {
 		for (let deg = 0; deg < 360; deg += 30) {
 			const target = around(SHOULDER, 18, deg);
@@ -136,26 +160,34 @@ describe('pullHead', () => {
 		expect(r.stretch).toBeCloseTo(1);
 	});
 
-	it('bends clockwise when pulled toward +x', () => {
-		const r = pullHead(pivot, from, around(pivot, 50, -90 + 20));
-		expect(r.angle).toBeCloseTo(20);
+	it('bends clockwise when pulled toward +x, nearly one to one at first', () => {
+		const r = pullHead(pivot, from, around(pivot, 50, -90 + 10));
+		expect(r.angle).toBeGreaterThan(9.5);
+		expect(r.angle).toBeLessThan(10);
 		expect(r.stretch).toBeCloseTo(1);
 	});
 
-	it('clamps the bend to the head limit', () => {
-		expect(pullHead(pivot, from, around(pivot, 50, -90 + 90)).angle).toBe(GRAB_LIMITS.head);
-		expect(pullHead(pivot, from, around(pivot, 50, -90 - 90)).angle).toBe(-GRAB_LIMITS.head);
+	it('bends ever less the further it is pulled, never past the head limit', () => {
+		const at = (deg: number) => pullHead(pivot, from, around(pivot, 50, -90 + deg)).angle;
+		expect(at(40) - at(20)).toBeLessThan(at(20));
+		expect(at(170)).toBeLessThan(GRAB_LIMITS.head);
+		expect(at(-170)).toBeGreaterThan(-GRAB_LIMITS.head);
+		expect(at(90)).toBeGreaterThan(GRAB_LIMITS.head * 0.8);
 	});
 
-	it('stretches by half the pull', () => {
-		expect(pullHead(pivot, from, { x: 100, y: 70 }).stretch).toBeCloseTo(1.1);
-		expect(pullHead(pivot, from, { x: 100, y: 90 }).stretch).toBeCloseTo(0.9);
+	it('stretches when pulled away from the neck and squashes when pushed in', () => {
+		expect(pullHead(pivot, from, { x: 100, y: 75 }).stretch).toBeCloseTo(1.1, 1);
+		expect(pullHead(pivot, from, { x: 100, y: 85 }).stretch).toBeCloseTo(0.9, 1);
 	});
 
-	it('clamps the stretch', () => {
+	it('keeps stretching further out, but never past the limits', () => {
 		const [lo, hi] = GRAB_LIMITS.stretch;
-		expect(pullHead(pivot, from, { x: 100, y: -200 }).stretch).toBe(hi);
-		expect(pullHead(pivot, from, pivot).stretch).toBe(lo);
+		const at = (y: number) => pullHead(pivot, from, { x: 100, y }).stretch;
+		expect(at(0)).toBeGreaterThan(at(40));
+		expect(at(-40)).toBeGreaterThan(at(0));
+		expect(at(-2000)).toBeLessThanOrEqual(hi);
+		expect(at(-2000)).toBeGreaterThan(hi - 0.01);
+		expect(at(pivot.y)).toBeGreaterThanOrEqual(lo);
 	});
 
 	it('survives a grab right on the pivot', () => {
@@ -171,27 +203,57 @@ describe('legSwing', () => {
 	const turned = (deg: number) => around(hip, 40, 90 + deg);
 
 	it('follows small swings for both legs', () => {
-		expect(legSwing(hip, foot, turned(10), -1)).toBeCloseTo(10);
-		expect(legSwing(hip, foot, turned(-10), -1)).toBeCloseTo(-10);
-		expect(legSwing(hip, foot, turned(10), 1)).toBeCloseTo(10);
-		expect(legSwing(hip, foot, turned(-10), 1)).toBeCloseTo(-10);
+		expect(legSwing(hip, foot, turned(5), -1)).toBeCloseTo(5, 0);
+		expect(legSwing(hip, foot, turned(-5), -1)).toBeCloseTo(-5, 0);
+		expect(legSwing(hip, foot, turned(5), 1)).toBeCloseTo(5, 0);
+		expect(legSwing(hip, foot, turned(-5), 1)).toBeCloseTo(-5, 0);
 	});
 
-	it('lets the left leg swing far out but only a little in', () => {
-		expect(legSwing(hip, foot, turned(60), -1)).toBeCloseTo(60);
-		expect(legSwing(hip, foot, turned(120), -1)).toBe(GRAB_LIMITS.legOut);
-		expect(legSwing(hip, foot, turned(-60), -1)).toBe(-GRAB_LIMITS.legIn);
+	it('lets the left leg swing far out but only a little in, with soft limits', () => {
+		expect(legSwing(hip, foot, turned(60), -1)).toBeGreaterThan(45);
+		expect(legSwing(hip, foot, turned(170), -1)).toBeLessThan(GRAB_LIMITS.legOut);
+		expect(legSwing(hip, foot, turned(170), -1)).toBeGreaterThan(
+			legSwing(hip, foot, turned(120), -1)
+		);
+		expect(legSwing(hip, foot, turned(-60), -1)).toBeGreaterThan(-GRAB_LIMITS.legIn);
+		expect(legSwing(hip, foot, turned(-60), -1)).toBeLessThan(-GRAB_LIMITS.legIn * 0.9);
 	});
 
 	it('mirrors the limits for the right leg', () => {
-		expect(legSwing(hip, foot, turned(-60), 1)).toBeCloseTo(-60);
-		expect(legSwing(hip, foot, turned(-120), 1)).toBe(-GRAB_LIMITS.legOut);
-		expect(legSwing(hip, foot, turned(60), 1)).toBe(GRAB_LIMITS.legIn);
+		expect(legSwing(hip, foot, turned(-60), 1)).toBeCloseTo(-legSwing(hip, foot, turned(60), -1));
+		expect(legSwing(hip, foot, turned(60), 1)).toBeCloseTo(-legSwing(hip, foot, turned(-60), -1));
 	});
 
 	it('swings the left foot toward -x when positive', () => {
 		const deg = legSwing(hip, foot, turned(30), -1);
 		const end = around(hip, 40, 90 + deg);
 		expect(end.x).toBeLessThan(foot.x);
+	});
+});
+
+describe('rubber', () => {
+	it('follows one to one at first and approaches its limit without passing it', () => {
+		expect(rubber(1, 50)).toBeCloseTo(1, 2);
+		expect(rubber(-1, 50)).toBeCloseTo(-1, 2);
+		expect(rubber(50, 50)).toBeLessThan(50);
+		expect(rubber(500, 50)).toBeLessThanOrEqual(50);
+		expect(rubber(500, 50)).toBeGreaterThan(49.9);
+	});
+});
+
+describe('legStretch', () => {
+	const hip: Point = { x: 80, y: 220 };
+	const foot: Point = { x: 80, y: 260 };
+
+	it('grows the leg as its foot is pulled away from the hip, softly up to the limit', () => {
+		expect(legStretch(hip, foot, foot)).toBeCloseTo(0);
+		expect(legStretch(hip, foot, { x: 80, y: 265 })).toBeCloseTo(5, 0);
+		expect(legStretch(hip, foot, { x: 80, y: 2000 })).toBeLessThanOrEqual(GRAB_LIMITS.legGrow);
+	});
+
+	it('only shrinks a little when pushed toward the hip', () => {
+		const pushed = legStretch(hip, foot, hip);
+		expect(pushed).toBeLessThan(0);
+		expect(pushed).toBeGreaterThanOrEqual(-GRAB_LIMITS.legShrink);
 	});
 });

@@ -50,6 +50,23 @@ async function pullRight(at: (type: string, x: number, y: number) => void) {
 }
 
 describe('Mascot grab', () => {
+	it('stretches the head like taffy when pulled far away from the neck', async () => {
+		const { head, at } = setup();
+		const scaleY = () =>
+			Number(/scale\([-\d.e]+ ([-\d.e]+)\)/.exec(head.getAttribute('transform') ?? '')?.[1]);
+		expect(scaleY()).toBeCloseTo(1, 1);
+		// The pop-in scales the whole figure, which would skew where the grab lands.
+		await new Promise((r) => setTimeout(r, 700));
+		at('pointerdown', 100, 60);
+		for (let k = 1; k <= 8; k++) {
+			at('pointermove', 100, 60 - k * 15);
+			await frame();
+		}
+		await expect.poll(scaleY).toBeGreaterThan(1.5);
+		at('pointerup', 100, -60);
+		await expect.poll(scaleY, { timeout: 4000 }).toBeCloseTo(1, 1);
+	});
+
 	it('bends the head toward the pointer and springs back when let go', async () => {
 		const { at, angle, onreaction } = setup();
 		await pullRight(at);

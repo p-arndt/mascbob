@@ -206,7 +206,8 @@ describe('Body', () => {
 			const { container } = render(Mascot, { motion: 'full', size: 200 });
 			const arm = container.querySelector('[data-grab="arm-left"]')!;
 			expect(arm.classList.contains('grabbable')).toBe(true);
-			await expect.poll(() => shoulderAngle(container, 'arm-left')).toBeCloseTo(16, 0);
+			// The pose spring starts at 16 and settles on the resting pose's 20.
+			await expect.poll(() => shoulderAngle(container, 'arm-left')).toBeCloseTo(20, 0);
 			const rest = shoulderAngle(container, 'arm-left');
 			const right = shoulderAngle(container, 'arm-right');
 			const release = pull(arm, arm.querySelector('.hand')!, -60, -70);
@@ -223,7 +224,7 @@ describe('Body', () => {
 		it('pulls the mirrored right arm in its own frame', async () => {
 			const { container } = render(Mascot, { motion: 'full', size: 200 });
 			const arm = container.querySelector('[data-grab="arm-right"]')!;
-			await expect.poll(() => shoulderAngle(container, 'arm-right')).toBeCloseTo(16, 0);
+			await expect.poll(() => shoulderAngle(container, 'arm-right')).toBeCloseTo(20, 0);
 			const release = pull(arm, arm.querySelector('.hand')!, 60, -70);
 			// Outward is +x on screen for the right arm, which is a raised angle in left-arm math.
 			await expect.poll(() => shoulderAngle(container, 'arm-right')).toBeGreaterThan(56);
@@ -244,6 +245,35 @@ describe('Body', () => {
 			await expect
 				.poll(() => Math.abs(legAngle(container, 'leg-left')), { timeout: 5000 })
 				.toBeLessThan(0.5);
+		});
+
+		it('stretches an arm and thins it out when pulled past its reach', async () => {
+			const { container } = render(Mascot, { motion: 'full', size: 200 });
+			const arm = container.querySelector('[data-grab="arm-left"]')!;
+			const upper = () => {
+				const d = arm.querySelector('.upper-arm')!.getAttribute('d') ?? '';
+				return Number(/V([-\d.e]+)/.exec(d)?.[1]);
+			};
+			const rest = upper();
+			const release = pull(arm, arm.querySelector('.hand')!, -120, 0);
+			await expect.poll(upper).toBeGreaterThan(rest * 1.5);
+			const width = (arm.querySelector(':scope > g') as SVGGElement).style.getPropertyValue(
+				'--arm'
+			);
+			expect(parseFloat(width)).toBeLessThan(14);
+			release();
+			await expect.poll(upper, { timeout: 5000 }).toBeCloseTo(rest, 0);
+		});
+
+		it('stretches a leg when its foot is pulled away from the hip', async () => {
+			const { container } = render(Mascot, { motion: 'full', size: 200 });
+			const leg = container.querySelectorAll('[data-grab="leg-left"]')[1];
+			const length = () => Number(leg.querySelector('.leg')!.getAttribute('height'));
+			const rest = length();
+			const release = pull(leg, leg.querySelector('.leg')!, 0, 60);
+			await expect.poll(length).toBeGreaterThan(rest + 20);
+			release();
+			await expect.poll(length, { timeout: 5000 }).toBeCloseTo(rest, 0);
 		});
 
 		it('stops the foot tap while its leg is held', async () => {

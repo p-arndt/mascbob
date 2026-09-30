@@ -54,7 +54,7 @@ pnpm add mascbob
 
 It reacts to the pointer: its head tilts toward the cursor, stroke over its head to pet it, circle around it to make it dizzy,
 boop it over and over to tickle it (keep going once it's grumpy and its head bursts into confetti),
-grab its head, an arm or a leg and pull it around like a puppet (it springs back with a wobble when you let go),
+grab its head, an arm or a leg and pull it around like a puppet (it stretches like rubber the further you pull and snaps back with a wobble when you let go),
 or leave it alone until it gets bored. `follow`, `pet`, `dizzy`, `tickle`, `explode`, `grab` and `bored` are on by
 default; `startle` and `shy` are opt-in. A plain click is still a boop; dragging only starts after a few pixels.
 The `grab` event carries the `part` (one of `GRAB_PARTS`); in head-only mode (`body={false}`) only the head can be grabbed:

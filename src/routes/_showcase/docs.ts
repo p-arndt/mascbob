@@ -142,7 +142,7 @@ export const REACTION_DOCS: Record<string, string> = {
 	tickle: 'Boop it again and again. Emits `{ type: "tickle", level, boops }`.',
 	explode:
 		'Keep booping once it is grumpy and its head bursts into confetti. Needs `tickle`. Emits `explode`.',
-	grab: 'Drag its head, an arm or a leg and it bends like a puppet, then springs back when you let go. A plain click is still a boop. Arms and legs need `body`. Emits `{ type: "grab", part }`.',
+	grab: 'Drag its head, an arm or a leg and it bends like a puppet, stretching like rubber the further you pull, then snaps back when you let go. A plain click is still a boop. Arms and legs need `body`. Emits `{ type: "grab", part }`.',
 	bored: 'Leave the mouse alone for 20 s. Emits `bored`, then `wake` when you come back.'
 };
 

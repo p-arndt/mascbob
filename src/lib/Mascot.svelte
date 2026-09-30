@@ -15,7 +15,7 @@
 	import { moodConfig } from './moods.js';
 	import { createBabble } from './speech.js';
 	import { aimAt, saccade } from './gaze.js';
-	import { drag, pullHead, type GrabPart } from './grab.js';
+	import { RELEASE_SPRING, drag, pullHead, tune, type GrabPart } from './grab.js';
 	import {
 		ReactionController,
 		resolveReactions,
@@ -175,7 +175,7 @@
 	/** 0..1; mouth opening of a yawn. */
 	const yawnMouth = new Tween(0);
 	/** Head bend (degrees) and stretch while pulled; loose, so letting go rings out as a jelly wobble. */
-	const headPull = new Spring({ angle: 0, stretch: 1 }, { stiffness: 0.12, damping: 0.25 });
+	const headPull = new Spring({ angle: 0, stretch: 1 }, RELEASE_SPRING);
 
 	let root = $state<HTMLElement>();
 	// Offscreen mascots pause their timers, pointer tracking and CSS loops: a page full of them stays smooth.
@@ -595,9 +595,13 @@
 		const pivot = { x: 100, y: neckY };
 		drag(e, {
 			frame: () => tiltFrame,
-			start: () => grab('head'),
-			move: (to, from) => headPull.set(pullHead(pivot, from, to), { instant: true }),
+			start: () => {
+				if (!grab('head')) return false;
+				tune(headPull, true);
+			},
+			move: (to, from) => headPull.set(pullHead(pivot, from, to), { instant: reduced }),
 			end: () => {
+				tune(headPull, false);
 				headPull.set({ angle: 0, stretch: 1 }, { instant: reduced });
 				release();
 			}

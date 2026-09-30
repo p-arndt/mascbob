@@ -11,13 +11,18 @@ export interface Point {
 }
 
 export const GRAB_LIMITS = {
-	/** Degrees the head bends on its neck either way. */
-	head: 40,
-	/** Head stretch when pulled away from (or pushed toward) the neck. */
-	stretch: [0.86, 1.22],
+	/** Degrees the head bends on its neck either way, approached but never reached. */
+	head: 55,
+	/** Head stretch along the neck: squashed when pushed in, taffy when pulled far out. */
+	stretch: [0.8, 2],
+	/** How many times its own length an arm stretches at most. */
+	arm: 2.6,
 	/** Degrees a leg swings outward, and inward across the other one. */
-	legOut: 75,
-	legIn: 15
+	legOut: 80,
+	legIn: 18,
+	/** ViewBox units a leg grows (or shrinks) at most when pulled along its length. */
+	legGrow: 70,
+	legShrink: 8
 } as const;
 
 /** Below this much elbow bend (degrees) the arm is nearly straight and may flip its elbow freely. */
@@ -31,6 +36,20 @@ function wrap(a: number): number {
 }
 
 /**
+ * Rubber band: follows `x` one to one at first, then gives less and less the further it
+ * is pulled, approaching `max` without ever reaching it. Soft limits feel like material
+ * resisting; hard clamps feel like the part got stuck.
+ */
+export function rubber(x: number, max: number): number {
+	return max * Math.tanh(x / max);
+}
+
+/** `rubber` with a separate limit on each side of zero. */
+function rubber2(x: number, below: number, above: number): number {
+	return x < 0 ? rubber(x, below) : rubber(x, above);
+}
+
+/**
  * Signed degrees `to` has turned around `pivot` since `from`, in SVG's `rotate()`
  * convention (positive is clockwise on screen, where y points down).
  */
@@ -40,12 +59,18 @@ export function swing(pivot: Point, from: Point, to: Point): number {
 	return wrap(deg(b - a));
 }
 
+/** Arm angles plus how much both segments are stretched (1 = their own length). */
+export interface ArmReach extends ArmAngles {
+	stretch: number;
+}
+
 /**
  * Two-bone IK for the left arm (mirror x around 100 for the right one), in the angle
  * convention of `limbEnd`: 0 is hanging down, positive swings toward -x. Out-of-reach
- * targets get the arm pointing at them at full length. The elbow keeps bending the way
- * it did in `prev` and only flips while the arm is nearly straight, so it never snaps;
- * when free, it prefers pointing outward, away from the torso.
+ * targets straighten the arm toward them and stretch it like rubber: the hand stays under
+ * the pointer at first and lags further behind the harder it is pulled. The elbow keeps
+ * bending the way it did in `prev` and only flips while the arm is nearly straight, so it
+ * never snaps; when free, it prefers pointing outward, away from the torso.
  */
 export function reachArm(
 	target: Point,
@@ -53,11 +78,14 @@ export function reachArm(
 	upper: number,
 	fore: number,
 	prev: ArmAngles
-): ArmAngles {
+): ArmReach {
 	const dx = target.x - shoulder.x;
 	const dy = target.y - shoulder.y;
 	const base = deg(Math.atan2(-dx, dy));
-	const d = clamp(Math.hypot(dx, dy), Math.abs(upper - fore) + 0.01, upper + fore - 0.001);
+	const reach = upper + fore;
+	const dist = Math.hypot(dx, dy);
+	const stretch = dist > reach ? 1 + rubber(dist / reach - 1, GRAB_LIMITS.arm - 1) : 1;
+	const d = clamp(dist, Math.abs(upper - fore) + 0.01, reach - 0.001);
 	const alpha = deg(Math.acos(clamp((upper ** 2 + d ** 2 - fore ** 2) / (2 * upper * d), -1, 1)));
 	const inner = deg(
 		Math.acos(clamp((upper ** 2 + fore ** 2 - d ** 2) / (2 * upper * fore), -1, 1))
@@ -68,7 +96,7 @@ export function reachArm(
 	const outward = Math.sin((a.a1 * Math.PI) / 180) >= Math.sin((b.a1 * Math.PI) / 180) ? a : b;
 	const pick = bend < STRAIGHT || prev.a2 === 0 ? outward : prev.a2 < 0 ? a : b;
 	// Stay on the same turn as `prev`, so a spring toward the result never spins the arm around.
-	return { a1: prev.a1 + wrap(pick.a1 - prev.a1), a2: pick.a2 };
+	return { a1: prev.a1 + wrap(pick.a1 - prev.a1), a2: pick.a2, stretch };
 }
 
 /**
@@ -76,12 +104,12 @@ export function reachArm(
  * from `from` to `to`, both relative to the neck `pivot`.
  */
 export function pullHead(pivot: Point, from: Point, to: Point): { angle: number; stretch: number } {
-	const angle = clamp(swing(pivot, from, to), -GRAB_LIMITS.head, GRAB_LIMITS.head);
-	const r0 = Math.max(Math.hypot(from.x - pivot.x, from.y - pivot.y), 12);
+	const angle = rubber(swing(pivot, from, to), GRAB_LIMITS.head);
+	// A grab close to the neck would otherwise turn every pixel into a huge stretch.
+	const r0 = Math.max(Math.hypot(from.x - pivot.x, from.y - pivot.y), 50);
 	const r1 = Math.hypot(to.x - pivot.x, to.y - pivot.y);
-	// Half the pull goes into the stretch; the rest reads as slack in the neck.
 	const [lo, hi] = GRAB_LIMITS.stretch;
-	return { angle, stretch: clamp(1 + (r1 / r0 - 1) * 0.5, lo, hi) };
+	return { angle, stretch: 1 + rubber2(r1 / r0 - 1, 1 - lo, hi - 1) };
 }
 
 /**
@@ -90,8 +118,30 @@ export function pullHead(pivot: Point, from: Point, to: Point): { angle: number;
  */
 export function legSwing(pivot: Point, from: Point, to: Point, side: -1 | 1): number {
 	// Rotating clockwise swings the foot toward -x, which is outward for the left leg.
-	const outward = clamp(swing(pivot, from, to) * -side, -GRAB_LIMITS.legIn, GRAB_LIMITS.legOut);
+	const outward = rubber2(swing(pivot, from, to) * -side, GRAB_LIMITS.legIn, GRAB_LIMITS.legOut);
 	return outward * -side;
+}
+
+/** ViewBox units a leg grows while its grabbed point is pulled away from the hip (negative: pushed in). */
+export function legStretch(pivot: Point, from: Point, to: Point): number {
+	const r0 = Math.hypot(from.x - pivot.x, from.y - pivot.y);
+	const r1 = Math.hypot(to.x - pivot.x, to.y - pivot.y);
+	return rubber2(r1 - r0, GRAB_LIMITS.legShrink, GRAB_LIMITS.legGrow);
+}
+
+/**
+ * Spring settings for a held part: stiff and well damped, so it tracks the pointer
+ * closely but smooths over coarse or jumpy pointer events instead of teleporting.
+ */
+export const HOLD_SPRING = { stiffness: 0.3, damping: 0.75 } as const;
+/** Spring settings once let go: loose and underdamped, so the part snaps back and jiggles. */
+export const RELEASE_SPRING = { stiffness: 0.12, damping: 0.22 } as const;
+
+/** Switches a spring between `HOLD_SPRING` and `RELEASE_SPRING`. */
+export function tune(spring: { stiffness: number; damping: number }, held: boolean): void {
+	const c = held ? HOLD_SPRING : RELEASE_SPRING;
+	spring.stiffness = c.stiffness;
+	spring.damping = c.damping;
 }
 
 /** Client coordinates to the local coordinates of `frame`, through every SVG and CSS transform. */
