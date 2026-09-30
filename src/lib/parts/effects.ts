@@ -1,7 +1,5 @@
-import { REACTION_TIMING } from '../interaction.js';
-
-export type ParticleKind = 'star' | 'heart' | 'confetti' | 'dot' | 'puff';
-export type ParticleTone = 'accent' | 'cheek' | 'eye' | 'light' | 'body' | 'smoke';
+export type ParticleKind = 'star' | 'heart' | 'confetti' | 'dot';
+export type ParticleTone = 'accent' | 'cheek' | 'eye' | 'light' | 'body';
 
 /**
  * One particle of a one-shot burst. It starts at (`x`, `y`), drifts `dx`
@@ -44,8 +42,6 @@ export interface BurstOptions {
 	duration: [number, number];
 	/** Upper bound for the random start delay. */
 	stagger: number;
-	/** Milliseconds before the first particle starts. */
-	at?: number;
 	rng?: () => number;
 }
 
@@ -74,7 +70,7 @@ export function burst(o: BurstOptions): Particle[] {
 			fall: round(rise + range(o.gravity)),
 			spin: Math.round((rng() < 0.5 ? -1 : 1) * range([90, 300])),
 			size: round(range(o.size)),
-			delay: Math.round((o.at ?? 0) + rng() * o.stagger),
+			delay: Math.round(rng() * o.stagger),
 			duration: Math.round(range(o.duration))
 		});
 	}
@@ -130,60 +126,28 @@ export function confettiPop(head: HeadBox, rng?: () => number): Particle[] {
 	});
 }
 
-/** Longest a particle from `headBlast` can live, fuse included. */
-export const BLAST_LIFETIME = 3100;
+/** Longest a particle from `headBlast` can live. */
+export const BLAST_LIFETIME = 1600;
 
-/**
- * The head bursting once the fuse has burnt down: fast debris flung all around, smoke
- * puffs drifting up, and slow confetti thrown high that rains back down past the figure.
- */
+/** The head bursting: confetti and shell chips thrown all around from where the head was. */
 export function headBlast(head: HeadBox, rng?: () => number): Particle[] {
 	const cy = (head.top + head.bottom) / 2;
-	const common = { cx: 100, cy, at: REACTION_TIMING.explodeFuse, rng };
-	return [
-		...burst({
-			...common,
-			rx: head.halfWidth * 0.6,
-			ry: (head.bottom - head.top) * 0.3,
-			count: 30,
-			kinds: ['confetti', 'star', 'confetti', 'dot', 'confetti', 'heart'],
-			tones: ['accent', 'cheek', 'eye', 'light', 'body'],
-			arc: [-Math.PI * 1.5, Math.PI * 0.5],
-			reach: [45, 90],
-			gravity: [70, 110],
-			size: [5, 10],
-			duration: [1300, 1900],
-			stagger: 80
-		}),
-		...burst({
-			...common,
-			rx: head.halfWidth * 0.4,
-			ry: (head.bottom - head.top) * 0.2,
-			count: 8,
-			kinds: ['puff'],
-			tones: ['smoke'],
-			arc: [-Math.PI * 1.5, Math.PI * 0.5],
-			reach: [14, 30],
-			gravity: [-30, -14],
-			size: [12, 20],
-			duration: [1400, 1900],
-			stagger: 150
-		}),
-		...burst({
-			...common,
-			rx: head.halfWidth * 0.3,
-			ry: 8,
-			count: 18,
-			kinds: ['confetti', 'confetti', 'dot'],
-			tones: ['accent', 'cheek', 'eye', 'light'],
-			arc: [-Math.PI * 0.85, -Math.PI * 0.15],
-			reach: [60, 100],
-			gravity: [130, 170],
-			size: [3.5, 6],
-			duration: [1800, 2100],
-			stagger: 250
-		})
-	];
+	return burst({
+		cx: 100,
+		cy,
+		rx: head.halfWidth * 0.6,
+		ry: (head.bottom - head.top) * 0.3,
+		count: 34,
+		kinds: ['confetti', 'confetti', 'dot', 'star', 'confetti', 'heart'],
+		tones: ['accent', 'cheek', 'eye', 'light', 'body'],
+		arc: [-Math.PI * 1.5, Math.PI * 0.5],
+		reach: [36, 70],
+		gravity: [50, 80],
+		size: [4, 8],
+		duration: [1000, 1450],
+		stagger: 120,
+		rng
+	});
 }
 
 /** Deterministic PRNG for tests and reproducible bursts. */

@@ -60,10 +60,9 @@ describe('Mascot reactions', () => {
 		for (let i = 0; i < 14; i++) el.click();
 		expect(onreaction).toHaveBeenLastCalledWith({ type: 'explode' });
 		await expect.element(el.querySelector('.blast') as SVGElement).toHaveClass('blasting');
-		expect(el.querySelectorAll('.pp').length).toBeGreaterThanOrEqual(56);
-		expect(el.querySelector('.blast-fx')).not.toBeNull();
+		expect(el.querySelectorAll('.pp').length).toBeGreaterThanOrEqual(34);
 		await expect
-			.element(el.querySelector('.blast') as SVGElement, { timeout: 5000 })
+			.element(el.querySelector('.blast') as SVGElement, { timeout: 3000 })
 			.not.toHaveClass('blasting');
 	});
 

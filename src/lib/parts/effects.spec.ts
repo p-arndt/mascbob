@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { SHAPE_DEFS } from '../geometry.js';
-import { REACTION_TIMING } from '../interaction.js';
 import {
 	BLAST_LIFETIME,
 	BURST_LIFETIME,
@@ -75,11 +74,7 @@ describe('presets', () => {
 			const ps = headBlast(shape, mulberry32(4));
 			expect(ps.some((p) => p.dx < -20)).toBe(true);
 			expect(ps.some((p) => p.dx > 20)).toBe(true);
-			expect(ps.some((p) => p.kind === 'puff')).toBe(true);
-			for (const p of ps) {
-				expect(p.delay).toBeGreaterThanOrEqual(REACTION_TIMING.explodeFuse);
-				expect(p.delay + p.duration).toBeLessThanOrEqual(BLAST_LIFETIME);
-			}
+			for (const p of ps) expect(p.delay + p.duration).toBeLessThanOrEqual(BLAST_LIFETIME);
 		}
 	});
 
