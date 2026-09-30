@@ -178,7 +178,7 @@ export function legStretch(pivot: Point, from: Point, to: Point): number {
  * Spring settings for a held part: stiff and well damped, so it tracks the pointer
  * closely but smooths over coarse or jumpy pointer events instead of teleporting.
  */
-export const HOLD_SPRING = { stiffness: 0.3, damping: 0.75 } as const;
+export const HOLD_SPRING = { stiffness: 0.5, damping: 0.9 } as const;
 /** Spring settings once let go: loose and underdamped, so the part snaps back and jiggles. */
 export const RELEASE_SPRING = { stiffness: 0.12, damping: 0.22 } as const;
 
@@ -222,24 +222,36 @@ export function drag(e: PointerEvent, h: DragHandlers): void {
 	if (!from) return;
 	const threshold = h.threshold ?? 5;
 	let active = false;
+	let x = e.clientX;
+	let y = e.clientY;
+	let raf = 0;
 	try {
 		el.setPointerCapture(e.pointerId);
 	} catch {
 		// Synthetic events have no active pointer to capture; moves still bubble to `el`.
 	}
+	// Re-aims every frame, not only on pointer events: the figure keeps breathing, swaying and
+	// leaning under a still pointer, and the held part has to stay put under it regardless.
+	const follow = () => {
+		if (!el.isConnected) return done();
+		const f = h.frame();
+		const to = f && toFrame(f, x, y);
+		if (to) h.move(to, from);
+		raf = requestAnimationFrame(follow);
+	};
 	const move = (ev: PointerEvent) => {
 		if (ev.pointerId !== e.pointerId) return;
-		if (!active) {
-			if (Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) < threshold) return;
-			if (h.start(from) === false) return done();
-			active = true;
-		}
-		const f = h.frame();
-		const to = f && toFrame(f, ev.clientX, ev.clientY);
-		if (to) h.move(to, from);
+		x = ev.clientX;
+		y = ev.clientY;
+		if (active) return;
+		if (Math.hypot(x - e.clientX, y - e.clientY) < threshold) return;
+		if (h.start(from) === false) return done();
+		active = true;
+		follow();
 	};
 	const done = (ev?: PointerEvent) => {
 		if (ev && ev.pointerId !== e.pointerId) return;
+		cancelAnimationFrame(raf);
 		el.removeEventListener('pointermove', move);
 		el.removeEventListener('pointerup', done);
 		el.removeEventListener('pointercancel', done);

@@ -235,14 +235,23 @@
 		return () => clearTimeout(timer);
 	});
 
+	// A held part is being pulled, not pressed: the figure stays unsquashed under it.
 	const restSquish = () =>
-		pressed ? { x: 1.1, y: 0.88 } : hovered ? { x: 0.985, y: 1.03 } : { x: 1, y: 1 };
+		grabbing
+			? { x: 1, y: 1 }
+			: pressed
+				? { x: 1.1, y: 0.88 }
+				: hovered
+					? { x: 0.985, y: 1.03 }
+					: { x: 1, y: 1 };
 
 	// Pressing squashes and holds (well damped, so it doesn't jiggle while held); releasing
 	// springs back loosely, which overshoots into a jelly bounce.
 	const loosenSquish = () => {
-		squish.damping = pressed ? 0.6 : 0.18;
-		squish.stiffness = pressed ? 0.25 : 0.16;
+		// Letting go of a press bounces; starting a grab eases out of it, or the figure would
+		// jiggle just as it gets pulled.
+		squish.damping = pressed || grabbing ? 0.6 : 0.18;
+		squish.stiffness = pressed || grabbing ? 0.25 : 0.16;
 	};
 	$effect(() => {
 		if (reduced) {
@@ -595,8 +604,21 @@
 		return true;
 	}
 
+	/** Where the pointer was, in viewBox x, when the held part was first pulled. */
+	let tugFrom: number | null = null;
+	/** The whole figure leans after a pull, like something light being tugged off balance. */
+	function tug(x: number) {
+		if (instant) return;
+		tugFrom ??= x;
+		clearTimeout(wobbleTimer);
+		wobble.target = clamp((x - tugFrom) * 0.05, -5, 5);
+	}
+
 	function release() {
 		grabbing = null;
+		// Let go, the lean rings out on the wobble spring like the figure regaining its balance.
+		if (tugFrom !== null) wobble.target = 0;
+		tugFrom = null;
 		// Short enough that a later keyboard boop isn't eaten if the click never came.
 		swallowClickUntil = performance.now() + 300;
 	}
@@ -683,8 +705,10 @@
 			sample.hovering = e.pointerType !== 'touch';
 			sample.pressed = pressed;
 			// Dragging a part around in circles must not count as circling or petting.
-			if (grabbing) reactor.activity();
-			else reactor.pointer(sample);
+			if (grabbing) {
+				reactor.activity();
+				tug(sample.x);
+			} else reactor.pointer(sample);
 		};
 		const leave = () => reactor.leave();
 		const opts = { passive: true } as const;

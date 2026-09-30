@@ -82,6 +82,47 @@ describe('Mascot grab', () => {
 		await expect.poll(() => Math.abs(angle()), { timeout: 4000 }).toBeLessThan(0.5);
 	});
 
+	it('leans the whole figure after a pull and rights it again on release', async () => {
+		const { el, at } = setup();
+		const rock = el.querySelector('.stand > g') as SVGGElement;
+		const lean = () =>
+			Number(/rotate\(([-\d.e]+)/.exec(rock.getAttribute('transform') ?? '')?.[1] ?? NaN);
+		const squash = () =>
+			/scale\(([-\d.e]+) ([-\d.e]+)\)/
+				.exec(rock.firstElementChild?.getAttribute('transform') ?? '')
+				?.slice(1)
+				.map(Number) ?? [NaN, NaN];
+		await new Promise((r) => setTimeout(r, 700));
+		at('pointerdown', 100, 60);
+		// A hand presses for a moment before it starts pulling, long enough to squash the figure.
+		await new Promise((r) => setTimeout(r, 200));
+		for (let k = 1; k <= 6; k++) {
+			at('pointermove', 100 + k * 10, 60);
+			// The lean follows the pointer across the page, as the window sees it.
+			window.dispatchEvent(
+				new PointerEvent('pointermove', {
+					pointerId: 1,
+					pointerType: 'mouse',
+					clientX: el.getBoundingClientRect().left + ((100 + k * 10) / 200) * 200,
+					clientY: 60
+				})
+			);
+			await frame();
+		}
+		// Being held is not being pressed: the figure eases out of the press squash without
+		// bouncing past its rest shape, so it doesn't jiggle just as it gets pulled.
+		const widths: number[] = [];
+		for (let k = 0; k < 40; k++) {
+			widths.push(squash()[0]);
+			await frame();
+		}
+		expect(Math.min(...widths)).toBeGreaterThan(0.998);
+		expect(squash()[0]).toBeCloseTo(1, 2);
+		await expect.poll(lean).toBeGreaterThan(1);
+		at('pointerup', 160, 60);
+		await expect.poll(() => Math.abs(lean()), { timeout: 4000 }).toBeLessThan(0.3);
+	});
+
 	it('does not boop on the click that ends a drag, but on the next one', async () => {
 		const { el, at, onboop } = setup();
 		await pullRight(at);
