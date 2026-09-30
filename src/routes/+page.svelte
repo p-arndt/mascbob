@@ -20,6 +20,7 @@
 	import { copyText, reveal } from './_showcase/interactions.js';
 	import SiteFooter from './_showcase/SiteFooter.svelte';
 	import SiteNav from './_showcase/SiteNav.svelte';
+	import TabIcon from './_showcase/TabIcon.svelte';
 
 	const themeNames = Object.keys(THEMES) as ThemeName[];
 	const tint = (theme: ThemeName, amount = 14) =>
@@ -128,6 +129,8 @@
 	<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
 	<meta name="theme-color" content="#111110" media="(prefers-color-scheme: dark)" />
 </svelte:head>
+
+<TabIcon />
 
 <div class="site">
 	<SiteNav />

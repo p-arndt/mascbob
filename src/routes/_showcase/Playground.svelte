@@ -26,6 +26,7 @@
 	import { page } from '$app/state';
 	import Code, { type Token } from './Code.svelte';
 	import { download, snapshotSvg, svgToPng } from './exporter.js';
+	import { showInTab } from './favicon.svelte.js';
 	import { copyText, pick } from './interactions.js';
 	import {
 		COLOR_KEYS,
@@ -105,6 +106,14 @@
 		paper: 'Paper'
 	};
 	const customStage = $derived(stage.startsWith('#') ? stage : null);
+
+	// The first run is just the default config; only a real change (or a share link) takes over the tab.
+	let designed = false;
+	$effect(() => {
+		const look = $state.snapshot({ mood, theme: themeValue, shape, eyes, accessories });
+		if (designed) showInTab(look, 'studio');
+		designed = true;
+	});
 
 	// A share link restores its configuration into the studio.
 	onMount(() => {

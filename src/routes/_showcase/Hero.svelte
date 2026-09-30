@@ -14,6 +14,7 @@
 		type Shape,
 		type ThemeName
 	} from '$lib/index.js';
+	import { showInTab } from './favicon.svelte.js';
 	import { copyText, pick } from './interactions.js';
 
 	const reduced = new MediaQuery('(prefers-reduced-motion: reduce)');
@@ -61,6 +62,8 @@
 	let bubble = $state<string | null>(null);
 
 	const accent = $derived(THEMES[theme].accent);
+
+	$effect(() => showInTab({ mood, theme, shape }, 'hero'));
 	const word = $derived(WORDS[mood] ?? mood);
 
 	type Prop = 'mood' | 'theme' | 'shape' | 'outfit';
