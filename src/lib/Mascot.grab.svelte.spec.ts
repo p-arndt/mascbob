@@ -93,6 +93,20 @@ describe('Mascot grab', () => {
 		await expect.poll(neck, { timeout: 4000 }).toBeNull();
 	});
 
+	it('grows the neck out of the turned torso, behind it', async () => {
+		const { el, at, angle } = setup();
+		await new Promise((r) => setTimeout(r, 700));
+		await pullRight(at);
+		await expect.poll(angle).toBeGreaterThan(10);
+		const neck = el.querySelector('.neck') as SVGPathElement;
+		const torso = el.querySelector('clipPath[id$="-torso"]') as SVGElement;
+		expect(neck.compareDocumentPosition(torso) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+		// The torso turns toward the pull, so the neck's root leaves the center line with it.
+		const [rootX] = (/^M([-\d.e]+)/.exec(neck.getAttribute('d') ?? '')?.slice(1) ?? []).map(Number);
+		expect(rootX).toBeGreaterThan(100.5);
+		at('pointerup', 160, 78);
+	});
+
 	it('bends the head toward the pointer and springs back when let go', async () => {
 		const { at, angle, stretch, pose, onreaction } = setup();
 		// The pop-in scales the whole figure, which would skew where the grab lands.

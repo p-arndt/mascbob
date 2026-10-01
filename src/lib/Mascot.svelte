@@ -811,6 +811,12 @@
 	const neckWidth = $derived(Math.min(hw * 0.6, 32) / Math.sqrt(1 + neckOut / 60));
 	// The torso follows a pulled head a little, like a neck tugging at its shoulders.
 	const torsoTurn = $derived(headTurn.current * 0.45 + pullTurn * 0.5 * grabFeel.lean);
+	// The neck grows out of the turned torso, so its root turns with it.
+	const neckRoot = $derived.by(() => {
+		const a = (torsoTurn * Math.PI) / 180;
+		const d = fig.hipY - (fig.torsoTop + 14);
+		return { x: 100 + d * Math.sin(a), y: fig.hipY - d * Math.cos(a) };
+	});
 	// In full-body mode the legs take some of the squash so the head doesn't sink into the torso.
 	const figureSquash = $derived(
 		body
@@ -995,23 +1001,24 @@
 								bend.current.angle} {tiltPivot}) translate(100 {bendY}) scale({1 /
 								Math.sqrt(bend.current.stretch)} {bend.current.stretch}) translate(-100 {-bendY})"
 						>
+							<!-- Behind the torso, so the neck rises out of the shoulders instead of lying on the chest. -->
+							{#if body && neckOut > 0.5}
+								<path
+									class="neck-edge"
+									d="M{neckRoot.x} {neckRoot.y}L{neckTop.x} {neckTop.y}"
+									stroke-width={neckWidth + 1.6}
+								/>
+								<path
+									class="neck"
+									d="M{neckRoot.x} {neckRoot.y}L{neckTop.x} {neckTop.y}"
+									stroke-width={neckWidth}
+								/>
+							{/if}
 							{#if body}
 								<!-- The torso turns a little with the head so no torso corner peeks out behind it. -->
 								<g transform="rotate({torsoTurn} 100 {fig.hipY})">
 									<Body layer="back" />
 								</g>
-							{/if}
-							{#if body && neckOut > 0.5}
-								<path
-									class="neck-edge"
-									d="M100 {fig.torsoTop + 14}L{neckTop.x} {neckTop.y}"
-									stroke-width={neckWidth + 1.6}
-								/>
-								<path
-									class="neck"
-									d="M100 {fig.torsoTop + 14}L{neckTop.x} {neckTop.y}"
-									stroke-width={neckWidth}
-								/>
 							{/if}
 							<!-- A pulled head moves as a whole on its neck and only tilts and squashes a little,
 							     so the face never skews. -->
