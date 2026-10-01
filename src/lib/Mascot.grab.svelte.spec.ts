@@ -6,6 +6,44 @@ import type { ReactionsInput } from './interaction.js';
 
 const frame = () => new Promise((r) => setTimeout(r, 16));
 
+it.each(['left', 'right'])(
+	'keeps an off-center %s hand grip under the pointer and springs back',
+	async (side) => {
+		const { container } = render(Mascot, {
+			size: 200,
+			motion: 'full',
+			float: false,
+			lookAt: 'none',
+			reactions: { grab: true }
+		});
+		await new Promise((r) => setTimeout(r, 700));
+		const arm = container.querySelector(`[data-grab="arm-${side}"]`) as SVGGElement;
+		const hand = arm.querySelector('.hand') as SVGCircleElement;
+		const center = () =>
+			new DOMPoint(0, hand.cy.baseVal.value).matrixTransform(hand.getScreenCTM()!);
+		const from = center();
+		const dx = side === 'left' ? -20 : 20;
+		const emit = (type: string, x: number, y: number) =>
+			arm.dispatchEvent(
+				new PointerEvent(type, {
+					bubbles: true,
+					pointerId: 9,
+					pointerType: 'mouse',
+					clientX: x,
+					clientY: y
+				})
+			);
+		emit('pointerdown', from.x + 3, from.y + 2);
+		await new Promise((r) => setTimeout(r, 180));
+		emit('pointermove', from.x + 3 + dx, from.y + 8);
+		await expect
+			.poll(() => Math.hypot(center().x - from.x - dx, center().y - from.y - 6))
+			.toBeLessThan(2);
+		emit('pointerup', from.x + 3 + dx, from.y + 8);
+		await expect.poll(() => Math.abs(center().x - from.x), { timeout: 4000 }).toBeLessThan(2);
+	}
+);
+
 function setup(reactions?: ReactionsInput, grab?: GrabOptions) {
 	const onreaction = vi.fn();
 	const onboop = vi.fn();

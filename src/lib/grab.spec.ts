@@ -99,11 +99,12 @@ describe('reachArm', () => {
 		}
 	});
 
-	it('stretches like rubber past its reach: one to one at first, then ever less', () => {
+	it('follows ordinary stretches directly and adds resistance to long pulls', () => {
 		const reach = UPPER + FORE;
 		const at = (d: number) => reachArm(around(SHOULDER, d, 90), SHOULDER, UPPER, FORE, REST);
 		expect(at(reach + 2).stretch * reach).toBeCloseTo(reach + 2, 0);
-		expect(at(reach * 2).stretch).toBeGreaterThan(1.6);
+		expect(at(reach * 1.7).stretch).toBeCloseTo(1.7);
+		expect(at(reach * 2).stretch).toBeGreaterThan(1.9);
 		expect(at(reach * 2).stretch).toBeLessThan(2);
 		expect(at(reach * 50).stretch).toBeLessThanOrEqual(GRAB_LIMITS.arm);
 	});

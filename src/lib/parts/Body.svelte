@@ -8,6 +8,7 @@
 		legStretch,
 		legSwing,
 		reachArm,
+		toFrame,
 		tune,
 		type ArmReach,
 		type Point
@@ -69,7 +70,7 @@
 	/** Where the pointer wants an arm it holds; null while the arm is free. */
 	const heldArm = $state<Record<Side, ArmReach | null>>({ left: null, right: null });
 	// Each arm's offset from its pose (stretch as the amount past 1) lives in its own spring:
-	// stiff while held, so the arm tracks the pointer smoothly, loose once let go, so it snaps
+	// direct while held, loose once let go, so it snaps
 	// back like rubber, all without disturbing the pose spring or the other arm.
 	const offset: Record<Side, Spring<ArmReach>> = {
 		left: new Spring({ a1: 0, a2: 0, stretch: 0 }, RELEASE_SPRING),
@@ -94,7 +95,7 @@
 			const p = posed(side);
 			offset[side].set(
 				{ a1: held.a1 - p.a1, a2: held.a2 - p.a2, stretch: held.stretch - 1 },
-				{ instant: m.reduced }
+				{ instant: true }
 			);
 		}
 	});
@@ -105,6 +106,16 @@
 	});
 
 	function grabArm(e: PointerEvent, side: Side) {
+		// Capture the grip before the press animation can lift the hand.
+		const frame = armFrames[side];
+		const hand = frame?.querySelector<SVGCircleElement>('.hand');
+		const matrix = hand?.getScreenCTM();
+		if (!frame || !hand || !matrix) return;
+		const screen = new DOMPoint(0, hand.cy.baseVal.value).matrixTransform(matrix);
+		const center = toFrame(frame, screen.x, screen.y);
+		const from = toFrame(frame, e.clientX, e.clientY);
+		if (!center || !from) return;
+		const grip = { x: from.x - center.x, y: from.y - center.y };
 		drag(e, {
 			frame: () => armFrames[side],
 			start: () => {
@@ -112,9 +123,9 @@
 				tune(offset[side], true);
 			},
 			move: (to) => {
-				// Aim the hand's center, not the wrist, so the hand ends up under the pointer.
+				// Preserve where the hand was caught instead of snapping its center to the pointer.
 				heldArm[side] = reachArm(
-					to,
+					{ x: to.x - grip.x, y: to.y - grip.y },
 					{ x: shoulder, y: b.shoulderY + arms.current.drop },
 					b.upperArm,
 					b.forearm + 1,
@@ -196,7 +207,7 @@
 				const pivot = hip(side);
 				spring.set(
 					{ angle: legSwing(pivot, rest, to, side), grow: legStretch(pivot, rest, to) },
-					{ instant: m.reduced }
+					{ instant: true }
 				);
 			},
 			end: () => {

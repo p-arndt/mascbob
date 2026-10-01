@@ -82,7 +82,10 @@ export function reachArm(
 	const base = deg(Math.atan2(-dx, dy));
 	const reach = upper + fore;
 	const dist = Math.hypot(dx, dy);
-	const stretch = dist > reach ? 1 + rubber(dist / reach - 1, GRAB_LIMITS.arm - 1) : 1;
+	// Follow ordinary pulls directly; resistance only starts on a long stretch.
+	const ratio = dist / reach;
+	const stretch =
+		ratio <= 1.8 ? Math.max(1, ratio) : 1.8 + rubber(ratio - 1.8, GRAB_LIMITS.arm - 1.8);
 	const d = clamp(dist, Math.abs(upper - fore) + 0.01, reach - 0.001);
 	const alpha = deg(Math.acos(clamp((upper ** 2 + d ** 2 - fore ** 2) / (2 * upper * d), -1, 1)));
 	const inner = deg(
