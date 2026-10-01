@@ -17,4 +17,13 @@ describe('Hero', () => {
 		await page.getByRole('button', { name: 'theme: og, next' }).click();
 		await expect.element(page.getByRole('button', { name: 'theme: volt, next' })).toBeVisible();
 	});
+
+	it('puts the mascot above its mood word on a phone', async () => {
+		await page.viewport(390, 844);
+		const { container } = render(Hero);
+		const figure = container.querySelector('.figure')!.getBoundingClientRect();
+		const word = container.querySelector('.word')!.getBoundingClientRect();
+		expect(figure.bottom).toBeLessThanOrEqual(word.top);
+		expect(word.top).toBeLessThan(844);
+	});
 });

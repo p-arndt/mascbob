@@ -183,7 +183,7 @@
 				{outfit}
 				body
 				shoes="sneakers"
-				size="clamp(200px, 22vw, 320px)"
+				size="clamp(170px, 22vw, 320px)"
 				label="mascbob, boop me"
 				onboop={boop}
 			/>
@@ -424,11 +424,55 @@
 	@media (max-width: 900px) {
 		.hero {
 			grid-template-columns: minmax(0, 1fr);
+			gap: 0;
 			min-height: 0;
-			padding-top: 2rem;
+			padding-top: 0.5rem;
 		}
+		/*
+		 * The headline is the mascot's mood, so the mascot has to come first or the word reads as
+		 * noise. The stage dissolves so the figure can lead and the hang tag can trail the copy.
+		 */
 		.stage {
-			min-height: 560px;
+			display: contents;
+		}
+		.disc {
+			display: none;
+		}
+		.figure {
+			order: -1;
+			justify-self: center;
+			margin: 0 0 1.5rem;
+			padding-top: 1rem;
+		}
+		.figure::before {
+			content: '';
+			position: absolute;
+			z-index: -1;
+			top: 0;
+			left: 50%;
+			width: min(300px, 80vw);
+			aspect-ratio: 1;
+			translate: -50% 0;
+			border-radius: 50%;
+			background: color-mix(in srgb, var(--accent) 16%, var(--bg));
+			transition: background 0.6s;
+		}
+		.tag {
+			order: 1;
+			position: static;
+			translate: none;
+			justify-self: center;
+			box-sizing: border-box;
+			margin-top: 2.5rem;
+		}
+		/* Under the figure, a column-wide word would dwarf the mascot it describes. */
+		.word {
+			font-size: min(28cqi, 7rem);
+		}
+	}
+	@media (max-width: 640px) {
+		h1 {
+			margin-top: 1rem;
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {
