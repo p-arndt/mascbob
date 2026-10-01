@@ -2,6 +2,11 @@
 	import { MediaQuery } from 'svelte/reactivity';
 	import {
 		ACCESSORIES,
+		SPECIES,
+		PROPORTION_RANGE,
+		PROPORTION_KEYS,
+		type Species,
+		type Proportions,
 		EYE_STYLES,
 		MOODS,
 		REACTIONS,
@@ -22,7 +27,8 @@
 		type Shoes,
 		type ThemeName
 	} from '$lib/index.js';
-	import { onMount, tick } from 'svelte';
+	import { onDestroy, onMount, tick } from 'svelte';
+	import { creatureGeometry, creatureViewTop } from '$lib/species.js';
 	import { page } from '$app/state';
 	import Code, { type Token } from './Code.svelte';
 	import { download, snapshotSvg, svgToPng } from './exporter.js';
@@ -30,6 +36,8 @@
 	import { copyText, pick } from './interactions.js';
 	import {
 		COLOR_KEYS,
+		CREATURE_PRESETS,
+		CREATURE_GEAR,
 		GAZES,
 		MOTIONS,
 		STAGES,
@@ -48,15 +56,76 @@
 
 	const themeNames = Object.keys(THEMES) as ThemeName[];
 	const reduced = new MediaQuery('(prefers-reduced-motion: reduce)');
+	const compact = new MediaQuery('(max-width: 900px)');
+	const studioId = $props.id();
 	const start = STUDIO_START;
+	const percentMin = PROPORTION_RANGE.min * 100;
+	const percentMax = PROPORTION_RANGE.max * 100;
 
 	let mood = $state<Mood>(start.mood);
+	let species = $state<Species>(start.species);
+	let proportions = $state<Proportions>({});
+	const proportionLabels = {
+		head: 'Head / silhouette',
+		body: 'Body width',
+		height: 'Body length',
+		arms: 'Arms / hands',
+		legs: 'Legs',
+		ears: 'Ears',
+		tail: 'Tail'
+	};
+	const proportionKeys = $derived(
+		PROPORTION_KEYS.filter((key) => {
+			if (!body) return species === 'critter' && key === 'ears';
+			if (key === 'ears') return species === 'critter';
+			if (key === 'tail') return species === 'critter' || species === 'wisp';
+			if (key === 'legs') return species === 'bob' || species === 'critter';
+			return true;
+		})
+	);
+	function proportionLabel(key: keyof Proportions) {
+		if (species === 'moss' || species === 'wisp') {
+			if (key === 'head') return 'Crown size';
+			if (key === 'arms') return 'Hand size';
+		}
+		return proportionLabels[key];
+	}
+	function setProportion(key: keyof Proportions, percent: number) {
+		if (!Number.isFinite(percent)) return;
+		proportions = {
+			...proportions,
+			[key]: Math.min(PROPORTION_RANGE.max, Math.max(PROPORTION_RANGE.min, percent / 100))
+		};
+	}
+	function resetProportion(key: keyof Proportions) {
+		const next = { ...proportions };
+		delete next[key];
+		proportions = next;
+	}
+	const companion = $derived(CREATURE_PRESETS.find((p) => p.species === species)!);
+	function pickSpecies(value: Species) {
+		const preset = CREATURE_PRESETS.find((p) => p.species === value)!;
+		species = value;
+		shape = start.shape;
+		proportions = { ...preset.proportions };
+		theme = preset.theme;
+		custom = { ...preset.colors };
+		eyes = preset.eyes;
+		accessories = [...preset.accessories];
+		body = true;
+		outfit = preset.outfit;
+		shoes = preset.shoes;
+	}
 	let theme = $state<ThemeName>(start.theme);
 	let custom = $state<StudioConfig['colors']>({});
 	let shape = $state<Shape>(start.shape);
 	let eyes = $state<EyeStyle>(start.eyes);
 	let accessories = $state<Accessory[]>(start.accessories);
 	let body = $state(start.body);
+	const unified = $derived(species === 'moss' || species === 'wisp');
+	$effect(() => {
+		if (unified) body = true;
+	});
 	let outfit = $state<Outfit>(start.outfit);
 	let shoes = $state<Shoes>(start.shoes);
 	let hands = $state(start.hands);
@@ -73,8 +142,17 @@
 	let size = $state(start.size);
 	let stage = $state<Stage>(start.stage);
 	let boops = $state(0);
+	const previewScale = $derived.by(() => {
+		const g = creatureGeometry(species, shape, undefined, proportions, body);
+		const h = body
+			? g.build.viewHeight - creatureViewTop(species, g.head, g.build, proportions)
+			: 200;
+		return Math.min(1, (compact.current ? 170 : 360) / ((size * h) / 200));
+	});
 
 	const config: StudioConfig = $derived({
+		species,
+		proportions,
 		mood,
 		theme,
 		colors: custom,
@@ -110,7 +188,15 @@
 	// The first run is just the default config; only a real change (or a share link) takes over the tab.
 	let designed = false;
 	$effect(() => {
-		const look = $state.snapshot({ mood, theme: themeValue, shape, eyes, accessories });
+		const look = $state.snapshot({
+			mood,
+			theme: themeValue,
+			shape,
+			eyes,
+			accessories,
+			species,
+			proportions
+		});
 		if (designed) showInTab(look, 'studio');
 		designed = true;
 	});
@@ -121,6 +207,8 @@
 		if (![...q.keys()].length) return;
 		const c = fromQuery(q);
 		({
+			species,
+			proportions,
 			mood,
 			theme,
 			shape,
@@ -252,12 +340,15 @@
 	};
 
 	function randomize() {
+		pickSpecies(pick(SPECIES));
 		mood = pick(MOODS);
 		theme = pick(themeNames);
 		shape = pick(SHAPES);
 		eyes = pick(EYE_STYLES);
-		outfit = pick(OUTFITS);
-		shoes = pick(SHOES);
+		if (species === 'bob' || species === 'critter') {
+			outfit = pick(OUTFITS);
+			shoes = pick(SHOES);
+		}
 		// Zero to two accessories keeps the result charming instead of cluttered.
 		const pool = [...ACCESSORIES].sort(() => Math.random() - 0.5);
 		accessories = pool.slice(0, Math.floor(Math.random() * 3));
@@ -277,14 +368,32 @@
 		}
 	}
 
-	type Panel = 'look' | 'gear' | 'motion' | 'export';
+	type Panel = 'companion' | 'colors' | 'gear' | 'motion' | 'export';
 	const PANELS: { id: Panel; label: string }[] = [
-		{ id: 'look', label: 'Look' },
+		{ id: 'companion', label: 'Companion' },
+		{ id: 'colors', label: 'Colors' },
 		{ id: 'gear', label: 'Gear' },
 		{ id: 'motion', label: 'Motion' },
 		{ id: 'export', label: 'Export' }
 	];
-	let panel = $state<Panel>('look');
+	let panel = $state<Panel>('companion');
+	function navigatePanel(event: KeyboardEvent) {
+		const index = PANELS.findIndex((p) => p.id === panel);
+		const next =
+			event.key === 'Home'
+				? 0
+				: event.key === 'End'
+					? PANELS.length - 1
+					: event.key === 'ArrowRight'
+						? (index + 1) % PANELS.length
+						: event.key === 'ArrowLeft'
+							? (index + PANELS.length - 1) % PANELS.length
+							: -1;
+		if (next < 0) return;
+		event.preventDefault();
+		panel = PANELS[next].id;
+		document.getElementById(`${studioId}-${panel}`)?.focus();
+	}
 
 	type Tab = 'svelte' | 'link';
 	let tab = $state<Tab>('svelte');
@@ -329,6 +438,10 @@
 
 	let done = $state<string | null>(null);
 	let doneTimer: ReturnType<typeof setTimeout>;
+	onDestroy(() => {
+		clearTimeout(reactionTimer);
+		clearTimeout(doneTimer);
+	});
 	function flash(what: string) {
 		done = what;
 		clearTimeout(doneTimer);
@@ -351,7 +464,7 @@
 		const rect = svg.getBoundingClientRect();
 		return { text: snapshotSvg(svg, rect), width: rect.width, height: rect.height };
 	}
-	const fileName = $derived(`mascbob-${mood}-${theme}`);
+	const fileName = $derived(`${species === 'bob' ? 'mascbob' : `${species}bob`}-${mood}-${theme}`);
 
 	async function exportSvg() {
 		const s = await snapshot();
@@ -403,15 +516,19 @@
 		style:--mid={colors.bodyMid}
 	>
 		<div class="stage-bar">
-			<div class="segmented" role="group" aria-label="Mode">
-				<button class:active={!body} aria-pressed={!body} onclick={() => (body = false)}
-					>Head</button
-				>
-				<button class:active={body} aria-pressed={body} onclick={() => (body = true)}>
-					Full body
-				</button>
-				<span class="thumb" class:right={body} aria-hidden="true"></span>
-			</div>
+			{#if unified}
+				<span class="pill">Full companion</span>
+			{:else}
+				<div class="segmented" role="group" aria-label="Mode">
+					<button class:active={!body} aria-pressed={!body} onclick={() => (body = false)}
+						>Head</button
+					>
+					<button class:active={body} aria-pressed={body} onclick={() => (body = true)}>
+						Full body
+					</button>
+					<span class="thumb" class:right={body} aria-hidden="true"></span>
+				</div>
+			{/if}
 			<div class="stage-actions">
 				<button class="pill" onclick={randomize} aria-label="Randomize" title="Randomize">
 					<svg bind:this={dice} viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
@@ -465,6 +582,8 @@
 							}}
 						>
 							<Mascot
+								{species}
+								{proportions}
 								{mood}
 								theme={name}
 								{shape}
@@ -491,6 +610,8 @@
 		{:else}
 			<div class="figure" bind:this={figure}>
 				<Mascot
+					{species}
+					{proportions}
 					{mood}
 					theme={themeValue}
 					{shape}
@@ -508,13 +629,14 @@
 					{motion}
 					{interactive}
 					level={config.level ?? undefined}
-					{size}
+					size={size * previewScale}
 					onboop={() => boops++}
 				/>
 			</div>
 		{/if}
 
 		<div class="boops" aria-live="polite">
+			<span class="companion-name">{companion.name}</span>
 			{#key boops}
 				<strong class:pop={boops > 0}>{boops}</strong>
 			{/key}
@@ -542,6 +664,10 @@
 			{#each PANELS as t (t.id)}
 				<button
 					role="tab"
+					id="{studioId}-{t.id}"
+					aria-controls="{studioId}-panel"
+					tabindex={panel === t.id ? 0 : -1}
+					onkeydown={navigatePanel}
 					aria-selected={panel === t.id}
 					class:active={panel === t.id}
 					onclick={() => (panel = t.id)}>{t.label}</button
@@ -549,8 +675,131 @@
 			{/each}
 		</div>
 
-		<div class="panel-body" role="tabpanel">
-			{#if panel === 'look'}
+		<div
+			class="panel-body"
+			role="tabpanel"
+			id="{studioId}-panel"
+			aria-labelledby="{studioId}-{panel}"
+			tabindex="0"
+		>
+			{#if panel === 'companion'}
+				<fieldset>
+					<legend>Choose a companion</legend>
+					<p class="note intro">
+						Four species, each with its own anatomy. Picking one applies its designed starting look.
+					</p>
+					<div class="companion-presets">
+						{#each CREATURE_PRESETS as preset (preset.species)}
+							<button
+								class:active={species === preset.species}
+								aria-pressed={species === preset.species}
+								onclick={() => pickSpecies(preset.species)}
+								aria-label="Use {preset.name} preset"
+							>
+								<Mascot
+									species={preset.species}
+									accessories={[...preset.accessories]}
+									proportions={preset.proportions}
+									eyes={preset.eyes}
+									theme={themeProp({ ...start, ...preset })}
+									outfit={preset.outfit}
+									shoes={preset.shoes}
+									motion="reduced"
+									lookAt="none"
+									effects={false}
+									interactive={false}
+									size={60}
+									label=""
+								/>
+								<span>{preset.name}</span>
+							</button>
+						{/each}
+					</div>
+				</fieldset>
+				<button class="reset" onclick={() => pickSpecies(species)}
+					>Restore {companion.name} starting look</button
+				>
+				{#if species === 'bob'}
+					<fieldset>
+						<legend>Head shape</legend>
+						{@render chipGroup(
+							SHAPES,
+							(s) => shape === s,
+							(s) => (shape = s)
+						)}
+					</fieldset>
+				{/if}
+				{#if proportionKeys.length}
+					<fieldset>
+						<legend>Proportions <span class="value">{percentMin}–{percentMax}%</span></legend>
+						{#each proportionKeys as key (key)}
+							<div class="proportion-row">
+								<label for="{studioId}-p-{key}">{proportionLabel(key)}</label>
+								<div class="percent">
+									<input
+										type="number"
+										min={percentMin}
+										max={percentMax}
+										step="1"
+										value={Math.round((proportions[key] ?? 1) * 100)}
+										aria-label="{proportionLabel(key)} percent"
+										onchange={(e) => {
+											if (e.currentTarget.value) setProportion(key, e.currentTarget.valueAsNumber);
+											e.currentTarget.value = String(Math.round((proportions[key] ?? 1) * 100));
+										}}
+									/>
+									<span aria-hidden="true">%</span>
+								</div>
+								<button
+									class="reset-one"
+									disabled={(proportions[key] ?? 1) === 1}
+									aria-label="Reset {proportionLabel(key)}"
+									title="Reset to 100%"
+									onclick={() => resetProportion(key)}>↺</button
+								>
+								<input
+									id="{studioId}-p-{key}"
+									class="range"
+									type="range"
+									min={PROPORTION_RANGE.min}
+									max={PROPORTION_RANGE.max}
+									step="0.01"
+									value={proportions[key] ?? 1}
+									oninput={(e) => setProportion(key, Number(e.currentTarget.value) * 100)}
+									style:--p="{(((proportions[key] ?? 1) - PROPORTION_RANGE.min) /
+										(PROPORTION_RANGE.max - PROPORTION_RANGE.min)) *
+										100}%"
+									aria-valuetext="{Math.round((proportions[key] ?? 1) * 100)} percent"
+								/>
+							</div>
+						{/each}
+					</fieldset>
+					{#if Object.keys(proportions).length}
+						<button class="reset" onclick={() => (proportions = {})}>Reset proportions</button>
+					{/if}
+				{/if}
+				<fieldset>
+					<legend>Eyes</legend>
+					{@render chipGroup(
+						EYE_STYLES,
+						(e) => eyes === e,
+						(e) => (eyes = e)
+					)}
+				</fieldset>
+
+				<fieldset>
+					<legend>Size <span class="value">{size}px</span></legend>
+					<input
+						class="range"
+						type="range"
+						min="80"
+						max="320"
+						bind:value={size}
+						style:--p="{((size - 80) / 240) * 100}%"
+						aria-label="Size"
+					/>
+				</fieldset>
+			{:else if panel === 'colors'}
 				<fieldset>
 					<legend>Colorway <span class="value">{theme}</span></legend>
 					<div class="swatches">
@@ -558,7 +807,7 @@
 							<button
 								class="swatch"
 								class:active={theme === name && !Object.keys(custom).length}
-								aria-pressed={theme === name}
+								aria-pressed={theme === name && !Object.keys(custom).length}
 								title={name}
 								aria-label="{name} theme"
 								style:--a={THEMES[name].bodyLight}
@@ -620,44 +869,30 @@
 						</label>
 					</div>
 				</fieldset>
-
-				<fieldset>
-					<legend>Shape</legend>
-					{@render chipGroup(
-						SHAPES,
-						(s) => shape === s,
-						(s) => (shape = s)
-					)}
-				</fieldset>
-				<fieldset>
-					<legend>Eyes</legend>
-					{@render chipGroup(
-						EYE_STYLES,
-						(e) => eyes === e,
-						(e) => (eyes = e)
-					)}
-				</fieldset>
-
-				<fieldset>
-					<legend>Size <span class="value">{size}px</span></legend>
-					<input
-						class="range"
-						type="range"
-						min="80"
-						max="320"
-						bind:value={size}
-						style:--p="{((size - 80) / 240) * 100}%"
-						aria-label="Size"
-					/>
-				</fieldset>
 			{:else if panel === 'gear'}
+				{#if accessories.length}
+					<fieldset>
+						<legend>Wearing <span class="value">click to remove</span></legend>
+						{@render chipGroup(accessories, () => true, toggle)}
+					</fieldset>
+					<button class="reset" onclick={() => (accessories = [])}>Remove all accessories</button>
+				{/if}
+				<fieldset>
+					<legend>Picked for {species}</legend>
+					{@render chipGroup(CREATURE_GEAR[species], (a) => accessories.includes(a), toggle)}
+				</fieldset>
 				<fieldset>
 					<legend>Accessories <span class="value">{accessories.length || 'none'}</span></legend>
 					{@render chipGroup(ACCESSORIES, (a) => accessories.includes(a), toggle)}
 				</fieldset>
-				<fieldset disabled={!body} class:off={!body}>
+				<fieldset
+					disabled={!body || species === 'moss' || species === 'wisp'}
+					class:off={!body || species === 'moss' || species === 'wisp'}
+				>
 					<legend>
 						Outfit
+						{#if species === 'moss' || species === 'wisp'}<span class="value">bob & critter</span
+							>{/if}
 						{#if !body}<span class="value">needs full body</span>{/if}
 					</legend>
 					{@render chipGroup(
@@ -666,9 +901,14 @@
 						(o) => (outfit = o)
 					)}
 				</fieldset>
-				<fieldset disabled={!body} class:off={!body}>
+				<fieldset
+					disabled={!body || species === 'moss' || species === 'wisp'}
+					class:off={!body || species === 'moss' || species === 'wisp'}
+				>
 					<legend>
 						Shoes
+						{#if species === 'moss' || species === 'wisp'}<span class="value">bob & critter</span
+							>{/if}
 						{#if !body}<span class="value">needs full body</span>{/if}
 					</legend>
 					{@render chipGroup(
@@ -853,6 +1093,86 @@
 </div>
 
 <style>
+	.intro {
+		margin-bottom: 1rem;
+	}
+	.companion-name {
+		margin-right: 0.5rem;
+		font-weight: 650;
+		color: var(--text-1);
+	}
+	.proportion-row {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto auto;
+		gap: 0.6rem;
+		align-items: center;
+		padding: 0.7rem 0;
+	}
+	.proportion-row > label {
+		font-size: 0.88rem;
+		font-weight: 550;
+	}
+	.proportion-row .range {
+		grid-column: 1 / -1;
+		margin: 0.3rem 0 0.5rem;
+	}
+	.percent {
+		display: flex;
+		align-items: center;
+		border: 1px solid var(--line);
+		border-radius: 8px;
+		background: var(--raised);
+		padding: 0.25rem 0.4rem;
+		font-size: 0.82rem;
+		color: var(--text-2);
+	}
+	.percent input {
+		width: 3.1rem;
+		border: 0;
+		background: none;
+		color: var(--text-1);
+		font: inherit;
+		font-variant-numeric: tabular-nums;
+	}
+	.reset-one {
+		width: 32px;
+		height: 32px;
+		border: 0;
+		border-radius: 8px;
+		background: var(--raised);
+		color: var(--text-1);
+		font-size: 1.1rem;
+		cursor: pointer;
+	}
+	.reset-one:disabled {
+		opacity: 0.35;
+		cursor: default;
+	}
+	.companion-presets {
+		display: grid;
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+		gap: 8px;
+	}
+	.companion-presets button {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: end;
+		gap: 10px;
+		padding: 16px 4px 10px;
+		border: 1px solid var(--line);
+		border-radius: 12px;
+		background: var(--surface);
+		color: inherit;
+		cursor: pointer;
+	}
+	.companion-presets button.active {
+		border-color: var(--text-1);
+		background: color-mix(in srgb, var(--text-1) 5%, var(--surface));
+	}
+	.companion-presets span {
+		font-size: 11px;
+	}
 	.playground {
 		display: grid;
 		grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
@@ -1044,10 +1364,12 @@
 	.tabs {
 		display: flex;
 		gap: 0.25rem;
-		padding: 1rem 1.25rem 0;
+		padding: 1rem 0.75rem 0;
+		overflow-x: auto;
 		border-bottom: 1px solid var(--line);
 	}
 	.tabs button {
+		flex: none;
 		position: relative;
 		padding: 0.6rem 0.8rem 0.85rem;
 		border: 0;
@@ -1480,6 +1802,12 @@
 			padding: 0.75rem;
 			gap: 0.4rem;
 		}
+		.dock {
+			flex-wrap: nowrap;
+			justify-content: start;
+			overflow-x: auto;
+			border-radius: 999px;
+		}
 		.tabs {
 			padding-top: 0.25rem;
 		}
@@ -1498,6 +1826,21 @@
 		}
 		.stage-bar .segmented button {
 			padding-inline: 0.75rem;
+		}
+		.stage-actions {
+			gap: 0.2rem;
+		}
+		.pill {
+			padding: 0.5rem 0.6rem;
+			font-size: 0.78rem;
+		}
+		.companion-presets {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+		.companion-presets button {
+			flex-direction: row;
+			justify-content: center;
+			padding: 8px;
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {

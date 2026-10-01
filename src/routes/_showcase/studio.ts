@@ -1,5 +1,10 @@
 import {
 	ACCESSORIES,
+	SPECIES,
+	PROPORTION_KEYS,
+	PROPORTION_RANGE,
+	type Species,
+	type Proportions,
 	DEFAULT_REACTIONS,
 	REACTIONS,
 	type Reaction,
@@ -38,6 +43,8 @@ export type StagePreset = (typeof STAGES)[number];
 export type Stage = StagePreset | `#${string}`;
 
 export interface StudioConfig {
+	species: Species;
+	proportions: Proportions;
 	mood: Mood;
 	theme: ThemeName;
 	colors: Partial<Record<ColorKey, string>>;
@@ -63,6 +70,8 @@ export interface StudioConfig {
 
 /** The library's own defaults: generated code and share links only spell out what differs. */
 export const LIBRARY_DEFAULTS: StudioConfig = {
+	species: 'bob',
+	proportions: {},
 	mood: 'idle',
 	theme: 'og',
 	colors: {},
@@ -94,7 +103,65 @@ export const STUDIO_START: StudioConfig = {
 	size: 240
 };
 
+/** Designed starting looks, separate from the species anatomy. */
+export const CREATURE_PRESETS = [
+	{
+		name: 'Bob',
+		accessories: [],
+		species: 'bob',
+		theme: 'og',
+		colors: {},
+		eyes: 'round',
+		proportions: {},
+		outfit: 'puffer',
+		shoes: 'sneakers'
+	},
+	{
+		name: 'Critterbob',
+		accessories: ['bow'],
+		species: 'critter',
+		theme: 'mocha',
+		colors: {},
+		eyes: 'puppy',
+		proportions: { ears: 1.1 },
+		outfit: 'none',
+		shoes: 'none'
+	},
+	{
+		name: 'Mossbob',
+		accessories: ['flower'],
+		species: 'moss',
+		theme: 'mocha',
+		colors: { bodyMid: '#b5c48b', accent: '#558545' },
+		eyes: 'round',
+		proportions: { body: 1.1, height: 0.9 },
+		outfit: 'none',
+		shoes: 'none'
+	},
+	{
+		name: 'Wispbob',
+		accessories: ['star-clip'],
+		species: 'wisp',
+		theme: 'lilac',
+		colors: { bodyMid: '#d8d7f3', accent: '#72bdae' },
+		eyes: 'round',
+		proportions: {},
+		outfit: 'none',
+		shoes: 'none'
+	}
+] as const satisfies readonly (Pick<
+	StudioConfig,
+	'species' | 'theme' | 'colors' | 'eyes' | 'proportions' | 'outfit' | 'shoes' | 'accessories'
+> & { name: string })[];
+
 const HEX = /^#[0-9a-f]{6}$/i;
+
+export const CREATURE_GEAR: Record<Species, readonly Accessory[]> = {
+	bob: ['cap', 'headphones', 'glasses', 'antenna', 'beanie'],
+	critter: ['bow', 'flower', 'glasses', 'headband', 'star-clip'],
+	moss: ['flower', 'glasses', 'bow', 'star-clip', 'beanie'],
+	wisp: ['star-clip', 'halo', 'nightcap', 'glasses', 'horns']
+};
 const oneOf = <T extends string>(list: readonly T[], v: string | null): T | undefined =>
 	list.includes(v as T) ? (v as T) : undefined;
 
@@ -102,6 +169,7 @@ export function toQuery(c: StudioConfig): string {
 	const q = new URLSearchParams();
 	const d = LIBRARY_DEFAULTS;
 	for (const key of [
+		'species',
 		'mood',
 		'theme',
 		'shape',
@@ -114,6 +182,9 @@ export function toQuery(c: StudioConfig): string {
 		if (c[key] !== d[key]) q.set(key, c[key]);
 	}
 	if (c.accessories.length) q.set('acc', c.accessories.join(','));
+	for (const key of PROPORTION_KEYS) {
+		if (c.proportions[key] !== undefined) q.set(`p-${key}`, String(c.proportions[key]));
+	}
 	for (const key of ['body', 'hands', 'float', 'effects', 'interactive'] as const) {
 		if (c[key] !== d[key]) q.set(key, c[key] ? '1' : '0');
 	}
@@ -140,6 +211,18 @@ export function fromQuery(q: URLSearchParams): StudioConfig {
 		if (HEX.test(v)) colors[key] = v.toLowerCase();
 	}
 	return {
+		species: oneOf(SPECIES, q.get('species')) ?? d.species,
+		proportions: Object.fromEntries(
+			PROPORTION_KEYS.flatMap((key) => {
+				const v = Number(q.get(`p-${key}`));
+				return q.has(`p-${key}`) &&
+					Number.isFinite(v) &&
+					v >= PROPORTION_RANGE.min &&
+					v <= PROPORTION_RANGE.max
+					? [[key, v]]
+					: [];
+			})
+		),
 		mood: oneOf(MOODS, q.get('mood')) ?? d.mood,
 		theme: oneOf(Object.keys(THEMES) as ThemeName[], q.get('theme')) ?? d.theme,
 		colors,
@@ -256,6 +339,14 @@ export interface Attr {
 export function mascotAttrs(c: StudioConfig): Attr[] {
 	const d = LIBRARY_DEFAULTS;
 	const attrs: (Attr | false)[] = [
+		c.species !== d.species && { name: 'species', value: c.species },
+		Object.keys(c.proportions).length > 0 && {
+			name: 'proportions',
+			value: `{ ${PROPORTION_KEYS.filter((key) => c.proportions[key] !== undefined)
+				.map((key) => `${key}: ${c.proportions[key]}`)
+				.join(', ')} }`,
+			expr: true
+		},
 		c.mood !== d.mood && { name: 'mood', value: c.mood },
 		themeAttr(c),
 		c.shape !== d.shape && { name: 'shape', value: c.shape },

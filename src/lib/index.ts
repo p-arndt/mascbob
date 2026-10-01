@@ -1,4 +1,6 @@
 export { default as Mascot } from './Mascot.svelte';
+export { SPECIES, PROPORTION_KEYS, PROPORTION_RANGE } from './species.js';
+export type { Species, Proportions } from './species.js';
 export { MOOD_CONFIGS, moodConfig } from './moods.js';
 export { THEMES, resolveTheme, themeStyle } from './themes.js';
 export type { ThemeInput, ThemeName } from './themes.js';

@@ -262,7 +262,10 @@ export const FOOT_COLLAR: Record<Shoes, number> = {
 
 /** Where the leg ends: a little below the collar, hidden inside the shoe or foot. */
 export function legBottomY(shoes: Shoes, b: BuildDef = STANDARD): number {
-	return b.groundY - ((FOOT_COLLAR[shoes] ?? FOOT_COLLAR.none) - 6) * b.footScale;
+	return Math.max(
+		b.hipY - 2,
+		b.groundY - ((FOOT_COLLAR[shoes] ?? FOOT_COLLAR.none) - 6) * b.footScale
+	);
 }
 
 /** Top of a shoe's collar in figure coordinates. */

@@ -10,6 +10,20 @@ export interface PropDoc {
 /** Every public `<Mascot>` prop. docs.spec.ts checks this against the component's Props interface. */
 export const PROPS: PropDoc[] = [
 	{
+		name: 'species',
+		type: 'Species',
+		default: "'bob'",
+		description:
+			'Anatomy: bob, critter (ears, paws and tail), moss (leaf arms and roots), or wisp (floating spirit).'
+	},
+	{
+		name: 'proportions',
+		type: 'Proportions',
+		default: '{}',
+		description:
+			'Multipliers from 0.4 to 1.8: head, body (width), height (body length), arms, legs, ears and tail. Ears apply to critter; tail to critter and wisp; legs to bob and critter. Head sizes the upper contour of moss and wisp without scaling the face.'
+	},
+	{
 		name: 'mood',
 		type: 'Mood',
 		default: "'idle'",
@@ -21,7 +35,12 @@ export const PROPS: PropDoc[] = [
 		default: "'og'",
 		description: 'A colorway preset, or a preset with individual colors overridden.'
 	},
-	{ name: 'shape', type: 'Shape', default: "'capsule'", description: 'Head silhouette.' },
+	{
+		name: 'shape',
+		type: 'Shape',
+		default: "'capsule'",
+		description: 'Head silhouette for species="bob". Other species have their own silhouette.'
+	},
 	{
 		name: 'eyes',
 		type: 'EyeStyle',
@@ -44,18 +63,18 @@ export const PROPS: PropDoc[] = [
 		name: 'outfit',
 		type: 'Outfit',
 		default: "'none'",
-		description: 'Clothing, only visible with `body`.'
+		description: 'Clothing for bob and critter, only visible with `body`.'
 	},
 	{
 		name: 'shoes',
 		type: 'Shoes',
 		default: "'none'",
-		description: 'Footwear, only visible with `body`.'
+		description: 'Footwear for bob and critter, only visible with `body`.'
 	},
 	{
 		name: 'build',
 		type: 'Build',
-		default: "'standard'",
+		default: 'species default',
 		description:
 			'Body proportions with `body`: `chubby`, `lanky`, `chibi`, or `blob` (no legs, bobs in place).'
 	},

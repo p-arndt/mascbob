@@ -3,7 +3,7 @@ import type { Mascot } from '$lib/index.js';
 
 export type Look = Pick<
 	ComponentProps<typeof Mascot>,
-	'mood' | 'theme' | 'shape' | 'eyes' | 'accessories'
+	'mood' | 'theme' | 'shape' | 'eyes' | 'accessories' | 'species' | 'proportions'
 >;
 
 /**

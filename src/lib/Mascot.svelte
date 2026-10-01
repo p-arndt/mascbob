@@ -4,10 +4,18 @@
 	import { MediaQuery } from 'svelte/reactivity';
 	import { cubicIn, cubicOut } from 'svelte/easing';
 	import { setMascot, svgRef } from './context.js';
-	import { SHAPE_DEFS, clamp } from './geometry.js';
+	import { clamp } from './geometry.js';
+	import {
+		creatureGeometry,
+		creatureViewTop,
+		resolveProportions,
+		type Species,
+		type Proportions
+	} from './species.js';
+	import Creature from './parts/Creature.svelte';
 	import Accessories from './parts/Accessories.svelte';
 	import Body from './parts/Body.svelte';
-	import { buildDef, torsoHalfWidth, type Build } from './parts/body.js';
+	import { torsoHalfWidth, type Build } from './parts/body.js';
 	import Effects from './parts/Effects.svelte';
 	import Face from './parts/Face.svelte';
 	import Hands from './parts/Hands.svelte';
@@ -41,6 +49,10 @@
 	import type { Accessory, EyeStyle, LookAt, Mood, Motion, Outfit, Shape, Shoes } from './types.js';
 
 	interface Props {
+		/** Anatomy of the companion; `bob` preserves the original mascot. */
+		species?: Species;
+		/** Size multipliers (0.4–1.8) relative to this species and build. */
+		proportions?: Proportions;
 		mood?: Mood;
 		/** Preset name or `{ base?, ...colors }`. `--mascbob-*` CSS variables override it. */
 		theme?: ThemeInput;
@@ -93,6 +105,8 @@
 	}
 
 	let {
+		species = 'bob',
+		proportions = {},
 		mood = 'idle',
 		theme = 'og',
 		shape = 'capsule',
@@ -102,7 +116,7 @@
 		body = true,
 		outfit = 'none',
 		shoes = 'none',
-		build = 'standard',
+		build,
 		lookAt = 'pointer',
 		level,
 		size = 160,
@@ -132,7 +146,9 @@
 	let reaction = $state<ReactionState | null>(null);
 	const activeMood: Mood = $derived(reaction?.mood ?? (booping ? 'happy' : mood));
 	const config = $derived(moodConfig(activeMood));
-	const head = $derived(SHAPE_DEFS[shape] ?? SHAPE_DEFS.pebble);
+	const geometry = $derived(creatureGeometry(species, shape, build, proportions, body));
+	const head = $derived(geometry.head);
+	const unified = $derived(species === 'moss' || species === 'wisp');
 	const style = $derived(themeStyle(resolveTheme(theme)));
 
 	// Tweens may call `duration` after unmount, where reading a derived would warn; mirror it into a plain variable.
@@ -554,7 +570,10 @@
 			if (!root || reactor.holdsGaze) return;
 			const rect = root.getBoundingClientRect();
 			// Aim from the face, not the middle of the figure.
-			const faceY = rect.top + rect.height * (FACE_Y / viewH);
+			const faceCenter = body
+				? head.bottom + fig.headY + (FACE_Y - head.bottom) * fig.headScale
+				: FACE_Y;
+			const faceY = rect.top + rect.height * ((faceCenter - viewTop) / viewH);
 			const aim = aimAt(e.clientX - (rect.left + rect.width / 2), e.clientY - faceY, rect.width);
 			focus.target = reduced ? 0 : aim.focus;
 			const next = { x: clamp(aim.x, -1, 1), y: clamp(aim.y, -1, 1) };
@@ -701,7 +720,7 @@
 	const NO_REACTIONS = resolveReactions(false);
 	$effect(() => {
 		reactor.configure(interactive ? reactionFlags : NO_REACTIONS, reduced, mood, {
-			viewHeight: viewH,
+			viewHeight: viewH + viewTop,
 			head
 		});
 	});
@@ -713,6 +732,7 @@
 		const el = root;
 		if (!el || !interactive || !onscreen || !Object.values(reactionFlags).some(Boolean)) return;
 		const viewHeight = viewH;
+		const viewOffset = viewTop;
 		let rect: DOMRect | null = null;
 		const forget = () => (rect = null);
 		const sample: PointerSample = { x: 0, y: 0, scale: 1, t: 0, hovering: false, pressed: false };
@@ -721,7 +741,7 @@
 			if (!rect.width) return;
 			sample.scale = rect.width / 200;
 			sample.x = (e.clientX - rect.left) / sample.scale;
-			sample.y = ((e.clientY - rect.top) / rect.height) * viewHeight;
+			sample.y = ((e.clientY - rect.top) / rect.height) * viewHeight + viewOffset;
 			sample.t = e.timeStamp;
 			sample.hovering = e.pointerType !== 'touch';
 			sample.pressed = pressed;
@@ -757,11 +777,12 @@
 	const t = $derived(head.top);
 	const hw = $derived(head.halfWidth);
 	const cssSize = $derived(typeof size === 'number' ? `${size}px` : size);
-	const fig = $derived(buildDef(build));
+	const fig = $derived(geometry.build);
 	// Legless builds bob like the bare head instead of standing.
 	const standing = $derived(body && fig.motion === 'stand');
 	const legs = $derived(body && fig.legs);
-	const viewH = $derived(body ? fig.viewHeight : 200);
+	const viewTop = $derived(body ? creatureViewTop(species, head, fig, proportions) : 0);
+	const viewH = $derived((body ? fig.viewHeight : 200) - viewTop);
 	const groundY = $derived(body ? fig.groundY + 1 : head.bottom + 14);
 	// With a body, the whole figure leans around its hips instead of the head's center.
 	const tiltPivot = $derived(body ? `100 ${fig.hipY}` : '100 110');
@@ -830,6 +851,12 @@
 	}
 
 	setMascot({
+		get species() {
+			return species;
+		},
+		get proportions() {
+			return resolveProportions(proportions);
+		},
 		uid,
 		get mood() {
 			return activeMood;
@@ -924,7 +951,7 @@
 </script>
 
 {#snippet art()}
-	<svg viewBox="0 0 200 {viewH}" aria-hidden="true" focusable="false">
+	<svg viewBox="0 {viewTop} 200 {viewH}" aria-hidden="true" focusable="false">
 		<defs>
 			<radialGradient id="{uid}-body" cx="0.36" cy="0.28" r="0.9">
 				<stop offset="0" class="stop-light" />
@@ -991,7 +1018,7 @@
 				<g transform="translate(0 {hop.current}) rotate({rock} {rockPivot})">
 					<g transform={figureSquash}>
 						<!-- Feet stay planted while the upper body tilts with the mood. -->
-						{#if body}
+						{#if body && !unified}
 							<Body layer="feet" />
 						{/if}
 						<!-- Everything above the legs: tilts with the mood and bends at the hips when pulled. -->
@@ -1002,7 +1029,7 @@
 								Math.sqrt(bend.current.stretch)} {bend.current.stretch}) translate(-100 {-bendY})"
 						>
 							<!-- Behind the torso, so the neck rises out of the shoulders instead of lying on the chest. -->
-							{#if body && neckOut > 0.5}
+							{#if body && !unified && neckOut > 0.5}
 								<path
 									class="neck-edge"
 									d="M{neckRoot.x} {neckRoot.y}L{neckTop.x} {neckTop.y}"
@@ -1014,7 +1041,7 @@
 									stroke-width={neckWidth}
 								/>
 							{/if}
-							{#if body}
+							{#if body && !unified}
 								<!-- The torso turns a little with the head so no torso corner peeks out behind it. -->
 								<g transform="rotate({torsoTurn} 100 {fig.hipY})">
 									<Body layer="back" />
@@ -1041,8 +1068,11 @@
 										<g class="blast" class:blasting={reaction?.name === 'explode'}>
 											<g class="breathe" class:lift={body}>
 												<Accessories layer="back" />
+												<Creature layer="back" />
 												<Shell />
+												<Creature layer="markings" />
 												<Face />
+												<Creature layer="front" />
 												<Accessories layer="front" />
 												{@render accessory?.({ top: t, halfWidth: hw })}
 											</g>
@@ -1050,11 +1080,11 @@
 									</g>
 								</g>
 							</g>
-							{#if body}
+							{#if body && !unified}
 								<g transform="rotate({torsoTurn} 100 {fig.hipY})">
 									<Body layer="front" />
 								</g>
-							{:else if hands}
+							{:else if hands && !(unified && body)}
 								<Hands />
 							{/if}
 							{#if effects}
@@ -1079,6 +1109,7 @@
 		class:grabbing={grabbing !== null}
 		aria-label={label}
 		data-mood={activeMood}
+		data-species={species}
 		{style}
 		style:width={cssSize}
 		style:aspect-ratio="200 / {viewH}"
@@ -1113,6 +1144,7 @@
 		class:no-float={!float || standing}
 		aria-label={label}
 		data-mood={activeMood}
+		data-species={species}
 		{style}
 		style:width={cssSize}
 		style:aspect-ratio="200 / {viewH}"

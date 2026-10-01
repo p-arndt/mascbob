@@ -260,9 +260,15 @@
 				<path class="tube-edge" d="M0 0V{fore}" />
 				<path class="tube" d="M0 0V{fore}" />
 				<circle class="hand" cy={fore + 1} r={(b.armWidth * 8) / 14} />
+				{#if m.species === 'critter'}
+					<ellipse class="paw-pad" cy={fore + 3} rx="3.5" ry="3" />
+					{#each [-1, 0, 1] as toe (toe)}
+						<circle class="paw-pad" cx={toe * 4} cy={fore - 2} r="1.4" />
+					{/each}
+				{/if}
 			</g>
 		</g>
-		<circle class="joint" r={b.armWidth / 2 + 0.5} />
+		{#if m.species === 'bob'}<circle class="joint" r={b.armWidth / 2 + 0.5} />{/if}
 	</g>
 {/snippet}
 
@@ -270,11 +276,16 @@
 <!-- Plain feet are part of the body: a stubby rounded toe in the leg's color, no seam. -->
 {#snippet plainFoot()}
 	{@const d =
-		'M-7 -10.5C-9.8 -10.5 -11 -7.5 -11 -4.5C-11 -1.5 -9.5 0 -6.5 0H10.5C14.5 0 16 -2 16 -4.8C16 -8.2 13 -10.2 8.5 -10.5Z'}
+		m.species === 'critter'
+			? 'M-8-13C-12-13-14-8-13-4C-12 0-7 1 0 0C7 1 16 0 17-5C18-10 11-14 5-14Q-2-16-8-13Z'
+			: 'M-7 -10.5C-9.8 -10.5 -11 -7.5 -11 -4.5C-11 -1.5 -9.5 0 -6.5 0H10.5C14.5 0 16 -2 16 -4.8C16 -8.2 13 -10.2 8.5 -10.5Z'}
 	<g class="foot-plain">
 		<path class="bare" {d} />
 		<path {d} fill={ref('shoe-ao')} />
 		<ellipse class="bare-light" cx="7" cy="-7.6" rx="4.5" ry="1.4" />
+		{#if m.species === 'critter'}
+			<path class="paw-toes" d="M7-8V-3M12-7V-3" />
+		{/if}
 	</g>
 {/snippet}
 
@@ -468,14 +479,16 @@
 					height={Math.max(legBottom - legTop + grow, 8)}
 					rx={legHw}
 				/>
-				<rect
-					class="knee"
-					x={-legHw - 0.5}
-					y={(legTop + legBottom + grow) / 2}
-					width={legHw * 2 + 1}
-					height="2.6"
-					rx="1.3"
-				/>
+				{#if m.species === 'bob'}
+					<rect
+						class="knee"
+						x={-legHw - 0.5}
+						y={(legTop + legBottom + grow) / 2}
+						width={legHw * 2 + 1}
+						height="2.6"
+						rx="1.3"
+					/>
+				{/if}
 				{#if outfit === 'overalls'}
 					<rect
 						class="shorts"
@@ -544,6 +557,20 @@
 		</g>
 	{/if}
 {:else if layer === 'back'}
+	{#if m.species === 'critter'}
+		<g transform="translate({100 + hw * 0.75} {b.hipY - 13}) scale({m.proportions.tail})">
+			<g class="critter-tail" class:excited={m.mood === 'happy' || m.mood === 'love'}>
+				<path
+					class="bare"
+					d="M0 0C36 5 52-24 41-50C37-59 26-60 21-50C16-40 31-28 20-19Q10-12 0-12Z"
+				/>
+				<path
+					class="tail-tip"
+					d="M41-50C37-59 26-60 21-50C18-44 21-37 23-32Q37-29 45-36Q45-43 41-50Z"
+				/>
+			</g>
+		</g>
+	{/if}
 	<defs>
 		<linearGradient id={id('torso-ao')} x1="0" y1="0" x2="0" y2="1">
 			<stop offset="0" class="stop-ink" stop-opacity="0.16" />
@@ -659,16 +686,20 @@
 	<path class="edge" d={torsoPath(hw, b)} />
 
 	<!-- A tiny status light on the chest echoes the LED face; it beats with the mood. -->
-	<g class="status {beat.mode}" class:love={m.mood === 'love'} style:--beat="{beat.period}s">
-		{#each [-5, 0, 5] as dx, i (dx)}
-			<circle
-				cx={100 + dx}
-				cy={COLLAR_Y + COLLAR_H + 16}
-				r="1.7"
-				style:animation-delay="{i * 0.08}s"
-			/>
-		{/each}
-	</g>
+	{#if m.species === 'critter' && outfit === 'none'}
+		<ellipse class="belly-patch" cx="100" cy={b.hipY - 17} rx={hw * 0.55} ry="14" />
+	{:else if m.species === 'bob'}
+		<g class="status {beat.mode}" class:love={m.mood === 'love'} style:--beat="{beat.period}s">
+			{#each [-5, 0, 5] as dx, i (dx)}
+				<circle
+					cx={100 + dx}
+					cy={COLLAR_Y + COLLAR_H + 16}
+					r="1.7"
+					style:animation-delay="{i * 0.08}s"
+				/>
+			{/each}
+		</g>
+	{/if}
 {:else}
 	{#if outfit === 'puffer'}
 		<ellipse class="collar-shadow" cx="100" cy={COLLAR_Y + COLLAR_H + 1} rx={collarHw - 6} ry="5" />
@@ -829,6 +860,34 @@
 {/if}
 
 <style>
+	.paw-pad,
+	.tail-tip {
+		fill: var(--c-accent);
+	}
+	.belly-patch {
+		fill: var(--c-body-light);
+	}
+	.paw-toes {
+		fill: none;
+		stroke: var(--c-visor);
+		stroke-width: 1;
+		opacity: 0.4;
+	}
+	.critter-tail {
+		transform-origin: 0 0;
+		animation: critter-wag 2.5s ease-in-out infinite alternate;
+	}
+	.critter-tail.excited {
+		animation-duration: 0.4s;
+	}
+	@keyframes critter-wag {
+		from {
+			transform: rotate(-8deg);
+		}
+		to {
+			transform: rotate(12deg);
+		}
+	}
 	.stop-ink {
 		stop-color: var(--c-visor);
 	}

@@ -13,6 +13,13 @@ import {
 
 const config = (p: Partial<StudioConfig> = {}): StudioConfig => ({ ...LIBRARY_DEFAULTS, ...p });
 
+it('shares and exports a creature with custom proportions', () => {
+	const c = config({ species: 'critter', proportions: { ears: 1.8, legs: 0.4 } });
+	expect(fromQuery(new URLSearchParams(toQuery(c)))).toEqual(c);
+	expect(svelteFile(c)).toContain('species="critter"');
+	expect(svelteFile(c)).toContain('proportions={{ legs: 0.4, ears: 1.8 }}');
+});
+
 describe('share links', () => {
 	it('round-trips a configuration', () => {
 		const c = config({

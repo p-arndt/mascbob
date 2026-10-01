@@ -298,7 +298,9 @@
 	{/if}
 	{#if has('mustache')}
 		<g
-			transform="translate({100 + m.face.mouthX + m.gazeX * 6} {107.5 +
+			transform="translate({100 + m.face.mouthX + m.gazeX * 6} {(m.species === 'critter'
+				? 115.5
+				: 107.5) +
 				m.gazeY * 5 -
 				m.talk * 2}) scale(0.82)"
 		>

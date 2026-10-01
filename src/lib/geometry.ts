@@ -12,6 +12,8 @@ export interface ShapeDef {
 	bottom: number;
 	/** Half width at eye height, to place hands and ears. */
 	halfWidth: number;
+	/** Continuous creatures may attach hands below the face at a different width. */
+	handHalfWidth?: number;
 	/**
 	 * Half width 16 units below `top`, where a hat's rim meets the head. Hats size from this
 	 * rather than `halfWidth` so they hug narrow crowns (egg, cloud) instead of overhanging.

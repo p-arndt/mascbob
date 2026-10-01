@@ -3,6 +3,7 @@ import type { ShapeDef } from './geometry.js';
 import type { GrabPart } from './grab.js';
 import type { Reaction } from './interaction.js';
 import type { BuildDef } from './parts/body.js';
+import type { Species, resolveProportions } from './species.js';
 import type { Accessory, EyeStyle, FaceParams, Mood, MoodConfig, Outfit, Shoes } from './types.js';
 
 /**
@@ -12,6 +13,8 @@ import type { Accessory, EyeStyle, FaceParams, Mood, MoodConfig, Outfit, Shoes }
 export interface MascotContext {
 	/** Prefix for SVG ids; shared defs are `${uid}-glow`, `${uid}-soft`, `${uid}-body`, `${uid}-hand`. */
 	readonly uid: string;
+	readonly species: Species;
+	readonly proportions: ReturnType<typeof resolveProportions>;
 	/** Mood currently shown (a boop briefly overrides the `mood` prop with `happy`). */
 	readonly mood: Mood;
 	readonly config: MoodConfig;

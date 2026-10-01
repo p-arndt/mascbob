@@ -9,6 +9,10 @@
 		OUTFITS,
 		SHAPES,
 		SHOES,
+		SPECIES,
+		PROPORTION_KEYS,
+		type Proportions,
+		type Species,
 		type EyeStyle,
 		type Build,
 		type Outfit,
@@ -19,6 +23,15 @@
 	// Visual test bench: /lab?body=1&theme=mint&size=180&acc=ring,ears&outfit=scarf&shoes=boots&build=chubby
 	// &eyes=cat&bg=ffe9a8 (hex without #, or a CSS color name), &pair=1 for every figure on white and black.
 	const body = $derived(page.url.searchParams.get('body') !== '0');
+	const species = $derived((page.url.searchParams.get('species') ?? 'bob') as Species);
+	const proportions: Proportions = $derived(
+		Object.fromEntries(
+			PROPORTION_KEYS.flatMap((key) => {
+				const value = page.url.searchParams.get(`p-${key}`);
+				return value === null ? [] : [[key, Number(value)]];
+			})
+		)
+	);
 	const theme = $derived((page.url.searchParams.get('theme') ?? 'og') as ThemeName);
 	const size = $derived(Number(page.url.searchParams.get('size') ?? 150));
 	const outfitParam = $derived(page.url.searchParams.get('outfit') ?? '');
@@ -52,8 +65,27 @@
 	);
 
 	const cases = [
-		...MOODS.map((mood) => ({ key: `mood-${mood}`, name: mood, mood, shape: undefined })),
-		...SHAPES.map((shape) => ({ key: `shape-${shape}`, name: shape, mood: undefined, shape }))
+		...SPECIES.map((species) => ({
+			key: `species-${species}`,
+			name: species,
+			species,
+			mood: undefined,
+			shape: undefined
+		})),
+		...MOODS.map((mood) => ({
+			key: `mood-${mood}`,
+			name: mood,
+			species: undefined,
+			mood,
+			shape: undefined
+		})),
+		...SHAPES.map((shape) => ({
+			key: `shape-${shape}`,
+			name: shape,
+			species: undefined,
+			mood: undefined,
+			shape
+		}))
 	];
 </script>
 
@@ -64,9 +96,12 @@
 				{#each grounds as ground, i (i)}
 					<div class="ground" style:background={ground}>
 						<Mascot
+							species={c.species ?? species}
 							mood={c.mood}
 							shape={c.shape}
 							{eyes}
+							{proportions}
+							motion={page.url.searchParams.get('motion') === 'reduced' ? 'reduced' : 'auto'}
 							{body}
 							{outfit}
 							{shoes}

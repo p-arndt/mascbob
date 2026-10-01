@@ -98,6 +98,30 @@ or bring your own palette through `theme` or CSS variables.
 
 ## Props
 
+### Creature species and proportions
+
+`species` selects an anatomy: `bob` (the original), `critter` (large ears, paws and a tail),
+`moss` (one plant body with leaf arms and roots), or `wisp` (a floating spirit with detached hands).
+They share the same moods, gaze, speech and pointer reactions. Moss and wisp can be grabbed
+by their silhouette or hands; bob and critter also have grabbable legs.
+
+```svelte
+<Mascot species="critter" proportions={{ head: 1.15, legs: 0.8, ears: 1.2 }} theme="mocha" />
+<Mascot species="moss" proportions={{ body: 1.2, height: 0.85 }} theme="mint" />
+<Mascot species="wisp" proportions={{ tail: 1.25 }} theme="lilac" />
+```
+
+Proportions are multipliers from `0.4` to `1.8` (default `1`); out-of-range values are clamped.
+`head` changes head size, `body` body width, `height` body length, and `arms` and `legs` limb
+length. `ears` applies to critter; `tail` to critter and wisp. Moss and wisp have no legs:
+`head` sizes the upper contour without scaling the face; `arms` sizes leaf arms or detached hands.
+With `body={false}`, body proportions are ignored; critter retains its adjustable ears.
+
+`shape` selects Bob's head only. `build` still selects Bob or Critter's body proportions before
+the multipliers are applied (defaults: `standard` for Bob, `chibi` for Critter). Moss and Wisp
+always keep their continuous anatomy; `build`, `outfit` and `shoes` do not apply to them.
+All species support themes, eye styles and head accessories. Import `SPECIES` for a picker.
+
 The value lists grow over time, so the library exports them. Import `MOODS`, `SHAPES`,
 `EYE_STYLES`, `ACCESSORIES`, `OUTFITS`, `SHOES`, `BUILDS` and `THEMES` (an object keyed by theme name) to see
 every option or to build your own pickers:

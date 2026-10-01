@@ -202,7 +202,7 @@
 		const shape = {
 			cx: 100 + f.mouthX + m.gazeX * 6,
 			// The jaw drops with the syllable.
-			y: 118 + m.gazeY * 5 + talk * 1.5,
+			y: (m.species === 'critter' ? 126 : 118) + m.gazeY * 5 + talk * 1.5,
 			width: f.mouthWidth * (1 + talk * v.wide) * (1 - sq * 0.3),
 			curve: f.mouthCurve,
 			open,
@@ -218,6 +218,17 @@
 	});
 
 	const cheekX = $derived(Math.min(m.shape.halfWidth, 62) - 16);
+	// Keep the nose above even the upper lip's control points, including speech and skew.
+	const noseY = $derived(
+		Math.min(
+			(m.species === 'critter' ? 114 : 108) + m.gazeY * 3,
+			mouth.y -
+				Math.abs(mouth.curve) / 2 -
+				mouth.open * mouth.round * 0.9 -
+				Math.abs(mouth.skew) -
+				8
+		)
+	);
 	const blush = $derived(clamp(f.cheeks + curious.current * 0.3 + sq * 0.4 + smile * 0.15, 0, 1));
 	const blushLines = $derived(clamp(Math.max(f.blushLines, sq * 0.9), 0, 1));
 	const DOTS = halftone(9.5, 6, 2.7);
@@ -233,6 +244,18 @@
 		</clipPath>
 	{/each}
 </defs>
+
+{#if m.species === 'critter'}
+	<!-- The muzzle belongs to the face: it follows the gaze with the nose and mouth. -->
+	<g clip-path={ref('shell-clip')}>
+		<g transform="translate({100 + m.gazeX * 5} {130 + m.gazeY * 4 + talk})">
+			<path
+				class="muzzle"
+				d="M-33-1C-33-13-19-20 0-20C19-20 33-12 33 0C33 14 17 20 0 20C-18 20-33 13-33-1Z"
+			/>
+		</g>
+	</g>
+{/if}
 
 <!-- Halftone cheeks: blush grows the dots rather than fading them, like more ink on the screen. -->
 {#each [-1, 1] as side (side)}
@@ -275,6 +298,9 @@
 					6}"
 			/>
 		</g>
+	{/if}
+	{#if m.species === 'critter'}
+		<ellipse class="nose" cx={100 + m.gazeX * 6} cy={noseY} rx="3.8" ry="2.5" />
 	{/if}
 	<path class="mouth" d={mouth.d} opacity={1 - mouth.cat} />
 	{#if mouth.cat > 0.01}
@@ -340,6 +366,9 @@
 {/if}
 
 <style>
+	.muzzle {
+		fill: var(--c-body-light);
+	}
 	.plate {
 		fill: currentColor;
 		stroke: currentColor;
