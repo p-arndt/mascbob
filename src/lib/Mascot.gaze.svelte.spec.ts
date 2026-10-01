@@ -85,6 +85,9 @@ it('moves Critter’s whole head, not only its printed eyes', async () => {
 it('does not follow an outside pointer when the follow reaction is disabled', async () => {
 	const { container } = render(Mascot, { motion: 'full', float: false, reactions: false });
 	const aim = container.querySelector<SVGGElement>('.head-aim')!;
+	// The runner's real cursor may rest over the fresh mascot, and hovering may still steer the head.
+	await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+	container.querySelector('.mascbob')!.dispatchEvent(new PointerEvent('pointerleave'));
 	window.dispatchEvent(
 		new PointerEvent('pointermove', { clientX: 1000, clientY: 1000, pointerType: 'mouse' })
 	);
