@@ -12,6 +12,7 @@
 		THEMES,
 		type ThemeName
 	} from '$lib/index.js';
+	import { resolve } from '$app/paths';
 	import type { ComponentProps } from 'svelte';
 	import '../_showcase/showcase.css';
 	import CodeBlock from '../_showcase/CodeBlock.svelte';
@@ -48,6 +49,18 @@
 		);
 		for (const el of node.querySelectorAll('section[id]')) io.observe(el);
 		return () => io.disconnect();
+	}
+
+	// On narrow screens the sidebar is a horizontal chip row; keep the current chip in view.
+	function followCurrent(node: HTMLElement) {
+		$effect(() => {
+			const link = node.querySelector<HTMLElement>(`a[href="#${current}"]`);
+			if (!link || node.scrollWidth <= node.clientWidth) return;
+			node.scrollTo({
+				left: link.offsetLeft - (node.clientWidth - link.offsetWidth) / 2,
+				behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'
+			});
+		});
 	}
 
 	let copied = $state<string | null>(null);
@@ -115,7 +128,7 @@
 			<button class="tile" onclick={() => copy(t.code)} title="Copy {t.code}">
 				<span class="art">
 					<Mascot
-						size={tall ? 64 : 76}
+						size={tall ? 'min(64px, 15vw)' : 'min(76px, 17vw)'}
 						interactive={false}
 						lookAt="wander"
 						hands={false}
@@ -135,7 +148,7 @@
 
 	<div class="docs" {@attach track}>
 		<aside>
-			<nav aria-label="On this page">
+			<nav aria-label="On this page" {@attach followCurrent}>
 				{#each SECTIONS as [id, title] (id)}
 					<a href="#{id}" class:current={current === id}>{title}</a>
 				{/each}
@@ -144,6 +157,7 @@
 
 		<article>
 			<header class="intro">
+				<a class="back" href={resolve('/')}>← Back to home</a>
 				<h1>Docs</h1>
 				<p>
 					One component, <code>&lt;Mascot&gt;</code>. Everything below is a prop. Click any tile to
@@ -290,7 +304,7 @@
 						<tbody>
 							{#each PROPS as p (p.name)}
 								<tr>
-									<td><code>{p.name}</code></td>
+									<td class="name"><code>{p.name}</code></td>
 									<td class="type">
 										<code>{p.type}</code>
 										<p>
@@ -298,7 +312,7 @@
 													>{:else}{part}{/if}{/each}
 										</p>
 									</td>
-									<td><code>{p.default}</code></td>
+									<td class="default"><code>{p.default}</code></td>
 								</tr>
 							{/each}
 						</tbody>
@@ -354,6 +368,17 @@
 		gap: 4.5rem;
 		max-width: 780px;
 		min-width: 0;
+	}
+	.back {
+		display: inline-block;
+		margin-bottom: 1rem;
+		color: var(--text-2);
+		text-decoration: none;
+		font-size: 0.92rem;
+		font-weight: 600;
+	}
+	.back:hover {
+		color: var(--text-1);
 	}
 	.intro h1 {
 		margin: 0;
@@ -514,7 +539,18 @@
 			grid-template-columns: minmax(0, 1fr);
 			gap: 1.5rem;
 		}
-		/* The sidebar becomes a swipeable row of section links. */
+		/* The sidebar becomes a swipeable row of section links, pinned under the site nav. */
+		aside {
+			position: sticky;
+			top: 4.1rem;
+			z-index: 40;
+			margin: 0 -1.5rem;
+			padding: 0.5rem 1.5rem;
+			background: var(--nav-bg);
+			backdrop-filter: blur(14px) saturate(180%);
+			-webkit-backdrop-filter: blur(14px) saturate(180%);
+			border-bottom: 1px solid var(--line);
+		}
 		aside nav {
 			position: static;
 			display: flex;
@@ -524,10 +560,83 @@
 		aside a {
 			flex: none;
 		}
+		section {
+			scroll-margin-top: 8rem;
+		}
 		.reactions div,
 		.vars div {
 			grid-template-columns: minmax(0, 1fr);
 			gap: 0.25rem;
+		}
+	}
+
+	@media (max-width: 640px) {
+		.docs {
+			padding: 0.5rem 1.5rem 4rem;
+		}
+		article {
+			gap: 3rem;
+		}
+		.intro h1 {
+			font-size: 3rem;
+		}
+		.intro p {
+			font-size: 1.05rem;
+		}
+		h2 {
+			font-size: 1.6rem;
+		}
+		h3 {
+			font-size: 1.15rem;
+		}
+		.gallery {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+			gap: 0.4rem;
+		}
+		.tile {
+			padding: 0.7rem 0.3rem 0.6rem;
+			border-radius: 16px;
+		}
+		.art {
+			height: 72px;
+		}
+		.gallery.tall .art {
+			height: 96px;
+		}
+		.name {
+			font-size: 0.85rem;
+		}
+		.tile code {
+			font-size: 0.66rem;
+		}
+
+		/* Three columns are too cramped for prose, so each prop becomes a stacked row. */
+		thead {
+			display: none;
+		}
+		table,
+		tbody,
+		td {
+			display: block;
+		}
+		tr {
+			display: grid;
+			grid-template-columns: auto minmax(0, 1fr);
+			gap: 0.4rem 0.75rem;
+			padding: 0.9rem 0;
+			border-top: 1px solid var(--line);
+		}
+		td {
+			padding: 0;
+			border: 0;
+		}
+		td.default {
+			justify-self: end;
+			grid-row: 1;
+			grid-column: 2;
+		}
+		td.type {
+			grid-column: 1 / -1;
 		}
 	}
 </style>
