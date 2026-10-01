@@ -1,1 +1,0 @@
-Choose `species="critter"`, `species="moss"` or `species="wisp"` for companions with their own anatomy, sharing Bob’s moods, reactions and accessories. Adjust their contour and limbs from 40–180% with `proportions`; Critter’s muzzle follows its nose and mouth through moods and speech, and the original `species="bob"` remains the default.

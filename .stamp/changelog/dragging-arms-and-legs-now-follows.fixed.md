@@ -1,1 +1,0 @@
-With `reactions={{ grab: true }}`, dragging arms and legs now follows the pointer more directly while keeping the soft spring-back on release. Grabbing a hand off-center no longer snaps its center to the pointer.

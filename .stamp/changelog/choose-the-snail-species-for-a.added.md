@@ -1,1 +1,0 @@
-Choose `species="snail"` for a companion with independently grabbable eye stalks that lean toward `lookAt`, a spiral house and a soft foot. It tucks its head in when shy or sleepy; `proportions.body` sizes its house, `height` its foot length and `arms` its eye stalks.
