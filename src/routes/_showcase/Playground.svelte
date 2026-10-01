@@ -1463,15 +1463,29 @@
 	}
 
 	@media (max-width: 900px) {
+		/*
+		 * One screen-sized card, like on desktop: only the controls scroll, and at their end the page
+		 * takes over. Pinning the stage to the page instead ate half the screen and left it colliding
+		 * with the tabs on the way out.
+		 */
 		.playground {
 			grid-template-columns: minmax(0, 1fr);
-			height: auto;
+			grid-template-rows: auto minmax(0, 1fr);
+			height: clamp(560px, calc(100svh - 5.5rem), 780px);
 		}
 		.stage {
-			min-height: 480px;
+			height: 320px;
+			box-sizing: border-box;
+			border-radius: 24px;
+			padding: 0.75rem;
+			gap: 0.4rem;
+		}
+		.tabs {
+			padding-top: 0.25rem;
 		}
 		.panel-body {
-			overflow: visible;
+			padding: 1.25rem;
+			overscroll-behavior: auto;
 		}
 		.downloads {
 			grid-template-columns: repeat(2, 1fr);
