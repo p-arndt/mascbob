@@ -148,6 +148,28 @@ export const CREATURE_PRESETS = [
 		proportions: {},
 		outfit: 'none',
 		shoes: 'none'
+	},
+	{
+		name: 'Octobob',
+		accessories: ['beanie'],
+		species: 'octo',
+		theme: 'mocha',
+		colors: { bodyMid: '#df9a89', accent: '#9b5269' },
+		eyes: 'round',
+		proportions: {},
+		outfit: 'none',
+		shoes: 'none'
+	},
+	{
+		name: 'Snailbob',
+		accessories: [],
+		species: 'snail',
+		theme: 'mocha',
+		colors: { bodyMid: '#c4ce9f', accent: '#b87755' },
+		eyes: 'round',
+		proportions: {},
+		outfit: 'none',
+		shoes: 'none'
 	}
 ] as const satisfies readonly (Pick<
 	StudioConfig,
@@ -160,7 +182,9 @@ export const CREATURE_GEAR: Record<Species, readonly Accessory[]> = {
 	bob: ['cap', 'headphones', 'glasses', 'antenna', 'beanie'],
 	critter: ['bow', 'flower', 'glasses', 'headband', 'star-clip'],
 	moss: ['flower', 'glasses', 'bow', 'star-clip', 'beanie'],
-	wisp: ['star-clip', 'halo', 'nightcap', 'glasses', 'horns']
+	wisp: ['star-clip', 'halo', 'nightcap', 'glasses', 'horns'],
+	octo: ['beanie', 'flower', 'nightcap', 'star-clip', 'glasses'],
+	snail: ['flower', 'bow', 'star-clip']
 };
 const oneOf = <T extends string>(list: readonly T[], v: string | null): T | undefined =>
 	list.includes(v as T) ? (v as T) : undefined;

@@ -148,7 +148,16 @@
 	const config = $derived(moodConfig(activeMood));
 	const geometry = $derived(creatureGeometry(species, shape, build, proportions, body));
 	const head = $derived(geometry.head);
-	const unified = $derived(species === 'moss' || species === 'wisp');
+	const unified = $derived(
+		species === 'moss' || species === 'wisp' || species === 'octo' || species === 'snail'
+	);
+	const snailTuck = new Spring(0, { stiffness: 0.08, damping: 0.55 });
+	$effect(() => {
+		snailTuck.set(
+			species === 'snail' && (activeMood === 'shy' || activeMood === 'sleepy') ? 1 : 0,
+			{ instant: reduced }
+		);
+	});
 	const style = $derived(themeStyle(resolveTheme(theme)));
 
 	// Tweens may call `duration` after unmount, where reading a derived would warn; mirror it into a plain variable.
@@ -306,15 +315,28 @@
 	const flip = () => (Math.random() < 0.5 ? -1 : 1);
 
 	let reactionLean = $state(0);
-	/** Degrees the head turns after an idle glance. */
-	let idleTurn = $state(0);
 	/** Degrees of a mood entry's head tilt. */
 	let gestureTurn = $state(0);
 	$effect(() => {
-		headTurn.target = reduced
-			? 0
-			: // A held head must not turn under the pointer, or the grabbed spot would slide away.
-				(hovered && !grabbing ? pointerX * 5 : 0) + reactionLean + idleTurn + gestureTurn;
+		if (reduced) {
+			headTurn.set(0, { instant: true });
+			return;
+		}
+		// Keep the current orientation while held, rather than turning under the grip.
+		if (grabbing) {
+			untrack(() => headTurn.set(headTurn.current, { instant: true }));
+			return;
+		}
+		const aim = gaze.target;
+		const follows = lookAt !== 'pointer' || reactionFlags.follow || hovered;
+		const strength = species === 'bob' || species === 'critter' ? 13 : 8;
+		const turn =
+			lookAt === 'none' || species === 'snail' || !follows
+				? 0
+				: aim.x * strength * (1 + Math.max(0, aim.y) * 0.2);
+		// The reaction controller also reports pointer-follow lean; don't add it twice.
+		const shyLean = reaction?.name === 'shy' ? reactionLean : 0;
+		headTurn.target = turn + (species === 'snail' ? 0 : shyLean) + gestureTurn;
 	});
 
 	let hopId = 0;
@@ -474,7 +496,6 @@
 	function idleCue(cue: IdleCue) {
 		if (cue.type === 'rouse') {
 			idleEpoch++;
-			idleTurn = 0;
 			const quick = { duration: instant ? 0 : 180, easing: cubicOut };
 			lids.set(0, quick);
 			sag.set(0, quick);
@@ -499,10 +520,6 @@
 		gaze.target = { x, y };
 		glanced = true;
 		if (Math.hypot(x - from.x, y - from.y) > 0.9 && blink.current === 0 && !asleep) blinkEyes();
-		const epoch = idleEpoch;
-		later(() => {
-			if (epoch === idleEpoch) idleTurn = x * 4;
-		}, 100);
 	}
 
 	function fidget(kind: Fidget) {
@@ -799,6 +816,20 @@
 	const headScale = $derived(body ? fig.headScale : 1);
 	const headY = $derived(body ? fig.headY : 0);
 	const neckY = $derived(head.bottom + headY - 6);
+	// A slight nod follows vertical gaze around the base, keeping continuous bodies grounded.
+	let gazeNod = $state(0);
+	let gazeShift = $state(0);
+	$effect(() => {
+		const follows = lookAt !== 'pointer' || reactionFlags.follow || hovered;
+		const separateHead = species === 'bob' || species === 'critter';
+		if (reduced || lookAt === 'none' || species === 'snail' || !follows) {
+			gazeNod = 0;
+			gazeShift = 0;
+		} else if (!grabbing) {
+			gazeNod = gaze.current.y * (separateHead ? 0.055 : 0.025);
+			gazeShift = separateHead ? gaze.current.x * 5 : 0;
+		}
+	});
 	// The ground reacts to the hop and the squash: smaller and fainter while airborne.
 	const air = $derived(clamp(-hop.current / 24, 0, 1));
 	const groundScale = $derived((1 - air * 0.35) * (1 + (squish.current.x - 1) * 0.8));
@@ -831,7 +862,7 @@
 	const neckOut = $derived(Math.hypot(pose.x, pose.y));
 	const neckWidth = $derived(Math.min(hw * 0.6, 32) / Math.sqrt(1 + neckOut / 60));
 	// The torso follows a pulled head a little, like a neck tugging at its shoulders.
-	const torsoTurn = $derived(headTurn.current * 0.45 + pullTurn * 0.5 * grabFeel.lean);
+	const torsoTurn = $derived(headTurn.current * 0.22 + pullTurn * 0.5 * grabFeel.lean);
 	// The neck grows out of the turned torso, so its root turns with it.
 	const neckRoot = $derived.by(() => {
 		const a = (torsoTurn * Math.PI) / 180;
@@ -1053,8 +1084,10 @@
 								transform="translate({pose.x} {pose.y}) rotate({pose.tilt} {headBase.x} {headBase.y}) translate({headBase.x} {headBase.y}) scale({pose.sx} {pose.sy}) translate({-headBase.x} {-headBase.y})"
 							>
 								<g
+									class="head-aim"
 									transform="rotate({headTurn.current +
-										headDrag} 100 {neckY}) translate(0 {headDrop})"
+										headDrag} 100 {neckY}) translate({gazeShift} {headDrop}) translate(100 {neckY}) scale(1 {1 -
+										gazeNod}) translate(-100 {-neckY})"
 								>
 									<!-- svelte-ignore a11y_no_static_element_interactions -->
 									<g
@@ -1069,12 +1102,25 @@
 											<g class="breathe" class:lift={body}>
 												<Accessories layer="back" />
 												<Creature layer="back" />
-												<Shell />
-												<Creature layer="markings" />
-												<Face />
+												<g
+													class="face-body"
+													transform={species === 'snail'
+														? `translate(${snailTuck.current * 13} ${head.bottom * snailTuck.current * 0.25}) scale(1 ${1 - snailTuck.current * 0.25})`
+														: undefined}
+												>
+													<Shell />
+													<Creature layer="markings" />
+													<Face />
+													{#if species === 'snail'}
+														<Accessories layer="front" />
+														{@render accessory?.({ top: t, halfWidth: hw })}
+													{/if}
+												</g>
 												<Creature layer="front" />
-												<Accessories layer="front" />
-												{@render accessory?.({ top: t, halfWidth: hw })}
+												{#if species !== 'snail'}
+													<Accessories layer="front" />
+													{@render accessory?.({ top: t, halfWidth: hw })}
+												{/if}
 											</g>
 										</g>
 									</g>
@@ -1084,7 +1130,7 @@
 								<g transform="rotate({torsoTurn} 100 {fig.hipY})">
 									<Body layer="front" />
 								</g>
-							{:else if hands && !(unified && body)}
+							{:else if hands && !(unified && body) && species !== 'snail'}
 								<Hands />
 							{/if}
 							{#if effects}

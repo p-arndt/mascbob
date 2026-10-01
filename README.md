@@ -101,24 +101,34 @@ or bring your own palette through `theme` or CSS variables.
 ### Creature species and proportions
 
 `species` selects an anatomy: `bob` (the original), `critter` (large ears, paws and a tail),
-`moss` (one plant body with leaf arms and roots), or `wisp` (a floating spirit with detached hands).
+`moss` (one plant body with leaf arms and roots), `wisp` (a floating spirit with detached hands),
+`octo` (a soft bell with four curled tentacles), or `snail` (eye stalks, a spiral house and a soft foot).
 They share the same moods, gaze, speech and pointer reactions. Moss and wisp can be grabbed
 by their silhouette or hands; bob and critter also have grabbable legs.
+Octo's four tentacles stretch independently and curl up when sleepy or sad. Its rear pair
+fires `onreaction` with `part: 'arm-left'` / `'arm-right'`; the front pair uses `'leg-left'` / `'leg-right'`.
+Snail keeps the shared morphing eyes on its stalks, tucks its head in when shy or sleepy,
+and can be grabbed by its head, house or either eye stalk. The stalks fire `onreaction`
+with `part: 'arm-left'` / `'arm-right'` and spring back on release. It has no hands or legs.
 
 ```svelte
 <Mascot species="critter" proportions={{ head: 1.15, legs: 0.8, ears: 1.2 }} theme="mocha" />
 <Mascot species="moss" proportions={{ body: 1.2, height: 0.85 }} theme="mint" />
 <Mascot species="wisp" proportions={{ tail: 1.25 }} theme="lilac" />
+<Mascot species="octo" proportions={{ arms: 1.2 }} theme="mocha" accessories={['beanie']} />
+<Mascot species="snail" proportions={{ body: 1.2, arms: 0.8 }} theme="mocha" />
 ```
 
 Proportions are multipliers from `0.4` to `1.8` (default `1`); out-of-range values are clamped.
 `head` changes head size, `body` body width, `height` body length, and `arms` and `legs` limb
 length. `ears` applies to critter; `tail` to critter and wisp. Moss and wisp have no legs:
 `head` sizes the upper contour without scaling the face; `arms` sizes leaf arms or detached hands.
+For octo, `head` sizes the crown, `body` the bell width, `height` the bell length and `arms` all four tentacles.
+For snail, `head` sizes the head contour, `body` the house, `height` the foot length and `arms` the eye stalks.
 With `body={false}`, body proportions are ignored; critter retains its adjustable ears.
 
 `shape` selects Bob's head only. `build` still selects Bob or Critter's body proportions before
-the multipliers are applied (defaults: `standard` for Bob, `chibi` for Critter). Moss and Wisp
+the multipliers are applied (defaults: `standard` for Bob, `chibi` for Critter). Moss, Wisp, Octo and Snail
 always keep their continuous anatomy; `build`, `outfit` and `shoes` do not apply to them.
 All species support themes, eye styles and head accessories. Import `SPECIES` for a picker.
 
@@ -155,6 +165,11 @@ import { MOODS, SHAPES, EYE_STYLES, ACCESSORIES, OUTFITS, SHOES, BUILDS, THEMES 
 | `onboop`      | click/tap handler                                                                                              | –                        |
 | `onreaction`  | called with a `ReactionEvent` (`pet`, `startle`, `dizzy`, `shy`, `tickle`, `explode`, `grab`, `bored`, `wake`) | –                        |
 | `accessory`   | snippet `({ top, halfWidth })` drawing custom SVG in the head's 200×200 viewBox                                | –                        |
+
+`lookAt` also guides a head lean and nod; the default `follow` reaction allows this even outside the mascot.
+Bob and Critter move their whole head toward the gaze while their torso follows only a little.
+Snail keeps its body and house steady and aims its eye stalks instead. `lookAt="none"` disables
+gaze-driven head motion; it also stops with reduced motion and holds its orientation during a drag.
 
 ## Styling with CSS
 

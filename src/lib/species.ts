@@ -2,7 +2,7 @@ import { SHAPE_DEFS, clamp, type ShapeDef } from './geometry.js';
 import { buildDef, type Build, type BuildDef } from './parts/body.js';
 import type { Shape } from './types.js';
 
-export const SPECIES = ['bob', 'critter', 'moss', 'wisp'] as const;
+export const SPECIES = ['bob', 'critter', 'moss', 'wisp', 'octo', 'snail'] as const;
 export type Species = (typeof SPECIES)[number];
 export const PROPORTION_KEYS = ['head', 'body', 'height', 'arms', 'legs', 'ears', 'tail'] as const;
 export const PROPORTION_RANGE = { min: 0.4, max: 1.8 } as const;
@@ -32,7 +32,8 @@ export function creatureGeometry(
 	body = true
 ): { head: ShapeDef; build: BuildDef } {
 	const p = resolveProportions(body ? input : { ears: input?.ears });
-	const unified = species === 'moss' || species === 'wisp';
+	const unified =
+		species === 'moss' || species === 'wisp' || species === 'octo' || species === 'snail';
 	const base = buildDef(
 		unified ? 'blob' : (build ?? (species === 'critter' ? 'chibi' : 'standard'))
 	);
@@ -67,6 +68,53 @@ export function creatureGeometry(
 			},
 			build: b
 		};
+	if (species === 'snail') {
+		const top = 80 - 8 * (p.head - 1);
+		const hw = 40 * (0.85 + p.head * 0.15);
+		return {
+			head: {
+				d: `M100 ${top}C${100 + hw} ${top} ${100 + hw} 104 ${100 + hw} 119C${100 + hw} 134 129 137 136 148Q142 155 151 160H68Q75 151 70 140C${100 - hw} 133 ${100 - hw} 128 ${100 - hw} 115C${100 - hw} 95 ${100 - hw * 0.8} ${top} 100 ${top}Z`,
+				top,
+				bottom: 160,
+				halfWidth: hw,
+				crownHalfWidth: 27
+			},
+			build: {
+				...b,
+				legs: false,
+				motion: 'stand',
+				headScale: 1,
+				hipY: 160,
+				groundY: 183,
+				viewHeight: 213
+			}
+		};
+	}
+	if (species === 'octo') {
+		const top = 100 - (32 + 12 * p.head);
+		const bottom = body ? 150 + 16 * p.height : 162;
+		const faceHw = 63 * (0.9 + p.head * 0.1);
+		const hw = 62 * (0.75 + p.body * 0.25);
+		const groundY = bottom + (body ? 18 + 24 * p.arms : 0);
+		return {
+			head: {
+				d: `M100 ${top}C${100 + faceHw * 0.85} ${top} ${100 + faceHw} 73 ${100 + faceHw} 106C${100 + faceHw} 133 ${100 + hw + 5} ${bottom - 28} ${100 + hw} ${bottom - 13}C${100 + hw - 4} ${bottom + 4} ${100 + hw * 0.38} ${bottom} 100 ${bottom}C${100 - hw * 0.38} ${bottom} ${100 - hw + 4} ${bottom + 4} ${100 - hw} ${bottom - 13}C${100 - hw - 5} ${bottom - 28} ${100 - faceHw} 133 ${100 - faceHw} 106C${100 - faceHw} 73 ${100 - faceHw * 0.85} ${top} 100 ${top}Z`,
+				top,
+				bottom,
+				halfWidth: faceHw,
+				crownHalfWidth: faceHw * 0.65
+			},
+			build: {
+				...b,
+				legs: false,
+				motion: 'stand',
+				headScale: 1,
+				hipY: bottom,
+				groundY,
+				viewHeight: groundY + 30
+			}
+		};
+	}
 	// Upper and lower contours have independent sizes; never scale the face with the whole body.
 	const bottom = body ? 140 + 84 * p.height : 170;
 	const top = 100 - (44 + 16 * p.head);
@@ -111,6 +159,7 @@ export function creatureViewTop(
 	input?: Proportions
 ): number {
 	const p = resolveProportions(input);
+	if (species === 'snail') return Math.min(0, Math.floor(20 - 20 * p.arms));
 	if (p.head <= 1 && (species !== 'critter' || p.ears <= 1)) return 0;
 	const artTop = Math.min(head.top - 32, species === 'critter' ? 61 - 50 * p.ears : head.top);
 	return Math.min(

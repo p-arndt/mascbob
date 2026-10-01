@@ -5,6 +5,7 @@
 	import { clamp, HEART_PATH } from '../geometry.js';
 	import { createLaugh, createVisemes, VOWELS } from '../speech.js';
 	import type { EyeParams } from '../types.js';
+	import { drag, RELEASE_SPRING, rubber } from '../grab.js';
 	import {
 		EYE_SIZES,
 		MISPRINT,
@@ -29,6 +30,42 @@
 	 */
 	const m = getMascot();
 	const ref = (name: string) => svgRef(m.uid, name);
+	const stalkPulls = [
+		new Spring({ x: 0, y: 0 }, RELEASE_SPRING),
+		new Spring({ x: 0, y: 0 }, RELEASE_SPRING)
+	];
+	let stalkFrame = $state<SVGGElement>();
+	function grabEye(event: PointerEvent, index: number) {
+		event.stopPropagation();
+		const origin = { ...eyes[index].shape };
+		let from = { x: 0, y: 0 };
+		drag(event, {
+			frame: () => stalkFrame,
+			start: (point) => {
+				if (!m.grab(index === 0 ? 'arm-left' : 'arm-right')) return false;
+				from = point;
+			},
+			move: (point) => {
+				const pull = stalkPulls[index];
+				const rest = eyes[index].shape;
+				const soften = (value: number) =>
+					Math.abs(value) <= 45
+						? value
+						: Math.sign(value) * (45 + rubber(Math.abs(value) - 45, 65));
+				pull.set(
+					{
+						x: origin.cx + soften(point.x - from.x) - (rest.cx - pull.current.x),
+						y: origin.cy + soften(point.y - from.y) - (rest.cy - pull.current.y)
+					},
+					{ instant: true }
+				);
+			},
+			end: () => {
+				stalkPulls[index].set({ x: 0, y: 0 }, { instant: m.reduced });
+				m.release();
+			}
+		});
+	}
 
 	// Pressing squeezes the eyes into "> <"; the underdamped spring overshoots below 0 on release, which reads as a pop.
 	const squeeze = new Spring(0, { stiffness: 0.2, damping: 0.36 });
@@ -129,7 +166,12 @@
 	// A big grin pushes the cheeks and lower lids up with it.
 	const smile = $derived(duchenne(f.mouthCurve, f.mouthRound));
 	// Eyes travel further up than down; the face sits high on the head.
-	const eyeY = $derived(96 + m.gazeY * (m.gazeY < 0 ? 12 : 10) + saccade.current.y);
+	const eyeY = $derived(
+		96 -
+			(m.species === 'snail' ? 16 + 20 * (m.body ? m.proportions.arms : 1) : 0) +
+			m.gazeY * (m.species === 'snail' ? 20 : m.gazeY < 0 ? 12 : 10) +
+			saccade.current.y
+	);
 	// Syllables knock the accent plate around a little, like a speaker cone.
 	const offset = $derived({ x: plate.current.x + talk * 1.6, y: plate.current.y - talk * 1.1 });
 
@@ -138,7 +180,15 @@
 		const outward = side === 'left' ? -1 : 1;
 		// A close pointer pulls both eyes in a little (vergence); eyes travel furthest of all
 		// features, which is what makes the flat face read as a turning head.
-		const cx = baseX + m.gazeX * 9 + saccade.current.x - outward * m.focus * 1.4;
+		const pull =
+			m.species === 'snail' ? stalkPulls[side === 'left' ? 0 : 1].current : { x: 0, y: 0 };
+		const cx =
+			baseX +
+			m.gazeX * (m.species === 'snail' ? 24 : 9) +
+			saccade.current.x -
+			outward * m.focus * 1.4 +
+			pull.x;
+		const cy = eyeY + pull.y;
 		const heart = clamp(p.heart, 0, 1);
 		const size = p.scale * grow * pop * (1 - heart) * (1 + m.focus * 0.08);
 		const fullH = base.h * size;
@@ -151,7 +201,7 @@
 		const closure = eyeClosure(m.blink, down);
 		const shape: EyeShape = {
 			cx,
-			cy: eyeY,
+			cy,
 			w: base.w * size,
 			h: fullH * Math.max(0, p.open) * (1 + up * 0.12) * closure.hScale * (1 - sq),
 			round: base.round,
@@ -164,18 +214,13 @@
 		const len = clamp(base.w * p.scale * 0.85, 9, 15);
 		// Brows bounce with the voice: talking faces are mostly eyebrows.
 		const browY =
-			eyeY -
-			(base.h * p.scale * clamp(p.open, 0.5, 1.25)) / 2 -
-			6 -
-			p.browLift -
-			talk * 2.2 -
-			up * 3;
+			cy - (base.h * p.scale * clamp(p.open, 0.5, 1.25)) / 2 - 6 - p.browLift - talk * 2.2 - up * 3;
 		// Positive tilt raises the inner end (toward the nose).
 		const rise = p.browTilt * len * 0.45 * (side === 'left' ? 1 : -1);
 		return {
 			shape,
 			d: smoothPath(eyeOutline(shape)),
-			heart: { cx, cy: eyeY, s: heart * base.w * 1.5 * p.scale * grow },
+			heart: { cx, cy, s: heart * base.w * 1.5 * p.scale * grow },
 			// The glint rides under the dropping lid too, or a blink would slice through it.
 			lid: lid + (1 - lid) * closure.lidDrop,
 			glint: base.glint ?? 1,
@@ -257,6 +302,31 @@
 	</g>
 {/if}
 
+{#if m.species === 'snail'}
+	<!-- The existing morphing eyes sit on living stalks, not a second face on the body. -->
+	{#each eyes as e, i (i)}
+		<g class="eye-stalk">
+			<path
+				class="stalk-edge"
+				d="M{i === 0 ? 83 : 117} {m.shape.top + 10}Q{i === 0 ? 73 : 127} {e.shape.cy + 22} {e.shape
+					.cx} {e.shape.cy}"
+			/>
+			<path
+				class="stalk-skin"
+				d="M{i === 0 ? 83 : 117} {m.shape.top + 10}Q{i === 0 ? 73 : 127} {e.shape.cy + 22} {e.shape
+					.cx} {e.shape.cy}"
+			/>
+			<ellipse
+				class="eye-bulb"
+				cx={e.shape.cx}
+				cy={e.shape.cy}
+				rx={Math.max(11, e.shape.w / 2 + 4)}
+				ry={Math.max(12, e.shape.h / 2 + 4)}
+			/>
+		</g>
+	{/each}
+{/if}
+
 <!-- Halftone cheeks: blush grows the dots rather than fading them, like more ink on the screen. -->
 {#each [-1, 1] as side (side)}
 	<g
@@ -290,12 +360,12 @@
 		<!-- "> <" -->
 		<g class="line thin" opacity={sq}>
 			<path
-				d="M{left.shape.cx - 6} {eyeY - 6}L{left.shape.cx + 5} {eyeY}L{left.shape.cx - 6} {eyeY +
-					6}"
+				d="M{left.shape.cx - 6} {left.shape.cy - 6}L{left.shape.cx + 5} {left.shape.cy}L{left.shape
+					.cx - 6} {left.shape.cy + 6}"
 			/>
 			<path
-				d="M{right.shape.cx + 6} {eyeY - 6}L{right.shape.cx - 5} {eyeY}L{right.shape.cx + 6} {eyeY +
-					6}"
+				d="M{right.shape.cx + 6} {right.shape.cy - 6}L{right.shape.cx - 5} {right.shape.cy}L{right
+					.shape.cx + 6} {right.shape.cy + 6}"
 			/>
 		</g>
 	{/if}
@@ -352,7 +422,7 @@
 </g>
 
 {#if m.config.effect === 'tear'}
-	<g transform="translate({left.shape.cx - left.shape.w * 0.35} {eyeY + 9})">
+	<g transform="translate({left.shape.cx - left.shape.w * 0.35} {left.shape.cy + 9})">
 		<path class="tear" d="M0 -4.5C1.8 -1.6 3 0 3 1.6A3 3 0 0 1 -3 1.6C-3 0 -1.8 -1.6 0 -4.5Z" />
 	</g>
 {:else if m.config.effect === 'sweat'}
@@ -365,7 +435,52 @@
 	</g>
 {/if}
 
+{#if m.species === 'snail'}
+	<g bind:this={stalkFrame}>
+		{#each eyes as e, i (i)}
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<ellipse
+				class="stalk-grip"
+				class:grabbable={m.canGrab}
+				data-grab={i === 0 ? 'arm-left' : 'arm-right'}
+				cx={e.shape.cx}
+				cy={e.shape.cy}
+				rx={Math.max(14, e.shape.w / 2 + 6)}
+				ry={Math.max(16, e.shape.h / 2 + 6)}
+				onpointerdown={(event) => grabEye(event, i)}
+				style:touch-action="none"
+			/>
+		{/each}
+	</g>
+{/if}
+
 <style>
+	.stalk-grip {
+		fill: transparent;
+	}
+	.grabbable {
+		cursor: grab;
+	}
+	.stalk-edge,
+	.stalk-skin {
+		fill: none;
+		stroke-linecap: round;
+	}
+	.stalk-edge {
+		stroke: var(--c-visor);
+		stroke-width: 11.6;
+		stroke-opacity: 0.5;
+	}
+	.stalk-skin {
+		stroke: var(--c-body-mid);
+		stroke-width: 10;
+	}
+	.eye-bulb {
+		fill: var(--c-body-light);
+		stroke: var(--c-visor);
+		stroke-width: 1.6;
+		stroke-opacity: 0.5;
+	}
 	.muzzle {
 		fill: var(--c-body-light);
 	}

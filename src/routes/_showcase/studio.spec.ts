@@ -20,7 +20,19 @@ it('shares and exports a creature with custom proportions', () => {
 	expect(svelteFile(c)).toContain('proportions={{ legs: 0.4, ears: 1.8 }}');
 });
 
+it('shares and exports octo with its tentacle length', () => {
+	const c = config({ species: 'octo', proportions: { arms: 1.6 } });
+	expect(fromQuery(new URLSearchParams(toQuery(c)))).toEqual(c);
+	expect(svelteFile(c)).toContain('species="octo"');
+	expect(svelteFile(c)).toContain('proportions={{ arms: 1.6 }}');
+});
+
 describe('share links', () => {
+	it('round-trips snail anatomy and exports the species', () => {
+		const c = config({ species: 'snail', proportions: { body: 1.6, height: 0.5, arms: 1.8 } });
+		expect(fromQuery(new URLSearchParams(toQuery(c)))).toEqual(c);
+		expect(svelteFile(c)).toContain('species="snail"');
+	});
 	it('round-trips a configuration', () => {
 		const c = config({
 			...STUDIO_START,

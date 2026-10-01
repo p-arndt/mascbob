@@ -1,0 +1,1 @@
+Use `species="octo"` for a soft-bell companion with four independently grabbable, curled tentacles. Adjust their length with `proportions.arms`; they tuck in when sleepy or sad and share the existing moods, themes and head accessories.

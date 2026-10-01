@@ -6,6 +6,35 @@ import Playground from './Playground.svelte';
 vi.mock('$app/state', () => ({ page: { url: new URL('https://example.com/') } }));
 
 describe('Studio controls', () => {
+	it('offers Snailbob with anatomy-specific controls', async () => {
+		render(Playground);
+		await page.getByRole('button', { name: 'Use Snailbob preset' }).click();
+		await expect
+			.element(page.getByRole('button', { name: 'Remove all accessories' }))
+			.not.toBeInTheDocument();
+		for (const name of ['Shell size percent', 'Foot length percent', 'Eye stalk length percent']) {
+			await expect.element(page.getByRole('spinbutton', { name })).toHaveValue(100);
+		}
+		await expect
+			.element(page.getByRole('button', { name: 'Head', exact: true }))
+			.not.toBeInTheDocument();
+		await expect
+			.element(page.getByRole('spinbutton', { name: 'Legs percent' }))
+			.not.toBeInTheDocument();
+	});
+	it('offers Octobob with tentacle proportions and only full anatomy', async () => {
+		render(Playground);
+		await page.getByRole('button', { name: 'Use Octobob preset' }).click();
+		await expect
+			.element(page.getByRole('spinbutton', { name: 'Tentacle length percent' }))
+			.toHaveValue(100);
+		await expect
+			.element(page.getByRole('button', { name: 'Head', exact: true }))
+			.not.toBeInTheDocument();
+		await expect
+			.element(page.getByRole('spinbutton', { name: 'Legs percent' }))
+			.not.toBeInTheDocument();
+	});
 	it('keeps percentage inputs and sliders in sync, with individual resets', async () => {
 		render(Playground);
 		await page.getByRole('button', { name: 'Use Mossbob preset' }).click();

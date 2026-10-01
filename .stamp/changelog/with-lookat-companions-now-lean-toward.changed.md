@@ -1,0 +1,1 @@
+With `lookAt` and the default `follow` reaction, companions now lean toward diagonal pointers even outside their bounds: Bob and Critter move their whole head while Snail keeps its body steady and aims only its eye stalks. Use `lookAt="none"` to disable gaze-driven head movement; reduced motion disables it and dragging holds the current orientation.

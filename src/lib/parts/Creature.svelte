@@ -4,6 +4,8 @@
 	import { drag, RELEASE_SPRING, tune } from '../grab.js';
 	import { floatingHands } from './body.js';
 	import { HATS } from './accessories.js';
+	import Octopus from './Octopus.svelte';
+	import Snail from './Snail.svelte';
 
 	let { layer }: { layer: 'back' | 'markings' | 'front' } = $props();
 	const m = getMascot();
@@ -56,7 +58,11 @@
 	}
 </script>
 
-{#if m.species !== 'bob'}
+{#if m.species === 'snail'}
+	<Snail {layer} />
+{:else if m.species === 'octo'}
+	<Octopus {layer} />
+{:else if m.species !== 'bob'}
 	<g class="creature-{m.species}" class:low class:excited>
 		{#if layer === 'back' && m.species === 'moss' && m.body}
 			<g transform="translate(100 {m.shape.bottom - 6}) scale({p.body} 1)">

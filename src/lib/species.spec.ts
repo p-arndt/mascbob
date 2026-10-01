@@ -10,7 +10,7 @@ describe('creature geometry', () => {
 		expect(g.build).toEqual(BUILD_DEFS.standard);
 	});
 	it('keeps unified species legless even when passed a standing build', () => {
-		for (const species of ['moss', 'wisp'] as const) {
+		for (const species of ['moss', 'wisp', 'octo', 'snail'] as const) {
 			const g = creatureGeometry(species, 'cat', 'lanky');
 			expect(g.build.legs).toBe(false);
 			expect(g).toEqual(creatureGeometry(species, 'orb', undefined));
@@ -45,6 +45,13 @@ describe('creature geometry', () => {
 	it('sanitizes non-finite and out-of-range proportions', () => {
 		const p = resolveProportions({ head: Infinity, body: NaN, height: -2, arms: 8 });
 		expect(p).toMatchObject({ head: 1, body: 1, height: 0.4, arms: 1.8, legs: 1 });
+	});
+	it('sizes octo tentacles without changing its face or bell', () => {
+		const regular = creatureGeometry('octo', 'capsule', undefined);
+		const long = creatureGeometry('octo', 'capsule', undefined, { arms: 1.8 });
+		expect(long.head).toEqual(regular.head);
+		expect(long.build.groundY).toBeGreaterThan(regular.build.groundY);
+		expect(long.build.viewHeight).toBeGreaterThan(long.build.groundY);
 	});
 	it('keeps the face scale fixed while sizing unified crowns and repositions hands with body width', () => {
 		for (const species of ['moss', 'wisp'] as const) {

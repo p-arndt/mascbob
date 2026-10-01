@@ -14,14 +14,14 @@ export const PROPS: PropDoc[] = [
 		type: 'Species',
 		default: "'bob'",
 		description:
-			'Anatomy: bob, critter (ears, paws and tail), moss (leaf arms and roots), or wisp (floating spirit).'
+			'Anatomy: bob, critter (ears, paws and tail), moss (leaf arms and roots), wisp (floating spirit), octo (four curled tentacles), or snail (eye stalks, spiral house and foot).'
 	},
 	{
 		name: 'proportions',
 		type: 'Proportions',
 		default: '{}',
 		description:
-			'Multipliers from 0.4 to 1.8: head, body (width), height (body length), arms, legs, ears and tail. Ears apply to critter; tail to critter and wisp; legs to bob and critter. Head sizes the upper contour of moss and wisp without scaling the face.'
+			'Multipliers from 0.4 to 1.8: head, body (width), height (body length), arms, legs, ears and tail. Ears apply to critter; tail to critter and wisp; legs to bob and critter. Head sizes the crown of moss, wisp and octo without scaling the face. Arms sizes all four octo tentacles. For snail: body sizes its house, height its foot length and arms its eye stalks.'
 	},
 	{
 		name: 'mood',
@@ -88,7 +88,8 @@ export const PROPS: PropDoc[] = [
 		name: 'lookAt',
 		type: "'pointer' | 'wander' | 'none' | { x, y }",
 		default: "'pointer'",
-		description: 'Where the eyes go. `{ x, y }` is a fixed direction in -1..1.'
+		description:
+			'Where the eyes and gentle head lean aim, including outside the figure. Snail aims its stalks without turning its body. `{ x, y }` is a fixed direction in -1..1; none disables gaze-driven movement.'
 	},
 	{
 		name: 'level',

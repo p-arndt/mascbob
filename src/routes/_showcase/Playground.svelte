@@ -76,6 +76,7 @@
 	};
 	const proportionKeys = $derived(
 		PROPORTION_KEYS.filter((key) => {
+			if (species === 'snail') return body && ['head', 'body', 'height', 'arms'].includes(key);
 			if (!body) return species === 'critter' && key === 'ears';
 			if (key === 'ears') return species === 'critter';
 			if (key === 'tail') return species === 'critter' || species === 'wisp';
@@ -84,6 +85,16 @@
 		})
 	);
 	function proportionLabel(key: keyof Proportions) {
+		if (species === 'snail') {
+			if (key === 'body') return 'Shell size';
+			if (key === 'height') return 'Foot length';
+			if (key === 'arms') return 'Eye stalk length';
+			if (key === 'head') return 'Head size';
+		}
+		if (species === 'octo') {
+			if (key === 'head') return 'Crown size';
+			if (key === 'arms') return 'Tentacle length';
+		}
 		if (species === 'moss' || species === 'wisp') {
 			if (key === 'head') return 'Crown size';
 			if (key === 'arms') return 'Hand size';
@@ -122,7 +133,9 @@
 	let eyes = $state<EyeStyle>(start.eyes);
 	let accessories = $state<Accessory[]>(start.accessories);
 	let body = $state(start.body);
-	const unified = $derived(species === 'moss' || species === 'wisp');
+	const unified = $derived(
+		species === 'moss' || species === 'wisp' || species === 'octo' || species === 'snail'
+	);
 	$effect(() => {
 		if (unified) body = true;
 	});
@@ -686,7 +699,8 @@
 				<fieldset>
 					<legend>Choose a companion</legend>
 					<p class="note intro">
-						Four species, each with its own anatomy. Picking one applies its designed starting look.
+						{CREATURE_PRESETS.length} species, each with its own anatomy. Picking one applies its designed
+						starting look.
 					</p>
 					<div class="companion-presets">
 						{#each CREATURE_PRESETS as preset (preset.species)}
@@ -885,14 +899,10 @@
 					<legend>Accessories <span class="value">{accessories.length || 'none'}</span></legend>
 					{@render chipGroup(ACCESSORIES, (a) => accessories.includes(a), toggle)}
 				</fieldset>
-				<fieldset
-					disabled={!body || species === 'moss' || species === 'wisp'}
-					class:off={!body || species === 'moss' || species === 'wisp'}
-				>
+				<fieldset disabled={!body || unified} class:off={!body || unified}>
 					<legend>
 						Outfit
-						{#if species === 'moss' || species === 'wisp'}<span class="value">bob & critter</span
-							>{/if}
+						{#if unified}<span class="value">bob & critter</span>{/if}
 						{#if !body}<span class="value">needs full body</span>{/if}
 					</legend>
 					{@render chipGroup(
@@ -901,14 +911,10 @@
 						(o) => (outfit = o)
 					)}
 				</fieldset>
-				<fieldset
-					disabled={!body || species === 'moss' || species === 'wisp'}
-					class:off={!body || species === 'moss' || species === 'wisp'}
-				>
+				<fieldset disabled={!body || unified} class:off={!body || unified}>
 					<legend>
 						Shoes
-						{#if species === 'moss' || species === 'wisp'}<span class="value">bob & critter</span
-							>{/if}
+						{#if unified}<span class="value">bob & critter</span>{/if}
 						{#if !body}<span class="value">needs full body</span>{/if}
 					</legend>
 					{@render chipGroup(
