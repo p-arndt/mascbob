@@ -14,6 +14,7 @@
 		OUTFITS,
 		SHAPES,
 		SHOES,
+		HELD_ITEMS,
 		THEMES,
 		resolveTheme,
 		type Accessory,
@@ -25,19 +26,21 @@
 		type ReactionEvent,
 		type Shape,
 		type Shoes,
+		type HeldItem,
 		type ThemeName
 	} from '$lib/index.js';
 	import { onDestroy, onMount, tick } from 'svelte';
 	import { creatureGeometry, creatureViewTop } from '$lib/species.js';
 	import { page } from '$app/state';
 	import Code, { type Token } from './Code.svelte';
+	import GearPicker from './GearPicker.svelte';
+	import { gearCrop } from './gear.js';
 	import { download, snapshotSvg, svgToPng } from './exporter.js';
 	import { showInTab } from './favicon.svelte.js';
 	import { copyText, pick } from './interactions.js';
 	import {
 		COLOR_KEYS,
 		CREATURE_PRESETS,
-		CREATURE_GEAR,
 		GAZES,
 		MOTIONS,
 		STAGES,
@@ -70,6 +73,7 @@
 		body: 'Body width',
 		height: 'Body length',
 		arms: 'Arms / hands',
+		muscle: 'Muscle',
 		legs: 'Legs',
 		ears: 'Ears',
 		tail: 'Tail'
@@ -80,7 +84,7 @@
 			if (!body) return species === 'critter' && key === 'ears';
 			if (key === 'ears') return species === 'critter';
 			if (key === 'tail') return species === 'critter' || species === 'wisp';
-			if (key === 'legs') return species === 'bob' || species === 'critter';
+			if (key === 'legs' || key === 'muscle') return species === 'bob' || species === 'critter';
 			return true;
 		})
 	);
@@ -141,6 +145,7 @@
 	});
 	let outfit = $state<Outfit>(start.outfit);
 	let shoes = $state<Shoes>(start.shoes);
+	let heldItem = $state<HeldItem>(start.heldItem);
 	let hands = $state(start.hands);
 	let float = $state(start.float);
 	let effects = $state(start.effects);
@@ -160,7 +165,7 @@
 		const h = body
 			? g.build.viewHeight - creatureViewTop(species, g.head, g.build, proportions)
 			: 200;
-		return Math.min(1, (compact.current ? 170 : 360) / ((size * h) / 200));
+		return Math.min(1, (compact.current ? 92 : 360) / ((size * h) / 200));
 	});
 
 	const config: StudioConfig = $derived({
@@ -175,6 +180,7 @@
 		body,
 		outfit,
 		shoes,
+		heldItem,
 		hands,
 		float,
 		effects,
@@ -230,6 +236,7 @@
 			body,
 			outfit,
 			shoes,
+			heldItem,
 			hands,
 			float,
 			effects,
@@ -309,6 +316,44 @@
 		reactionTimer = setTimeout(() => (lastReaction = null), 2400);
 	}
 
+	// Tiles preview the current mascot; head tiles wear only their own accessory to stay comparable.
+	const look = $derived({
+		species,
+		proportions,
+		mood,
+		theme: themeValue,
+		shape,
+		eyes,
+		accessories,
+		outfit,
+		shoes,
+		heldItem,
+		hands
+	});
+	const headCrop = $derived(gearCrop('head', species, shape, proportions));
+	// Long tabs are split into parts so every part fits the card next to the preview, without scrolling.
+	type Part = { id: string; label: string };
+	const BODY_PARTS = $derived<Part[]>([
+		...(species === 'bob' ? [{ id: 'shape', label: 'Head shape' }] : []),
+		{ id: 'eyes', label: 'Eyes' },
+		{ id: 'proportions', label: 'Proportions' }
+	]);
+	let bodyPart = $state('shape');
+	// Only bob has head shapes; the other species open on their eyes instead.
+	const shownBodyPart = $derived(BODY_PARTS.some((p) => p.id === bodyPart) ? bodyPart : 'eyes');
+	const MOTION_PARTS: Part[] = [
+		{ id: 'behavior', label: 'Behavior' },
+		{ id: 'reactions', label: 'Reactions' }
+	];
+	let motionPart = $state('behavior');
+	const GEAR_PARTS = [
+		{ id: 'accessories', label: 'Accessories' },
+		{ id: 'clothes', label: 'Clothes' },
+		{ id: 'shoes', label: 'Shoes' },
+		{ id: 'hand', label: 'In hand' }
+	] as const;
+	let gearPart = $state<(typeof GEAR_PARTS)[number]['id']>('accessories');
+
 	function toggle(a: Accessory) {
 		accessories = accessories.includes(a)
 			? accessories.filter((x) => x !== a)
@@ -381,15 +426,25 @@
 		}
 	}
 
-	type Panel = 'companion' | 'colors' | 'gear' | 'motion' | 'export';
+	type Panel = 'species' | 'body' | 'colors' | 'outfit' | 'motion' | 'export';
 	const PANELS: { id: Panel; label: string }[] = [
-		{ id: 'companion', label: 'Companion' },
+		{ id: 'species', label: 'Species' },
+		{ id: 'body', label: 'Body' },
 		{ id: 'colors', label: 'Colors' },
-		{ id: 'gear', label: 'Gear' },
+		{ id: 'outfit', label: 'Outfit' },
 		{ id: 'motion', label: 'Motion' },
 		{ id: 'export', label: 'Export' }
 	];
-	let panel = $state<Panel>('companion');
+	let panel = $state<Panel>('species');
+	let tabsEl = $state<HTMLElement>();
+	// Keeps the active tab visible when the tab strip overflows on a phone.
+	async function openPanel(id: Panel) {
+		panel = id;
+		await tick();
+		const tab = document.getElementById(`${studioId}-${id}`);
+		if (tabsEl && tab)
+			tabsEl.scrollLeft = tab.offsetLeft - (tabsEl.clientWidth - tab.offsetWidth) / 2;
+	}
 	function navigatePanel(event: KeyboardEvent) {
 		const index = PANELS.findIndex((p) => p.id === panel);
 		const next =
@@ -404,11 +459,16 @@
 							: -1;
 		if (next < 0) return;
 		event.preventDefault();
-		panel = PANELS[next].id;
+		openPanel(PANELS[next].id);
 		document.getElementById(`${studioId}-${panel}`)?.focus();
 	}
 
-	type Tab = 'svelte' | 'link';
+	type Tab = 'svelte' | 'link' | 'files';
+	const EXPORT_PARTS: Part[] = [
+		{ id: 'svelte', label: 'Svelte' },
+		{ id: 'link', label: 'Share link' },
+		{ id: 'files', label: 'Files' }
+	];
 	let tab = $state<Tab>('svelte');
 	const INSTALL = 'pnpm add mascbob';
 
@@ -500,6 +560,19 @@
 	}
 </script>
 
+{#snippet parts(items: readonly Part[], current: string, set: (id: string) => void, label: string)}
+	<div class="chips parts" role="group" aria-label={label}>
+		{#each items as part (part.id)}
+			<button
+				class="chip"
+				class:active={current === part.id}
+				aria-pressed={current === part.id}
+				onclick={() => set(part.id)}>{part.label}</button
+			>
+		{/each}
+	</div>
+{/snippet}
+
 {#snippet chipGroup<T extends string>(
 	items: readonly T[],
 	isOn: (item: T) => boolean,
@@ -577,7 +650,7 @@
 					</svg>
 					<span>Compare</span>
 				</button>
-				<button class="pill dark" onclick={() => (panel = 'export')}>Get code</button>
+				<button class="pill dark" onclick={() => openPanel('export')}>Export</button>
 			</div>
 		</div>
 
@@ -605,6 +678,7 @@
 								{body}
 								{outfit}
 								{shoes}
+								{heldItem}
 								{hands}
 								{float}
 								{effects}
@@ -633,6 +707,7 @@
 					{body}
 					{outfit}
 					{shoes}
+					{heldItem}
 					{hands}
 					{float}
 					{effects}
@@ -673,7 +748,7 @@
 	</div>
 
 	<div class="panel">
-		<div class="tabs" role="tablist" aria-label="Studio sections">
+		<div class="tabs" role="tablist" aria-label="Studio sections" bind:this={tabsEl}>
 			{#each PANELS as t (t.id)}
 				<button
 					role="tab"
@@ -683,7 +758,7 @@
 					onkeydown={navigatePanel}
 					aria-selected={panel === t.id}
 					class:active={panel === t.id}
-					onclick={() => (panel = t.id)}>{t.label}</button
+					onclick={() => openPanel(t.id)}>{t.label}</button
 				>
 			{/each}
 		</div>
@@ -695,13 +770,14 @@
 			aria-labelledby="{studioId}-{panel}"
 			tabindex="0"
 		>
-			{#if panel === 'companion'}
+			{#if panel === 'species'}
 				<fieldset>
-					<legend>Choose a companion</legend>
-					<p class="note intro">
-						{CREATURE_PRESETS.length} species, each with its own anatomy. Picking one applies its designed
-						starting look.
-					</p>
+					<legend>
+						Species
+						<button class="reset" onclick={() => pickSpecies(species)}
+							>Restore {companion.name} starting look</button
+						>
+					</legend>
 					<div class="companion-presets">
 						{#each CREATURE_PRESETS as preset (preset.species)}
 							<button
@@ -730,20 +806,31 @@
 						{/each}
 					</div>
 				</fieldset>
-				<button class="reset" onclick={() => pickSpecies(species)}
-					>Restore {companion.name} starting look</button
-				>
-				{#if species === 'bob'}
+			{:else if panel === 'body'}
+				{@render parts(BODY_PARTS, shownBodyPart, (id) => (bodyPart = id), 'Body')}
+				{#if shownBodyPart === 'shape'}
 					<fieldset>
 						<legend>Head shape</legend>
-						{@render chipGroup(
-							SHAPES,
-							(s) => shape === s,
-							(s) => (shape = s)
-						)}
+						<GearPicker
+							items={SHAPES}
+							crop={(s) => gearCrop('head', 'bob', s)}
+							isOn={(s) => shape === s}
+							pick={(s) => (shape = s)}
+							look={(s) => ({ ...look, shape: s, hands: false, accessories: [] })}
+						/>
 					</fieldset>
-				{/if}
-				{#if proportionKeys.length}
+				{:else if shownBodyPart === 'eyes'}
+					<fieldset>
+						<legend>Eyes</legend>
+						<GearPicker
+							items={EYE_STYLES}
+							crop={gearCrop('face', species, shape, proportions)}
+							isOn={(e) => eyes === e}
+							pick={(e) => (eyes = e)}
+							look={(e) => ({ ...look, mood: 'idle', eyes: e, hands: false, accessories: [] })}
+						/>
+					</fieldset>
+				{:else if proportionKeys.length}
 					<fieldset>
 						<legend>Proportions <span class="value">{percentMin}–{percentMax}%</span></legend>
 						{#each proportionKeys as key (key)}
@@ -791,28 +878,14 @@
 					{#if Object.keys(proportions).length}
 						<button class="reset" onclick={() => (proportions = {})}>Reset proportions</button>
 					{/if}
+				{:else}
+					<p class="note">Bob's bare head has no proportions to tune.</p>
 				{/if}
-				<fieldset>
-					<legend>Eyes</legend>
-					{@render chipGroup(
-						EYE_STYLES,
-						(e) => eyes === e,
-						(e) => (eyes = e)
-					)}
-				</fieldset>
-
-				<fieldset>
-					<legend>Size <span class="value">{size}px</span></legend>
-					<input
-						class="range"
-						type="range"
-						min="80"
-						max="320"
-						bind:value={size}
-						style:--p="{((size - 80) / 240) * 100}%"
-						aria-label="Size"
-					/>
-				</fieldset>
+				{#if shownBodyPart === 'proportions' && !body && !unified}
+					<button class="link-btn" onclick={() => (body = true)}
+						>Switch to full body for arms, legs and body →</button
+					>
+				{/if}
 			{:else if panel === 'colors'}
 				<fieldset>
 					<legend>Colorway <span class="value">{theme}</span></legend>
@@ -883,166 +956,198 @@
 						</label>
 					</div>
 				</fieldset>
-			{:else if panel === 'gear'}
-				{#if accessories.length}
-					<fieldset>
-						<legend>Wearing <span class="value">click to remove</span></legend>
-						{@render chipGroup(accessories, () => true, toggle)}
-					</fieldset>
-					<button class="reset" onclick={() => (accessories = [])}>Remove all accessories</button>
+			{:else if panel === 'outfit'}
+				{#if !unified}
+					{@render parts(
+						GEAR_PARTS,
+						gearPart,
+						(id) => (gearPart = id as typeof gearPart),
+						'Outfit'
+					)}
 				{/if}
-				<fieldset>
-					<legend>Picked for {species}</legend>
-					{@render chipGroup(CREATURE_GEAR[species], (a) => accessories.includes(a), toggle)}
-				</fieldset>
-				<fieldset>
-					<legend>Accessories <span class="value">{accessories.length || 'none'}</span></legend>
-					{@render chipGroup(ACCESSORIES, (a) => accessories.includes(a), toggle)}
-				</fieldset>
-				<fieldset disabled={!body || unified} class:off={!body || unified}>
-					<legend>
-						Outfit
-						{#if unified}<span class="value">bob & critter</span>{/if}
-						{#if !body}<span class="value">needs full body</span>{/if}
-					</legend>
-					{@render chipGroup(
-						OUTFITS,
-						(o) => outfit === o,
-						(o) => (outfit = o)
-					)}
-				</fieldset>
-				<fieldset disabled={!body || unified} class:off={!body || unified}>
-					<legend>
-						Shoes
-						{#if unified}<span class="value">bob & critter</span>{/if}
-						{#if !body}<span class="value">needs full body</span>{/if}
-					</legend>
-					{@render chipGroup(
-						SHOES,
-						(f) => shoes === f,
-						(f) => (shoes = f)
-					)}
-				</fieldset>
-				{#if !body}
-					<button class="link-btn" onclick={() => (body = true)}>Switch to full body →</button>
-				{/if}
-			{:else if panel === 'motion'}
-				<fieldset>
-					<legend>Gaze</legend>
-					{@render chipGroup(
-						GAZES,
-						(l) => lookAt === l,
-						(l) => (lookAt = l)
-					)}
-				</fieldset>
-				<fieldset>
-					<legend>Extras</legend>
-					<div class="toggles">
-						<label class="toggle">
-							<input type="checkbox" bind:checked={hands} />
-							<span>Hands</span>
-						</label>
-						<label class="toggle">
-							<input type="checkbox" bind:checked={float} />
-							<span>Float</span>
-						</label>
-						<label class="toggle">
-							<input type="checkbox" bind:checked={effects} />
-							<span>Effects</span>
-						</label>
-						<label class="toggle">
-							<input type="checkbox" bind:checked={interactive} />
-							<span>Interactive</span>
-						</label>
-					</div>
-				</fieldset>
-				<fieldset>
-					<legend
-						>Motion <span class="value">{motion === 'auto' ? 'follows your OS' : ''}</span></legend
-					>
-					{@render chipGroup(
-						MOTIONS,
-						(m) => motion === m,
-						(m) => (motion = m)
-					)}
-				</fieldset>
-				{#if mood === 'talking'}
+				{#if unified || gearPart === 'accessories'}
 					<fieldset>
 						<legend>
-							Mouth level
-							<span class="value">{levelAuto ? 'babbling' : levelValue.toFixed(2)}</span>
+							Accessories
+							{#if accessories.length}
+								<span class="value">{accessories.length} on</span>
+								<button class="reset" onclick={() => (accessories = [])}
+									>Remove all accessories</button
+								>
+							{/if}
 						</legend>
-						<div class="level">
+						<GearPicker
+							items={ACCESSORIES}
+							crop={headCrop}
+							isOn={(a) => accessories.includes(a)}
+							pick={toggle}
+							look={(a) => ({ ...look, hands: false, accessories: [a] })}
+						/>
+					</fieldset>
+					{#if unified}
+						<p class="note">Clothes, shoes and held items fit bob and critter.</p>
+					{/if}
+				{:else}
+					{#if !body}
+						<button class="link-btn" onclick={() => (body = true)}
+							>Switch to full body for clothes, shoes and held items →</button
+						>
+					{/if}
+					<fieldset disabled={!body} class:off={!body}>
+						{#if gearPart === 'clothes'}
+							<legend>Clothes</legend>
+							<GearPicker
+								items={OUTFITS}
+								crop={gearCrop('outfit', species, shape, proportions)}
+								disabled={!body}
+								isOn={(o) => outfit === o}
+								pick={(o) => (outfit = o)}
+								look={(o) => ({ ...look, outfit: o })}
+							/>
+						{:else if gearPart === 'shoes'}
+							<legend>Shoes</legend>
+							<GearPicker
+								items={SHOES}
+								crop={gearCrop('shoes', species, shape, proportions)}
+								disabled={!body}
+								isOn={(f) => shoes === f}
+								pick={(f) => (shoes = f)}
+								look={(f) => ({ ...look, shoes: f })}
+							/>
+						{:else}
+							<legend>In hand</legend>
+							<GearPicker
+								items={HELD_ITEMS}
+								crop={gearCrop('hand', species, shape, proportions)}
+								disabled={!body}
+								isOn={(item) => heldItem === item}
+								pick={(item) => (heldItem = item)}
+								look={(item) => ({ ...look, heldItem: item })}
+							/>
+							<p class="note">Try talking with the microphone, or focused with the phone.</p>
+						{/if}
+					</fieldset>
+				{/if}
+			{:else if panel === 'motion'}
+				{@render parts(MOTION_PARTS, motionPart, (id) => (motionPart = id), 'Motion')}
+				{#if motionPart === 'behavior'}
+					<fieldset>
+						<legend>Gaze</legend>
+						{@render chipGroup(
+							GAZES,
+							(l) => lookAt === l,
+							(l) => (lookAt = l)
+						)}
+					</fieldset>
+					<fieldset>
+						<legend>Extras</legend>
+						<div class="toggles">
 							<label class="toggle">
-								<input type="checkbox" bind:checked={levelAuto} />
-								<span>Auto</span>
+								<input type="checkbox" bind:checked={hands} />
+								<span>Hands</span>
 							</label>
+							<label class="toggle">
+								<input type="checkbox" bind:checked={float} />
+								<span>Float</span>
+							</label>
+							<label class="toggle">
+								<input type="checkbox" bind:checked={effects} />
+								<span>Effects</span>
+							</label>
+							<label class="toggle">
+								<input type="checkbox" bind:checked={interactive} />
+								<span>Interactive</span>
+							</label>
+						</div>
+					</fieldset>
+					<fieldset>
+						<legend
+							>Motion <span class="value">{motion === 'auto' ? 'follows your OS' : ''}</span
+							></legend
+						>
+						{@render chipGroup(
+							MOTIONS,
+							(m) => motion === m,
+							(m) => (motion = m)
+						)}
+					</fieldset>
+					{#if mood === 'talking'}
+						<fieldset>
+							<legend>
+								Mouth level
+								<span class="value">{levelAuto ? 'babbling' : levelValue.toFixed(2)}</span>
+							</legend>
+							<div class="level">
+								<label class="toggle">
+									<input type="checkbox" bind:checked={levelAuto} />
+									<span>Auto</span>
+								</label>
+								<input
+									class="range"
+									type="range"
+									min="0"
+									max="1"
+									step="0.05"
+									disabled={levelAuto}
+									bind:value={levelValue}
+									style:--p="{levelValue * 100}%"
+									aria-label="Mouth level"
+								/>
+							</div>
+						</fieldset>
+					{/if}
+				{:else}
+					<fieldset disabled={!interactive} class:off={!interactive}>
+						<legend>
+							Pointer reactions <span class="value"
+								>{!interactive
+									? 'needs interactive'
+									: reactions.length
+										? `${reactions.length} on`
+										: 'off'}</span
+							>
+						</legend>
+						<ul class="reactions">
+							{#each REACTIONS as r (r)}
+								<li>
+									<label class="toggle">
+										<input
+											type="checkbox"
+											checked={reactions.includes(r)}
+											onchange={() => toggleReaction(r)}
+										/>
+										<span>{r}</span>
+									</label>
+									<em>{REACTION_HINTS[r]}</em>
+								</li>
+							{/each}
+						</ul>
+					</fieldset>
+				{/if}
+			{:else}
+				<div class="export">
+					{@render parts(EXPORT_PARTS, tab, (id) => (tab = id as Tab), 'Export format')}
+					{#if tab === 'svelte'}
+						<fieldset>
+							<legend>Size in your app <span class="value">{size}px</span></legend>
 							<input
 								class="range"
 								type="range"
-								min="0"
-								max="1"
-								step="0.05"
-								disabled={levelAuto}
-								bind:value={levelValue}
-								style:--p="{levelValue * 100}%"
-								aria-label="Mouth level"
+								min="80"
+								max="320"
+								bind:value={size}
+								style:--p="{((size - 80) / 240) * 100}%"
+								aria-label="Size"
 							/>
-						</div>
-					</fieldset>
-				{/if}
-				<fieldset disabled={!interactive} class:off={!interactive}>
-					<legend>
-						Pointer reactions <span class="value"
-							>{!interactive
-								? 'needs interactive'
-								: reactions.length
-									? `${reactions.length} on`
-									: 'off'}</span
-						>
-					</legend>
-					<ul class="reactions">
-						{#each REACTIONS as r (r)}
-							<li>
-								<label class="toggle">
-									<input
-										type="checkbox"
-										checked={reactions.includes(r)}
-										onchange={() => toggleReaction(r)}
-									/>
-									<span>{r}</span>
-								</label>
-								<em>{REACTION_HINTS[r]}</em>
-							</li>
-						{/each}
-					</ul>
-				</fieldset>
-			{:else}
-				<div class="export">
-					<button
-						class="install"
-						onclick={() => copy('install', INSTALL)}
-						title="Copy install command"
-					>
-						<code>{INSTALL}</code>
-						<span>{done === 'install' ? 'Copied' : 'Copy'}</span>
-					</button>
-					<div class="segmented" role="tablist" aria-label="Export format">
+						</fieldset>
 						<button
-							role="tab"
-							aria-selected={tab === 'svelte'}
-							class:active={tab === 'svelte'}
-							onclick={() => (tab = 'svelte')}>Svelte</button
+							class="install"
+							onclick={() => copy('install', INSTALL)}
+							title="Copy install command"
 						>
-						<button
-							role="tab"
-							aria-selected={tab === 'link'}
-							class:active={tab === 'link'}
-							onclick={() => (tab = 'link')}>Share link</button
-						>
-						<span class="thumb" class:right={tab === 'link'} aria-hidden="true"></span>
-					</div>
-					{#if tab === 'svelte'}
+							<code>{INSTALL}</code>
+							<span>{done === 'install' ? 'Copied' : 'Copy'}</span>
+						</button>
 						<div class="code">
 							<Code lines={tokens} />
 							<button
@@ -1053,7 +1158,7 @@
 								{done === 'code' ? 'Copied' : 'Copy'}
 							</button>
 						</div>
-					{:else}
+					{:else if tab === 'link'}
 						<div class="link">
 							<input
 								readonly
@@ -1070,28 +1175,29 @@
 							</button>
 						</div>
 						<p class="note">Opens this page with your mascot already set up in the studio.</p>
+					{:else}
+						<div class="downloads">
+							<button class="file" class:done={done === 'file'} onclick={exportSvelte}>
+								<span>.svelte</span><small>Component</small>
+							</button>
+							<button class="file" class:done={done === 'svg'} onclick={exportSvg}>
+								<span>SVG</span><small>Vector</small>
+							</button>
+							<button class="file" class:done={done === 'png'} onclick={exportPng}>
+								<span>PNG</span><small>1024 px</small>
+							</button>
+							<button
+								class="file"
+								class:done={done === 'svgcode'}
+								onclick={async () => {
+									const s = await snapshot();
+									if (s) copy('svgcode', s.text);
+								}}
+							>
+								<span>{done === 'svgcode' ? 'Copied' : 'Copy'}</span><small>SVG markup</small>
+							</button>
+						</div>
 					{/if}
-					<div class="downloads">
-						<button class="file" class:done={done === 'file'} onclick={exportSvelte}>
-							<span>.svelte</span><small>Component</small>
-						</button>
-						<button class="file" class:done={done === 'svg'} onclick={exportSvg}>
-							<span>SVG</span><small>Vector</small>
-						</button>
-						<button class="file" class:done={done === 'png'} onclick={exportPng}>
-							<span>PNG</span><small>1024 px</small>
-						</button>
-						<button
-							class="file"
-							class:done={done === 'svgcode'}
-							onclick={async () => {
-								const s = await snapshot();
-								if (s) copy('svgcode', s.text);
-							}}
-						>
-							<span>{done === 'svgcode' ? 'Copied' : 'Copy'}</span><small>SVG markup</small>
-						</button>
-					</div>
 				</div>
 			{/if}
 		</div>
@@ -1099,9 +1205,6 @@
 </div>
 
 <style>
-	.intro {
-		margin-bottom: 1rem;
-	}
 	.companion-name {
 		margin-right: 0.5rem;
 		font-weight: 650;
@@ -1179,6 +1282,10 @@
 	.companion-presets span {
 		font-size: 11px;
 	}
+	/*
+	 * A fixed card with every tab part sized to fit it: the preview never leaves the screen and the
+	 * controls need no scroll area. If a part ever overflows, its scroll hands over to the page.
+	 */
 	.playground {
 		display: grid;
 		grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
@@ -1372,6 +1479,7 @@
 		gap: 0.25rem;
 		padding: 1rem 0.75rem 0;
 		overflow-x: auto;
+		scrollbar-width: none;
 		border-bottom: 1px solid var(--line);
 	}
 	.tabs button {
@@ -1408,7 +1516,6 @@
 		min-height: 0;
 		padding: 1.5rem 1.75rem 2rem;
 		overflow-y: auto;
-		overscroll-behavior: contain;
 	}
 
 	fieldset {
@@ -1425,11 +1532,16 @@
 		display: flex;
 		gap: 0.5rem;
 		align-items: baseline;
+		width: 100%;
 		margin-bottom: 0.65rem;
 		padding: 0;
 		font-size: 0.92rem;
 		font-weight: 650;
 		color: var(--text-1);
+	}
+	legend .reset {
+		margin-left: auto;
+		font-weight: 500;
 	}
 	.value {
 		font-weight: 500;
@@ -1657,9 +1769,6 @@
 		display: grid;
 		gap: 1rem;
 	}
-	.export .segmented {
-		justify-self: start;
-	}
 	.install {
 		display: flex;
 		align-items: center;
@@ -1791,18 +1900,13 @@
 	}
 
 	@media (max-width: 900px) {
-		/*
-		 * One screen-sized card, like on desktop: only the controls scroll, and at their end the page
-		 * takes over. Pinning the stage to the page instead ate half the screen and left it colliding
-		 * with the tabs on the way out.
-		 */
 		.playground {
 			grid-template-columns: minmax(0, 1fr);
 			grid-template-rows: auto minmax(0, 1fr);
-			height: clamp(560px, calc(100svh - 5.5rem), 780px);
+			height: clamp(600px, calc(100svh - 4.5rem), 780px);
 		}
 		.stage {
-			height: 320px;
+			height: 240px;
 			box-sizing: border-box;
 			border-radius: 24px;
 			padding: 0.75rem;
@@ -1818,11 +1922,48 @@
 			padding-top: 0.25rem;
 		}
 		.panel-body {
-			padding: 1.25rem;
-			overscroll-behavior: auto;
+			gap: 0.8rem;
+			padding: 0.9rem 1rem 1rem;
+		}
+		legend {
+			margin-bottom: 0.45rem;
+		}
+		/* One swipeable row, so the part switcher never costs a second line of the small screen. */
+		.parts {
+			flex-wrap: nowrap;
+			padding-block: 2px;
+			overflow-x: auto;
+			scrollbar-width: none;
+		}
+		.parts .chip {
+			flex: none;
 		}
 		.downloads {
 			grid-template-columns: repeat(2, 1fr);
+		}
+		/* One line per proportion: label, slider, value, reset. */
+		.proportion-row {
+			grid-template-columns: 5.5rem minmax(0, 1fr) auto auto;
+			grid-template-areas: 'label range percent reset';
+			gap: 0.4rem;
+			padding: 0.35rem 0;
+		}
+		.proportion-row > label {
+			grid-area: label;
+			font-size: 0.8rem;
+		}
+		.proportion-row .range {
+			grid-area: range;
+			margin: 0;
+		}
+		.proportion-row .percent {
+			grid-area: percent;
+		}
+		.proportion-row .reset-one {
+			grid-area: reset;
+		}
+		.reactions li {
+			padding: 0.4rem 0;
 		}
 	}
 	@media (max-width: 520px) {
@@ -1841,12 +1982,10 @@
 			font-size: 0.78rem;
 		}
 		.companion-presets {
-			grid-template-columns: repeat(2, minmax(0, 1fr));
+			grid-template-columns: repeat(3, minmax(0, 1fr));
 		}
 		.companion-presets button {
-			flex-direction: row;
-			justify-content: center;
-			padding: 8px;
+			padding: 10px 4px 8px;
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {

@@ -178,14 +178,6 @@ export const CREATURE_PRESETS = [
 
 const HEX = /^#[0-9a-f]{6}$/i;
 
-export const CREATURE_GEAR: Record<Species, readonly Accessory[]> = {
-	bob: ['cap', 'headphones', 'glasses', 'antenna', 'beanie'],
-	critter: ['bow', 'flower', 'glasses', 'headband', 'star-clip'],
-	moss: ['flower', 'glasses', 'bow', 'star-clip', 'beanie'],
-	wisp: ['star-clip', 'halo', 'nightcap', 'glasses', 'horns'],
-	octo: ['beanie', 'flower', 'nightcap', 'star-clip', 'glasses'],
-	snail: ['flower', 'bow', 'star-clip']
-};
 const oneOf = <T extends string>(list: readonly T[], v: string | null): T | undefined =>
 	list.includes(v as T) ? (v as T) : undefined;
 
