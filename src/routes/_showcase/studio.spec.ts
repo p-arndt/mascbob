@@ -159,3 +159,12 @@ describe('code generation', () => {
 		expect(parseInt(t.bodyDark!.slice(1, 3), 16)).toBeLessThan(0x80);
 	});
 });
+
+it('shares held items and exports them only for full-body bob and critter', () => {
+	const c = config({ heldItem: 'phone' });
+	expect(fromQuery(new URLSearchParams(toQuery(c)))).toEqual(c);
+	expect(svelteFile(c)).toContain('heldItem="phone"');
+	expect(svelteFile({ ...c, body: false })).not.toContain('heldItem');
+	expect(svelteFile({ ...c, species: 'snail' })).not.toContain('heldItem');
+	expect(fromQuery(new URLSearchParams('heldItem=invalid')).heldItem).toBe('none');
+});

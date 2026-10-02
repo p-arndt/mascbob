@@ -29,6 +29,20 @@ describe('creature geometry', () => {
 		);
 		expect(g.build.viewHeight).toBeGreaterThan(g.build.groundY);
 	});
+	it('thickens arms and slightly widens shoulders with muscle, only on jointed arms', () => {
+		const strong = creatureGeometry('bob', 'capsule', undefined, { muscle: 1.6 });
+		expect(strong.build.armWidth).toBeCloseTo(BUILD_DEFS.standard.armWidth * 1.6);
+		expect(strong.build.upperArm).toBe(BUILD_DEFS.standard.upperArm);
+		expect(strong.build.torso.max).toBeGreaterThan(BUILD_DEFS.standard.torso.max);
+		expect(strong.build.torso.max).toBeLessThan(BUILD_DEFS.standard.torso.max * 1.6);
+		expect(
+			creatureGeometry('critter', 'capsule', undefined, { muscle: 1.6 }).build.armWidth
+		).toBeCloseTo(BUILD_DEFS.chibi.armWidth * 1.6);
+		for (const species of ['moss', 'wisp', 'octo', 'snail'] as const)
+			expect(creatureGeometry(species, 'capsule', undefined, { muscle: 1.6 })).toEqual(
+				creatureGeometry(species, 'capsule', undefined)
+			);
+	});
 	it('ignores body proportions in avatar mode', () => {
 		for (const species of SPECIES) {
 			expect(
@@ -36,7 +50,7 @@ describe('creature geometry', () => {
 					species,
 					'capsule',
 					undefined,
-					{ height: 1.3, body: 1.3, tail: 1.3 },
+					{ height: 1.3, body: 1.3, tail: 1.3, muscle: 1.3 },
 					false
 				)
 			).toEqual(creatureGeometry(species, 'capsule', undefined, {}, false));

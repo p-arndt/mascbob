@@ -4,7 +4,16 @@ import type { GrabPart } from './grab.js';
 import type { Reaction } from './interaction.js';
 import type { BuildDef } from './parts/body.js';
 import type { Species, resolveProportions } from './species.js';
-import type { Accessory, EyeStyle, FaceParams, Mood, MoodConfig, Outfit, Shoes } from './types.js';
+import type {
+	Accessory,
+	EyeStyle,
+	FaceParams,
+	HeldItem,
+	Mood,
+	MoodConfig,
+	Outfit,
+	Shoes
+} from './types.js';
 
 /**
  * Live state that `Mascot.svelte` shares with its parts. Every field is a
@@ -43,6 +52,7 @@ export interface MascotContext {
 	readonly body: boolean;
 	readonly outfit: Outfit;
 	readonly shoes: Shoes;
+	readonly heldItem: HeldItem;
 	/** Body proportions of the full figure (the resolved `build` prop). */
 	readonly build: BuildDef;
 	/**

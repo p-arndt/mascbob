@@ -4,7 +4,16 @@ import type { Shape } from './types.js';
 
 export const SPECIES = ['bob', 'critter', 'moss', 'wisp', 'octo', 'snail'] as const;
 export type Species = (typeof SPECIES)[number];
-export const PROPORTION_KEYS = ['head', 'body', 'height', 'arms', 'legs', 'ears', 'tail'] as const;
+export const PROPORTION_KEYS = [
+	'head',
+	'body',
+	'height',
+	'arms',
+	'muscle',
+	'legs',
+	'ears',
+	'tail'
+] as const;
 export const PROPORTION_RANGE = { min: 0.4, max: 1.8 } as const;
 /** Multipliers relative to the species/build. Values are limited to 0.4–1.8; omitted values are 1. */
 export type Proportions = Partial<Record<(typeof PROPORTION_KEYS)[number], number>>;
@@ -37,6 +46,8 @@ export function creatureGeometry(
 	const base = buildDef(
 		unified ? 'blob' : (build ?? (species === 'critter' ? 'chibi' : 'standard'))
 	);
+	// Only jointed arms can bulk up; the continuous species keep their soft limbs.
+	const muscle = unified ? 1 : p.muscle;
 	const hipY = base.torsoTop + (base.hipY - base.torsoTop) * p.height;
 	const groundY = base.legs ? hipY + (base.groundY - base.hipY) * p.legs : hipY;
 	const b: BuildDef = {
@@ -47,11 +58,13 @@ export function creatureGeometry(
 		shoulderY: base.torsoTop + (base.shoulderY - base.torsoTop) * p.height,
 		upperArm: base.upperArm * p.arms,
 		forearm: base.forearm * p.arms,
+		armWidth: base.armWidth * muscle,
 		headScale: base.headScale * p.head,
 		torso: {
 			...base.torso,
-			ratio: base.torso.ratio * p.body,
-			max: base.torso.max * p.body,
+			// Bulk shows in the shoulders too, but far less than in the arms.
+			ratio: base.torso.ratio * p.body * (1 + (muscle - 1) * 0.15),
+			max: base.torso.max * p.body * (1 + (muscle - 1) * 0.15),
 			bellyY: base.torsoTop + (base.torso.bellyY - base.torsoTop) * p.height
 		}
 	};

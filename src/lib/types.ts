@@ -49,6 +49,9 @@ export type EyeStyle = (typeof EYE_STYLES)[number];
 export { ACCESSORIES, type Accessory } from './parts/accessories.js';
 export { BUILDS, OUTFITS, SHOES, type Build, type Outfit, type Shoes } from './parts/body.js';
 
+export const HELD_ITEMS = ['none', 'sword', 'microphone', 'phone'] as const;
+export type HeldItem = (typeof HELD_ITEMS)[number];
+
 export type Effect =
 	'sparkles' | 'waves' | 'dots' | 'zzz' | 'tear' | 'hearts' | 'question' | 'sweat';
 export type HandPose = 'rest' | 'up' | 'wave' | 'think';

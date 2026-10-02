@@ -1,0 +1,1 @@
+Give full-body bob and critter a `heldItem="sword"`, `"microphone"` or `"phone"`. They swing a long fantasy sword, gesture with the microphone while `mood="talking"`, or check a small phone with its screen facing them; `motion="reduced"` keeps the movements still.

@@ -46,7 +46,17 @@
 		type ReactionsInput
 	} from './interaction.js';
 	import { resolveTheme, themeStyle, type ThemeInput } from './themes.js';
-	import type { Accessory, EyeStyle, LookAt, Mood, Motion, Outfit, Shape, Shoes } from './types.js';
+	import type {
+		Accessory,
+		EyeStyle,
+		HeldItem,
+		LookAt,
+		Mood,
+		Motion,
+		Outfit,
+		Shape,
+		Shoes
+	} from './types.js';
 
 	interface Props {
 		/** Anatomy of the companion; `bob` preserves the original mascot. */
@@ -67,6 +77,8 @@
 		outfit?: Outfit;
 		/** Footwear on the full figure; plain feet by default. */
 		shoes?: Shoes;
+		/** Object in the right hand, with its own gesture; full-body bob and critter only. */
+		heldItem?: HeldItem;
 		/** Body proportions of the full figure; `blob` has no legs and bobs instead of standing. */
 		build?: Build;
 		lookAt?: LookAt;
@@ -116,6 +128,7 @@
 		body = true,
 		outfit = 'none',
 		shoes = 'none',
+		heldItem = 'none',
 		build,
 		lookAt = 'pointer',
 		level,
@@ -939,6 +952,9 @@
 		},
 		get outfit() {
 			return outfit;
+		},
+		get heldItem() {
+			return heldItem;
 		},
 		get shoes() {
 			return shoes;

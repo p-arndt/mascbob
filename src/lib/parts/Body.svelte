@@ -1,4 +1,5 @@
 <script lang="ts">
+	import HeldItem from './HeldItem.svelte';
 	import { Spring } from 'svelte/motion';
 	import { getMascot, svgRef } from '../context.js';
 	import { clamp } from '../geometry.js';
@@ -40,7 +41,17 @@
 	const ref = (name: string) => svgRef(m.uid, name);
 	const id = (name: string) => `${m.uid}-${name}`;
 
-	const pose = $derived(bodyPose(m.config.hands, m.mood));
+	const pose = $derived.by(() => {
+		const p = bodyPose(m.config.hands, m.mood);
+		if (m.heldItem === 'none') return p;
+		const right =
+			m.heldItem === 'sword'
+				? { a1: 35, a2: 135 }
+				: m.heldItem === 'microphone'
+					? { a1: -25, a2: -145 }
+					: { a1: 25, a2: 145 };
+		return { ...p, right };
+	});
 	const arms = new Spring(
 		{ la1: 16, la2: -14, ra1: 16, ra2: -14, drop: 0 },
 		{ stiffness: 0.09, damping: 0.42 }
@@ -108,7 +119,7 @@
 	function grabArm(e: PointerEvent, side: Side) {
 		// Capture the grip before the press animation can lift the hand.
 		const frame = armFrames[side];
-		const hand = frame?.querySelector<SVGCircleElement>('.hand');
+		const hand = frame?.querySelector<SVGCircleElement | SVGEllipseElement>('.hand');
 		const matrix = hand?.getScreenCTM();
 		if (!frame || !hand || !matrix) return;
 		const screen = new DOMPoint(0, hand.cy.baseVal.value).matrixTransform(matrix);
@@ -236,7 +247,7 @@
 	const capeHem = $derived(Math.min(b.hipY + 18, b.groundY - 4));
 </script>
 
-{#snippet arm(p: ArmReach, swing: boolean)}
+{#snippet arm(p: ArmReach, swing: boolean, carrying = false)}
 	{@const upper = b.upperArm * p.stretch}
 	{@const fore = b.forearm * p.stretch}
 	<!-- A stretched arm thins out, like pulled rubber keeping its volume; the hand keeps its size. -->
@@ -252,14 +263,36 @@
 		<g transform="translate(0 {upper}) rotate({p.a2})">
 			<g
 				class="fore"
-				class:swing
+				class:swing={swing && !carrying}
+				class:sword={carrying && swing && m.heldItem === 'sword'}
+				class:microphone={carrying && swing && m.heldItem === 'microphone' && m.mood === 'talking'}
+				class:phone={carrying && swing && m.heldItem === 'phone'}
 				class:wave={pose.swing === 'wave'}
 				class:cheer={pose.swing === 'cheer'}
 				class:gesture={pose.swing === 'gesture'}
 			>
 				<path class="tube-edge" d="M0 0V{fore}" />
 				<path class="tube" d="M0 0V{fore}" />
-				<circle class="hand" cy={fore + 1} r={(b.armWidth * 8) / 14} />
+				{#if carrying}
+					<g
+						transform="translate(0 {fore + 1}) rotate(180) scale({Math.min(
+							1.1,
+							Math.max(0.8, b.armWidth / 14)
+						)})"
+					>
+						<HeldItem item={m.heldItem} />
+					</g>
+				{/if}
+				{#if carrying && m.heldItem === 'phone'}
+					<ellipse
+						class="hand"
+						cy={fore + 1}
+						rx={(b.armWidth * 3.5) / 14}
+						ry={(b.armWidth * 5) / 14}
+					/>
+				{:else}
+					<circle class="hand" cy={fore + 1} r={(b.armWidth * 8) / 14} />
+				{/if}
 				{#if m.species === 'critter'}
 					<ellipse class="paw-pad" cy={fore + 3} rx="3.5" ry="3" />
 					{#each [-1, 0, 1] as toe (toe)}
@@ -853,7 +886,11 @@
 				bind:this={armFrames.right}
 				onpointerdown={(e) => grabArm(e, 'right')}
 			>
-				{@render arm(right, pose.swingArm !== 'left' && !heldArm.right)}
+				{@render arm(
+					right,
+					(m.heldItem !== 'none' || pose.swingArm !== 'left') && !heldArm.right,
+					m.heldItem !== 'none'
+				)}
 			</g>
 		</g>
 	</g>
@@ -1326,6 +1363,31 @@
 	}
 	.fore.swing.gesture {
 		animation: gesture 1.1s ease-in-out infinite alternate;
+	}
+	.fore.sword {
+		animation: sword-swing 2.8s ease-in-out infinite;
+	}
+	.fore.microphone {
+		animation: gesture 0.8s ease-in-out infinite alternate;
+	}
+	.fore.phone {
+		animation: gesture 2.4s ease-in-out infinite alternate;
+	}
+	@keyframes sword-swing {
+		0%,
+		65%,
+		100% {
+			transform: rotate(0deg);
+		}
+		75% {
+			transform: rotate(-24deg);
+		}
+		84% {
+			transform: rotate(18deg);
+		}
+		92% {
+			transform: rotate(-6deg);
+		}
 	}
 	.fidget .arm:not(.held) .hand {
 		transform-box: fill-box;

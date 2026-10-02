@@ -3,6 +3,7 @@
 	import {
 		ACCESSORIES,
 		EYE_STYLES,
+		HELD_ITEMS,
 		BUILDS,
 		MOODS,
 		Mascot,
@@ -14,6 +15,7 @@
 		type Proportions,
 		type Species,
 		type EyeStyle,
+		type HeldItem,
 		type Build,
 		type Outfit,
 		type Shoes,
@@ -37,6 +39,10 @@
 	const outfitParam = $derived(page.url.searchParams.get('outfit') ?? '');
 	const outfit = $derived<Outfit | undefined>(
 		(OUTFITS as readonly string[]).includes(outfitParam) ? (outfitParam as Outfit) : undefined
+	);
+	const heldItemParam = $derived(page.url.searchParams.get('heldItem') ?? 'none');
+	const heldItem = $derived<HeldItem>(
+		HELD_ITEMS.includes(heldItemParam as HeldItem) ? (heldItemParam as HeldItem) : 'none'
 	);
 	const shoesParam = $derived(page.url.searchParams.get('shoes') ?? '');
 	const shoes = $derived<Shoes | undefined>(
@@ -105,6 +111,7 @@
 							{body}
 							{outfit}
 							{shoes}
+							{heldItem}
 							{build}
 							{theme}
 							{size}

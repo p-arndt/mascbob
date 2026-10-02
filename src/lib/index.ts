@@ -11,7 +11,16 @@ export { REACTIONS, DEFAULT_REACTIONS, resolveReactions } from './interaction.js
 export type { Reaction, ReactionEvent, ReactionsInput } from './interaction.js';
 export { GRAB_PARTS, DEFAULT_GRAB, resolveGrab } from './grab.js';
 export type { GrabOptions, GrabPart } from './grab.js';
-export { MOODS, SHAPES, EYE_STYLES, ACCESSORIES, OUTFITS, SHOES, BUILDS } from './types.js';
+export {
+	MOODS,
+	SHAPES,
+	EYE_STYLES,
+	ACCESSORIES,
+	OUTFITS,
+	SHOES,
+	BUILDS,
+	HELD_ITEMS
+} from './types.js';
 export type {
 	Accessory,
 	Build,
@@ -20,6 +29,7 @@ export type {
 	EyeStyle,
 	FaceParams,
 	HandPose,
+	HeldItem,
 	LookAt,
 	Mood,
 	MoodConfig,

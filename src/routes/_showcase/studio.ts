@@ -13,6 +13,7 @@ import {
 	OUTFITS,
 	SHAPES,
 	SHOES,
+	HELD_ITEMS,
 	THEMES,
 	type Accessory,
 	type EyeStyle,
@@ -21,6 +22,7 @@ import {
 	type Outfit,
 	type Shape,
 	type Shoes,
+	type HeldItem,
 	type ThemeColors,
 	type ThemeName
 } from '$lib/index.js';
@@ -54,6 +56,7 @@ export interface StudioConfig {
 	body: boolean;
 	outfit: Outfit;
 	shoes: Shoes;
+	heldItem: HeldItem;
 	hands: boolean;
 	float: boolean;
 	effects: boolean;
@@ -81,6 +84,7 @@ export const LIBRARY_DEFAULTS: StudioConfig = {
 	body: true,
 	outfit: 'none',
 	shoes: 'none',
+	heldItem: 'none',
 	hands: true,
 	float: true,
 	effects: true,
@@ -192,6 +196,7 @@ export function toQuery(c: StudioConfig): string {
 		'eyes',
 		'outfit',
 		'shoes',
+		'heldItem',
 		'lookAt',
 		'motion'
 	] as const) {
@@ -250,6 +255,7 @@ export function fromQuery(q: URLSearchParams): StudioConfig {
 		body: flag('body', d.body),
 		outfit: oneOf(OUTFITS, q.get('outfit')) ?? d.outfit,
 		shoes: oneOf(SHOES, q.get('shoes')) ?? d.shoes,
+		heldItem: oneOf(HELD_ITEMS, q.get('heldItem')) ?? d.heldItem,
 		hands: flag('hands', d.hands),
 		float: flag('float', d.float),
 		effects: flag('effects', d.effects),
@@ -375,6 +381,9 @@ export function mascotAttrs(c: StudioConfig): Attr[] {
 		c.body !== d.body && { name: 'body', value: String(c.body), expr: true },
 		c.body && c.outfit !== d.outfit && { name: 'outfit', value: c.outfit },
 		c.body && c.shoes !== d.shoes && { name: 'shoes', value: c.shoes },
+		c.body &&
+			(c.species === 'bob' || c.species === 'critter') &&
+			c.heldItem !== d.heldItem && { name: 'heldItem', value: c.heldItem },
 		c.hands !== d.hands && { name: 'hands', value: String(c.hands), expr: true },
 		c.float !== d.float && { name: 'float', value: String(c.float), expr: true },
 		c.effects !== d.effects && { name: 'effects', value: String(c.effects), expr: true },

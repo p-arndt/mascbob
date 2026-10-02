@@ -72,6 +72,13 @@ export const PROPS: PropDoc[] = [
 		description: 'Footwear for bob and critter, only visible with `body`.'
 	},
 	{
+		name: 'heldItem',
+		type: 'HeldItem',
+		default: "'none'",
+		description:
+			'An object in the right hand: sword (swings), microphone (gestures while talking), or phone (checks messages). Full-body bob and critter only. Respects reduced motion.'
+	},
+	{
 		name: 'build',
 		type: 'Build',
 		default: 'species default',

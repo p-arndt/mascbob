@@ -113,6 +113,7 @@ with `part: 'arm-left'` / `'arm-right'` and spring back on release. It has no ha
 
 ```svelte
 <Mascot species="critter" proportions={{ head: 1.15, legs: 0.8, ears: 1.2 }} theme="mocha" />
+<Mascot proportions={{ muscle: 1.6 }} outfit="jersey" />
 <Mascot species="moss" proportions={{ body: 1.2, height: 0.85 }} theme="mint" />
 <Mascot species="wisp" proportions={{ tail: 1.25 }} theme="lilac" />
 <Mascot species="octo" proportions={{ arms: 1.2 }} theme="mocha" accessories={['beanie']} />
@@ -121,7 +122,7 @@ with `part: 'arm-left'` / `'arm-right'` and spring back on release. It has no ha
 
 Proportions are multipliers from `0.4` to `1.8` (default `1`); out-of-range values are clamped.
 `head` changes head size, `body` body width, `height` body length, and `arms` and `legs` limb
-length. `ears` applies to critter; `tail` to critter and wisp. Moss and wisp have no legs:
+length. `muscle` bulks up Bob's and Critter's arms and fists and broadens the shoulders a little. `ears` applies to critter; `tail` to critter and wisp. Moss and wisp have no legs:
 `head` sizes the upper contour without scaling the face; `arms` sizes leaf arms or detached hands.
 For octo, `head` sizes the crown, `body` the bell width, `height` the bell length and `arms` all four tentacles.
 For snail, `head` sizes the head contour, `body` the house, `height` the foot length and `arms` the eye stalks.
@@ -149,6 +150,7 @@ import { MOODS, SHAPES, EYE_STYLES, ACCESSORIES, OUTFITS, SHOES, BUILDS, THEMES 
 | `accessories` | array of `ACCESSORIES`                                                                                         | `[]`                     |
 | `body`        | full figure with arms and legs, 2:3 (`size` is the width); `false` shows just the head                         | `true`                   |
 | `outfit`      | one of `OUTFITS`; only visible with `body`                                                                     | `none`                   |
+| `heldItem`    | `none`, `sword`, `microphone` or `phone`; full-body bob and critter                                            | `none`                   |
 | `shoes`       | one of `SHOES`; only visible with `body`                                                                       | `none`                   |
 | `build`       | one of `BUILDS` (`standard`, `chubby`, `lanky`, `chibi`, `blob`); only visible with `body`                     | `standard`               |
 | `hands`       | floating hands that gesture with the mood (head-only mode)                                                     | `true`                   |
@@ -186,6 +188,17 @@ Every color is also a CSS variable, which wins over the `theme` prop:
 	--mascbob-accent: #ff4fd8;
 	--mascbob-sprout: #6fdc8c;
 }
+```
+
+Give bob or critter something to hold with `heldItem`. The sword swings, the microphone
+moves while `mood="talking"`, and the phone gently tilts with its screen facing the mascot. Items follow
+the hand when you grab an arm; `motion="reduced"` stops their looping movements.
+Import `HELD_ITEMS` for a picker. Head-only avatars and other species do not show held items.
+
+```svelte
+<Mascot heldItem="sword" outfit="cape" mood="happy" />
+<Mascot heldItem="microphone" mood="talking" />
+<Mascot heldItem="phone" mood="focused" />
 ```
 
 ## Custom accessories
@@ -237,6 +250,14 @@ Stop the stream's tracks and close the `AudioContext` when you are done. Without
 
 - `just` lists all recipes
 - `just dev` starts the showcase at http://localhost:5173
+- `/world` opens Bob World, a local isometric game prototype with a bot opponent, playable by
+  touch or mouse. Tap to walk and walk up to Rumi to challenge it. Duels are flicked in
+  simultaneous turns: pull anywhere like a slingshot in one of three strengths, both arrows are
+  revealed, then both Bobs slide at once. A dotted path shows where Bob stops if it misses, so a
+  full-power miss can carry you out yourself; the ring closes in from turn three, and the first
+  one out loses. Tapping fast at the gym builds strength that shows as `muscle` and makes Bob
+  heavier. Wins drop capsules with accessories, outfits and
+  shoes. Everything is saved in this browser; this prototype has no online connection.
 - `just ci` runs type check, lint, tests and the package build
 - `just readme-art` re-renders the images in this README from the real component
 - `just release` cuts a release
