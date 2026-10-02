@@ -534,7 +534,7 @@
 	}
 
 	let figure = $state<HTMLElement>();
-	async function snapshot() {
+	async function snapshot(animated = false) {
 		// The compare grid replaces the single figure, and an export is always of that one mascot.
 		if (compare) {
 			compare = false;
@@ -543,7 +543,7 @@
 		const svg = figure?.querySelector('svg');
 		if (!svg) return null;
 		const rect = svg.getBoundingClientRect();
-		return { text: snapshotSvg(svg, rect), width: rect.width, height: rect.height };
+		return { text: snapshotSvg(svg, rect, { animated }), width: rect.width, height: rect.height };
 	}
 	const fileName = $derived(`${species === 'bob' ? 'mascbob' : `${species}bob`}-${mood}-${theme}`);
 
@@ -552,6 +552,13 @@
 		if (!s) return;
 		download(s.text, `${fileName}.svg`, 'image/svg+xml');
 		flash('svg');
+	}
+
+	async function exportAnimatedSvg() {
+		const s = await snapshot(true);
+		if (!s) return;
+		download(s.text, `${fileName}-animated.svg`, 'image/svg+xml');
+		flash('animated');
 	}
 
 	async function exportPng() {
@@ -1192,6 +1199,9 @@
 							</button>
 							<button class="file" class:done={done === 'svg'} onclick={exportSvg}>
 								<span>SVG</span><small>Vector</small>
+							</button>
+							<button class="file" class:done={done === 'animated'} onclick={exportAnimatedSvg}>
+								<span>SVG</span><small>Animated</small>
 							</button>
 							<button class="file" class:done={done === 'png'} onclick={exportPng}>
 								<span>PNG</span><small>1024 px</small>
@@ -1912,7 +1922,7 @@
 	}
 	.downloads {
 		display: grid;
-		grid-template-columns: repeat(4, 1fr);
+		grid-template-columns: repeat(3, 1fr);
 		gap: 0.5rem;
 	}
 	.file {

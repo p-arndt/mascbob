@@ -1,8 +1,9 @@
 /**
- * Static exports of a live mascot. The component styles itself through scoped CSS and
+ * Standalone exports of a live mascot. The component styles itself through scoped CSS and
  * custom properties, which a standalone file does not have, so the snapshot bakes the
  * computed paint of every element into attributes. CSS transforms are left out on
- * purpose: they are the idle animations, and the rest pose is what an export should show.
+ * purpose: they are the idle animations, and the rest pose is what a still export should
+ * show. An animated export carries those loops along as plain keyframes instead.
  */
 const PAINT = [
 	'fill',
@@ -52,7 +53,74 @@ const INITIAL: Record<(typeof PAINT)[number], string> = {
 	visibility: 'visible'
 };
 
-export function snapshotSvg(svg: SVGSVGElement, size: { width: number; height: number }): string {
+/** Keyframe fields that describe the frame rather than a CSS property. */
+const KEYFRAME_META = new Set(['offset', 'computedOffset', 'easing', 'composite']);
+
+const kebab = (prop: string) => prop.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
+
+function keyframesCss(frames: ComputedKeyframe[]): string {
+	return frames
+		.map((frame) => {
+			const decls = Object.entries(frame)
+				.filter(([prop, value]) => !KEYFRAME_META.has(prop) && value != null && value !== '')
+				.map(([prop, value]) => `${kebab(prop)}:${value}`);
+			// Linear is what the element's own timing function already covers.
+			if (frame.easing && frame.easing !== 'linear') {
+				decls.push(`animation-timing-function:${frame.easing}`);
+			}
+			return `${+(frame.computedOffset * 100).toFixed(3)}%{${decls.join(';')}}`;
+		})
+		.join('');
+}
+
+/**
+ * The element's endless CSS loops as inline declarations, with their keyframes registered in
+ * `keyframes`. One-shot animations (pop-in, reactions) are dropped: a file has no moment to
+ * play them in. Each loop keeps its current phase, so the file starts where the page stood.
+ */
+function loopStyle(el: Element, cs: CSSStyleDeclaration, keyframes: Map<string, string>) {
+	const names = cs.animationName.split(', ');
+	const pick = (list: string, i: number) => {
+		const items = list.split(/,(?![^(]*\))\s*/);
+		return items[i % items.length];
+	};
+	const loops: string[] = [];
+	for (const a of el.getAnimations()) {
+		if (!(a instanceof CSSAnimation) || !(a.effect instanceof KeyframeEffect)) continue;
+		const i = names.indexOf(a.animationName);
+		if (i < 0 || pick(cs.animationIterationCount, i) !== 'infinite') continue;
+		const body = keyframesCss(a.effect.getKeyframes());
+		if (!keyframes.has(body)) keyframes.set(body, `loop${keyframes.size}`);
+		// The component paces its loops through the playback rate, which a file cannot carry.
+		const rate = a.playbackRate || 1;
+		const duration = (a.effect.getComputedTiming().duration as number) / rate;
+		// Staggered loops (hearts, notes) keep their own delay ahead of the shared clock.
+		const delay = (Number(a.effect.getTiming().delay ?? 0) - Number(a.currentTime ?? 0)) / rate;
+		loops.push(
+			[
+				keyframes.get(body),
+				`${Math.round(duration)}ms`,
+				pick(cs.animationTimingFunction, i),
+				`${Math.round(delay)}ms`,
+				'infinite',
+				pick(cs.animationDirection, i)
+			].join(' ')
+		);
+	}
+	if (!loops.length) return [];
+	return [
+		`animation:${loops.join(',')}`,
+		`transform-box:${cs.transformBox}`,
+		`transform-origin:${cs.transformOrigin}`
+	];
+}
+
+export function snapshotSvg(
+	svg: SVGSVGElement,
+	size: { width: number; height: number },
+	{ animated = false } = {}
+): string {
+	const keyframes = new Map<string, string>();
 	const clone = svg.cloneNode(true) as SVGSVGElement;
 	const source = [svg, ...svg.querySelectorAll('*')];
 	const target = [clone, ...clone.querySelectorAll('*')];
@@ -69,6 +137,7 @@ export function snapshotSvg(svg: SVGSVGElement, size: { width: number; height: n
 			if (prop === 'opacity' && el.getAnimations().length) continue;
 			style.push(`${prop}:${value}`);
 		}
+		if (animated) style.push(...loopStyle(el, cs, keyframes));
 		out.removeAttribute('class');
 		out.removeAttribute('style');
 		if (style.length) out.setAttribute('style', style.join(';'));
@@ -78,6 +147,14 @@ export function snapshotSvg(svg: SVGSVGElement, size: { width: number; height: n
 	clone.setAttribute('height', String(Math.round(size.height)));
 	clone.removeAttribute('role');
 	clone.removeAttribute('tabindex');
+	if (keyframes.size) {
+		const css = [...keyframes].map(([body, name]) => `@keyframes ${name}{${body}}`);
+		// The file plays wherever it ends up, so it honours reduced motion on its own.
+		css.push('@media (prefers-reduced-motion:reduce){*{animation:none!important}}');
+		const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+		style.textContent = css.join('');
+		clone.prepend(style);
+	}
 	return new XMLSerializer().serializeToString(clone);
 }
 
