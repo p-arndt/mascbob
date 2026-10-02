@@ -123,10 +123,14 @@
 			gap: 5px;
 		}
 		.tile {
-			padding: 4px 4px 6px;
+			padding: 4px 2px 6px;
+		}
+		.frame {
+			aspect-ratio: 1.15;
 		}
 		.name {
-			font-size: 11px;
+			font-size: 10px;
+			letter-spacing: -0.01em;
 		}
 	}
 </style>

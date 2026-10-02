@@ -160,12 +160,15 @@
 	let size = $state(start.size);
 	let stage = $state<Stage>(start.stage);
 	let boops = $state(0);
+	// On a phone the figure fills whatever height its row of the stage has left.
+	let figureHeight = $state(0);
 	const previewScale = $derived.by(() => {
 		const g = creatureGeometry(species, shape, undefined, proportions, body);
 		const h = body
 			? g.build.viewHeight - creatureViewTop(species, g.head, g.build, proportions)
 			: 200;
-		return Math.min(1, (compact.current ? 92 : 360) / ((size * h) / 200));
+		const room = compact.current ? figureHeight * 0.96 || 130 : 360;
+		return Math.min(1, room / ((size * h) / 200));
 	});
 
 	const config: StudioConfig = $derived({
@@ -341,6 +344,11 @@
 	let bodyPart = $state('shape');
 	// Only bob has head shapes; the other species open on their eyes instead.
 	const shownBodyPart = $derived(BODY_PARTS.some((p) => p.id === bodyPart) ? bodyPart : 'eyes');
+	const COLOR_PARTS: Part[] = [
+		{ id: 'colors', label: 'Colors' },
+		{ id: 'background', label: 'Background' }
+	];
+	let colorPart = $state('colors');
 	const MOTION_PARTS: Part[] = [
 		{ id: 'behavior', label: 'Behavior' },
 		{ id: 'reactions', label: 'Reactions' }
@@ -561,10 +569,9 @@
 </script>
 
 {#snippet parts(items: readonly Part[], current: string, set: (id: string) => void, label: string)}
-	<div class="chips parts" role="group" aria-label={label}>
+	<div class="parts" role="group" aria-label={label} style:--n={items.length}>
 		{#each items as part (part.id)}
 			<button
-				class="chip"
 				class:active={current === part.id}
 				aria-pressed={current === part.id}
 				onclick={() => set(part.id)}>{part.label}</button
@@ -695,7 +702,7 @@
 				{/each}
 			</ul>
 		{:else}
-			<div class="figure" bind:this={figure}>
+			<div class="figure" bind:this={figure} bind:clientHeight={figureHeight}>
 				<Mascot
 					{species}
 					{proportions}
@@ -887,75 +894,78 @@
 					>
 				{/if}
 			{:else if panel === 'colors'}
-				<fieldset>
-					<legend>Colorway <span class="value">{theme}</span></legend>
-					<div class="swatches">
-						{#each themeNames as name (name)}
-							<button
-								class="swatch"
-								class:active={theme === name && !Object.keys(custom).length}
-								aria-pressed={theme === name && !Object.keys(custom).length}
-								title={name}
-								aria-label="{name} theme"
-								style:--a={THEMES[name].bodyLight}
-								style:--b={THEMES[name].bodyMid}
-								style:--c={THEMES[name].bodyDark}
-								style:--k={THEMES[name].accent}
-								style:--e={THEMES[name].eye}
-								onclick={() => pickTheme(name)}
-							></button>
-						{/each}
-					</div>
-				</fieldset>
+				{@render parts(COLOR_PARTS, colorPart, (id) => (colorPart = id), 'Colors')}
+				{#if colorPart === 'colors'}
+					<fieldset>
+						<legend>Colorway <span class="value">{theme}</span></legend>
+						<div class="swatches">
+							{#each themeNames as name (name)}
+								<button
+									class="swatch"
+									class:active={theme === name && !Object.keys(custom).length}
+									aria-pressed={theme === name && !Object.keys(custom).length}
+									title={name}
+									aria-label="{name} theme"
+									style:--a={THEMES[name].bodyLight}
+									style:--b={THEMES[name].bodyMid}
+									style:--c={THEMES[name].bodyDark}
+									style:--k={THEMES[name].accent}
+									style:--e={THEMES[name].eye}
+									onclick={() => pickTheme(name)}
+								></button>
+							{/each}
+						</div>
+					</fieldset>
 
-				<fieldset>
-					<legend>
-						Colors
-						{#if Object.keys(custom).length}
-							<button class="reset" onclick={() => (custom = {})}>Reset to {theme}</button>
-						{:else}
-							<span class="value">from {theme}</span>
-						{/if}
-					</legend>
-					<div class="colors">
-						{#each COLOR_KEYS as key (key)}
-							<label class="color" class:changed={custom[key]}>
+					<fieldset>
+						<legend>
+							Colors
+							{#if Object.keys(custom).length}
+								<button class="reset" onclick={() => (custom = {})}>Reset to {theme}</button>
+							{:else}
+								<span class="value">from {theme}</span>
+							{/if}
+						</legend>
+						<div class="colors">
+							{#each COLOR_KEYS as key (key)}
+								<label class="color" class:changed={custom[key]}>
+									<input
+										type="color"
+										value={colors[key]}
+										defaultValue={colors[key]}
+										oninput={(e) => setColor(key, e.currentTarget.value)}
+									/>
+									<span>{COLOR_LABELS[key]}</span>
+								</label>
+							{/each}
+						</div>
+					</fieldset>
+				{:else}
+					<fieldset>
+						<legend>Background <span class="value">studio only</span></legend>
+						<div class="chips">
+							{#each STAGES as preset (preset)}
+								<button
+									class="chip stage-chip"
+									class:active={stage === preset}
+									aria-pressed={stage === preset}
+									onclick={() => (stage = preset)}
+								>
+									<i style:background={stageStyle(preset, colors.accent).background}></i>
+									{STAGE_LABELS[preset]}
+								</button>
+							{/each}
+							<label class="color" class:changed={customStage}>
 								<input
 									type="color"
-									value={colors[key]}
-									defaultValue={colors[key]}
-									oninput={(e) => setColor(key, e.currentTarget.value)}
+									value={customStage ?? '#ffe9a8'}
+									oninput={(e) => (stage = e.currentTarget.value as Stage)}
 								/>
-								<span>{COLOR_LABELS[key]}</span>
+								<span>Custom</span>
 							</label>
-						{/each}
-					</div>
-				</fieldset>
-
-				<fieldset>
-					<legend>Background <span class="value">studio only</span></legend>
-					<div class="chips">
-						{#each STAGES as preset (preset)}
-							<button
-								class="chip stage-chip"
-								class:active={stage === preset}
-								aria-pressed={stage === preset}
-								onclick={() => (stage = preset)}
-							>
-								<i style:background={stageStyle(preset, colors.accent).background}></i>
-								{STAGE_LABELS[preset]}
-							</button>
-						{/each}
-						<label class="color" class:changed={customStage}>
-							<input
-								type="color"
-								value={customStage ?? '#ffe9a8'}
-								oninput={(e) => (stage = e.currentTarget.value as Stage)}
-							/>
-							<span>Custom</span>
-						</label>
-					</div>
-				</fieldset>
+						</div>
+					</fieldset>
+				{/if}
 			{:else if panel === 'outfit'}
 				{#if !unified}
 					{@render parts(
@@ -1062,7 +1072,7 @@
 					</fieldset>
 					<fieldset>
 						<legend
-							>Motion <span class="value">{motion === 'auto' ? 'follows your OS' : ''}</span
+							>Animation <span class="value">{motion === 'auto' ? 'follows your OS' : ''}</span
 							></legend
 						>
 						{@render chipGroup(
@@ -1128,8 +1138,8 @@
 				<div class="export">
 					{@render parts(EXPORT_PARTS, tab, (id) => (tab = id as Tab), 'Export format')}
 					{#if tab === 'svelte'}
-						<fieldset>
-							<legend>Size in your app <span class="value">{size}px</span></legend>
+						<label class="size-row">
+							<span>Size in your app <span class="value">{size}px</span></span>
 							<input
 								class="range"
 								type="range"
@@ -1139,7 +1149,7 @@
 								style:--p="{((size - 80) / 240) * 100}%"
 								aria-label="Size"
 							/>
-						</fieldset>
+						</label>
 						<button
 							class="install"
 							onclick={() => copy('install', INSTALL)}
@@ -1539,6 +1549,51 @@
 		font-weight: 650;
 		color: var(--text-1);
 	}
+	/*
+	 * Switching between parts of a tab is navigation, not a setting: a full-width segmented track
+	 * keeps it from reading like the option chips below it.
+	 */
+	.parts {
+		display: grid;
+		grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+		gap: 2px;
+		padding: 3px;
+		border-radius: 12px;
+		background: var(--surface-2);
+	}
+	.parts button {
+		padding: 0.5rem 0.75rem;
+		border: 0;
+		border-radius: 9px;
+		background: none;
+		color: var(--text-2);
+		font: inherit;
+		font-size: 0.86rem;
+		font-weight: 600;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		cursor: pointer;
+		transition:
+			background 0.15s,
+			color 0.15s;
+	}
+	.parts button:hover {
+		color: var(--text-1);
+	}
+	.parts button.active {
+		background: light-dark(var(--raised), #42423e);
+		color: var(--text-1);
+		box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
+	}
+	.size-row {
+		display: grid;
+		grid-template-columns: auto minmax(0, 1fr);
+		gap: 1rem;
+		align-items: center;
+		font-size: 0.92rem;
+		font-weight: 650;
+	}
 	legend .reset {
 		margin-left: auto;
 		font-weight: 500;
@@ -1905,21 +1960,47 @@
 			grid-template-rows: auto minmax(0, 1fr);
 			height: clamp(600px, calc(100svh - 4.5rem), 780px);
 		}
+		/* The boop counter floats over the stage so the figure gets its row on a small screen. */
 		.stage {
-			height: 240px;
+			grid-template-rows: auto 1fr auto;
+			height: 295px;
 			box-sizing: border-box;
 			border-radius: 24px;
 			padding: 0.75rem;
 			gap: 0.4rem;
 		}
+		.boops {
+			position: absolute;
+			left: 1rem;
+			bottom: 3.6rem;
+			font-size: 0.75rem;
+		}
+		/* The fade tells the mood strip goes on past the edge. */
 		.dock {
 			flex-wrap: nowrap;
 			justify-content: start;
 			overflow-x: auto;
+			scrollbar-width: none;
 			border-radius: 999px;
+			mask-image: linear-gradient(to right, #000 82%, transparent);
 		}
+		.dock button {
+			padding: 0.4rem 0.7rem;
+			font-size: 0.8rem;
+		}
+		/* All six tabs share the width, so none hides past the edge. */
 		.tabs {
-			padding-top: 0.25rem;
+			gap: 0;
+			padding: 0.25rem 0.5rem 0;
+		}
+		.tabs button {
+			flex: 1 1 auto;
+			padding: 0.55rem 0.2rem 0.7rem;
+			font-size: 0.8rem;
+		}
+		.tabs button.active::after {
+			left: 0.2rem;
+			right: 0.2rem;
 		}
 		.panel-body {
 			gap: 0.8rem;
@@ -1928,15 +2009,14 @@
 		legend {
 			margin-bottom: 0.45rem;
 		}
-		/* One swipeable row, so the part switcher never costs a second line of the small screen. */
+		/* Segments size to their labels so a long one like "Accessories" is never cut off. */
 		.parts {
-			flex-wrap: nowrap;
-			padding-block: 2px;
-			overflow-x: auto;
-			scrollbar-width: none;
+			display: flex;
 		}
-		.parts .chip {
-			flex: none;
+		.parts button {
+			flex: 1 1 auto;
+			padding-inline: 0.45rem;
+			font-size: 0.8rem;
 		}
 		.downloads {
 			grid-template-columns: repeat(2, 1fr);
@@ -1963,7 +2043,13 @@
 			grid-area: reset;
 		}
 		.reactions li {
-			padding: 0.4rem 0;
+			padding: 0.3rem 0;
+		}
+		.code :global(pre) {
+			min-height: 0;
+			padding: 0.8rem 1rem;
+			font-size: 0.74rem;
+			line-height: 1.5;
 		}
 	}
 	@media (max-width: 520px) {
