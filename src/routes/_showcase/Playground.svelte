@@ -36,6 +36,7 @@
 	import GearPicker from './GearPicker.svelte';
 	import { gearCrop } from './gear.js';
 	import { download, snapshotSvg, svgToPng } from './exporter.js';
+	import { CLIP_FORMATS, renderClip, type ClipFormat } from './clip.js';
 	import { showInTab } from './favicon.svelte.js';
 	import { copyText, pick } from './interactions.js';
 	import {
@@ -559,6 +560,22 @@
 		if (!s) return;
 		download(s.text, `${fileName}-animated.svg`, 'image/svg+xml');
 		flash('animated');
+	}
+
+	let rendering = $state<ClipFormat | null>(null);
+	async function exportClip(format: ClipFormat) {
+		const s = await snapshot(true);
+		if (!s || rendering) return;
+		rendering = format;
+		try {
+			download(await renderClip(s.text, s, format), `${fileName}.${format}`);
+			flash(format);
+		} catch {
+			// WebP and WebM encoding need Chromium; other browsers get told instead of a broken file.
+			flash(`${format}-failed`);
+		} finally {
+			rendering = null;
+		}
 	}
 
 	async function exportPng() {
@@ -1206,6 +1223,22 @@
 							<button class="file" class:done={done === 'png'} onclick={exportPng}>
 								<span>PNG</span><small>1024 px</small>
 							</button>
+							{#each CLIP_FORMATS as format (format)}
+								<button
+									class="file"
+									class:done={done === format}
+									disabled={rendering !== null}
+									onclick={() => exportClip(format)}
+								>
+									<span>{format.toUpperCase()}</span><small
+										>{rendering === format
+											? 'Rendering…'
+											: done === `${format}-failed`
+												? 'Not supported here'
+												: '3 s loop'}</small
+									>
+								</button>
+							{/each}
 							<button
 								class="file"
 								class:done={done === 'svgcode'}
