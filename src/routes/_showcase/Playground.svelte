@@ -535,6 +535,8 @@
 	}
 
 	let figure = $state<HTMLElement>();
+	/** How long the gaze and head springs take to settle back to center. */
+	const GAZE_SETTLE_MS = 600;
 	async function snapshot(animated = false) {
 		// The compare grid replaces the single figure, and an export is always of that one mascot.
 		if (compare) {
@@ -543,8 +545,18 @@
 		}
 		const svg = figure?.querySelector('svg');
 		if (!svg) return null;
-		const rect = svg.getBoundingClientRect();
-		return { text: snapshotSvg(svg, rect, { animated }), width: rect.width, height: rect.height };
+		// The pointer is on the export button, so a following mascot would be caught looking at it.
+		const gaze = lookAt;
+		if (gaze !== 'none') {
+			lookAt = 'none';
+			await new Promise((r) => setTimeout(r, GAZE_SETTLE_MS));
+		}
+		try {
+			const rect = svg.getBoundingClientRect();
+			return { text: snapshotSvg(svg, rect, { animated }), width: rect.width, height: rect.height };
+		} finally {
+			lookAt = gaze;
+		}
 	}
 	const fileName = $derived(`${species === 'bob' ? 'mascbob' : `${species}bob`}-${mood}-${theme}`);
 

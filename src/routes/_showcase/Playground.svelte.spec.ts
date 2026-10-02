@@ -188,3 +188,37 @@ describe('Studio layout', () => {
 		await expect.element(page.getByRole('slider', { name: 'Size' })).toBeInTheDocument();
 	});
 });
+
+describe('Studio export', () => {
+	it('exports the mascot looking ahead, not at the pointer on the button', async () => {
+		const blobs: Blob[] = [];
+		const create = vi.spyOn(URL, 'createObjectURL').mockImplementation((b) => {
+			blobs.push(b as Blob);
+			return 'blob:test';
+		});
+		const { container } = render(Playground);
+		const stage = container.querySelector<HTMLElement>('.mascbob')!;
+		const aim = stage.querySelector<SVGGElement>('.head-aim')!;
+		const svg = stage.querySelector('svg')!;
+		const index = [...svg.querySelectorAll('*')].indexOf(aim);
+		const rect = stage.getBoundingClientRect();
+		window.dispatchEvent(
+			new PointerEvent('pointermove', {
+				clientX: rect.right + 300,
+				clientY: rect.bottom + 200,
+				pointerType: 'mouse'
+			})
+		);
+		await expect.poll(() => aim.transform.baseVal.getItem(0).angle).toBeGreaterThan(4);
+
+		await page.getByRole('button', { name: 'Export', exact: true }).click();
+		await page.getByRole('button', { name: 'Files', exact: true }).click();
+		await page.getByRole('button', { name: /SVG\s*Vector/ }).click();
+		await expect.poll(() => blobs.length, { timeout: 3000 }).toBe(1);
+		create.mockRestore();
+
+		const doc = new DOMParser().parseFromString(await blobs[0].text(), 'image/svg+xml');
+		const exported = [...doc.documentElement.querySelectorAll('*')][index] as SVGGElement;
+		expect(Math.abs(exported.transform.baseVal.getItem(0).angle)).toBeLessThan(0.5);
+	});
+});
