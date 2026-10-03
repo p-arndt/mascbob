@@ -938,6 +938,9 @@
 		get hovered() {
 			return hovered;
 		},
+		get headOut() {
+			return neckOut;
+		},
 		get pressed() {
 			return pressed;
 		},

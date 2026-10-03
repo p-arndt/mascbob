@@ -703,7 +703,12 @@
 	<!-- Drawn over the outfit because the head shades whatever the torso wears; the head itself
 	     covers the top half, so only the falloff below the chin shows. Offset right, away from
 	     the top-left light. -->
-	<g class="head-shadow" clip-path={ref('torso')}>
+	<!-- Fades as the head is pulled off, or the torso keeps a shadow of a head that is not there. -->
+	<g
+		class="head-shadow"
+		clip-path={ref('torso')}
+		opacity={m.headOut > 0.5 ? clamp(1 - m.headOut / 14, 0, 1) : undefined}
+	>
 		<!-- Stacked copies of the head's own outline, so the shadow hugs its rounded corners
 		     down the sides instead of only darkening the middle. -->
 		<g

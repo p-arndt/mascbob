@@ -213,7 +213,7 @@ describe('builds', () => {
 			motion: 'stand'
 		});
 		expect(torsoPath(48, b)).toBe(
-			'M52 152Q52 136 68 136L132 136Q148 136 148 152L148 188C148 206 126.4 214 100 214C73.6 214 52 206 52 188Z'
+			'M52 162Q52 136 78 136L122 136Q148 136 148 162L148 188C148 206 126.4 214 100 214C73.6 214 52 206 52 188Z'
 		);
 		expect(torsoHalfWidth(70, b)).toBe(44);
 		expect(shoulderX(48, b)).toBe(55);

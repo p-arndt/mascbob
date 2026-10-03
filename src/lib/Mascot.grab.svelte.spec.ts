@@ -123,6 +123,8 @@ describe('Mascot grab', () => {
 		}
 		await expect.poll(() => pose().y).toBeLessThan(-30);
 		expect(neck()).not.toBeNull();
+		// No shadow of the head is left behind on the torso once it is lifted off.
+		expect(Number(el.querySelector('.head-shadow')?.getAttribute('opacity'))).toBeLessThan(0.1);
 		// Only a hint of stretch: the neck takes the pull, the face keeps its shape.
 		expect(scaleY()).toBeGreaterThan(1.1);
 		expect(scaleY()).toBeLessThan(1.3);

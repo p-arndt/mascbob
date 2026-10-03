@@ -75,6 +75,8 @@ export interface MascotContext {
 	 * add detail, e.g. spiral eyes while `dizzy` or hands over the eyes while `shy`.
 	 */
 	readonly reaction: Reaction | null;
+	/** How far a pulled head sits off its seat on the torso, in viewBox units; 0 at rest. */
+	readonly headOut: number;
 	/** Part currently held and pulled by the pointer, or null. */
 	readonly grabbing: GrabPart | null;
 	/** Whether parts may be grabbed at all (`interactive` with the `grab` reaction on). */

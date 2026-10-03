@@ -302,7 +302,8 @@ export function torsoOuterWidth(hw: number, b: BuildDef = STANDARD): number {
 export function torsoPath(hw: number, b: BuildDef = STANDARD): string {
 	const t = b.torso;
 	const top = b.torsoTop;
-	const round = Math.min(hw * t.shoulder * 0.4, 16);
+	// Domed shoulders: the head hides them, but a pulled head reveals the top, and a flat one reads as a box.
+	const round = Math.min(hw * t.shoulder * 0.6, 26);
 	const shoulders = (l: number, r: number) =>
 		`M${l} ${top + round}Q${l} ${top} ${l + round} ${top}L${r - round} ${top}Q${r} ${top} ${r} ${top + round}`;
 	const hip = b.hipY;
