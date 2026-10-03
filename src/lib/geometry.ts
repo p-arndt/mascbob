@@ -22,7 +22,7 @@ export interface ShapeDef {
 }
 
 export const SHAPE_DEFS: Record<Shape, ShapeDef> = {
-	// Tall pill: with a body it reads as one capsule from head to hips (the collar hides the seam).
+	// Tall pill: with a body it overhangs a slightly narrower torso, so it sits on it like a helmet.
 	capsule: {
 		d: 'M52 88C52 58 72 36 100 36C128 36 148 58 148 88L148 146C148 162 136 172 100 172C64 172 52 162 52 146Z',
 		top: 36,

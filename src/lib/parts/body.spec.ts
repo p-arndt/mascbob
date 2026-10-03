@@ -68,9 +68,15 @@ describe('bodyPose', () => {
 	});
 
 	it('brings the thinking hand up to the chin', () => {
-		const { wrist } = armJoints(bodyPose('think', 'thinking').right);
-		expect(wrist.y).toBeLessThan(SHOULDER_Y + 5);
-		expect(wrist.x).toBeGreaterThan(shoulderX(48));
+		const pose = bodyPose('think', 'thinking').right;
+		const { shoulder, wrist } = armJoints(pose);
+		// Under the capsule's chin (bottom 172), well inside the shoulder.
+		expect(wrist.y).toBeGreaterThan(165);
+		expect(wrist.y).toBeLessThan(178);
+		expect(wrist.x).toBeGreaterThan(shoulder.x + 18);
+		// A forearm folded back past ~110° piles the hand onto the shoulder joint.
+		expect(Math.abs(pose.a2)).toBeLessThan(110);
+		expect(Math.hypot(wrist.x - shoulder.x, wrist.y - shoulder.y)).toBeGreaterThan(20);
 	});
 
 	it('brings the hands in toward the chest when in love', () => {
@@ -163,9 +169,10 @@ describe('SHOES', () => {
 });
 
 describe('torso', () => {
-	it('stays compact under wide heads', () => {
-		expect(torsoHalfWidth(40)).toBe(40);
-		expect(torsoHalfWidth(70)).toBe(48);
+	it('stays a little narrower than the head, and compact under wide heads', () => {
+		expect(torsoHalfWidth(40)).toBe(36);
+		expect(torsoHalfWidth(48)).toBeLessThan(48);
+		expect(torsoHalfWidth(70)).toBe(44);
 	});
 
 	it('spans from the torso top down to the hips', () => {
@@ -208,7 +215,7 @@ describe('builds', () => {
 		expect(torsoPath(48, b)).toBe(
 			'M52 152Q52 136 68 136L132 136Q148 136 148 152L148 188C148 206 126.4 214 100 214C73.6 214 52 206 52 188Z'
 		);
-		expect(torsoHalfWidth(70, b)).toBe(48);
+		expect(torsoHalfWidth(70, b)).toBe(44);
 		expect(shoulderX(48, b)).toBe(55);
 	});
 

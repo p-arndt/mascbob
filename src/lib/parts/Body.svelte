@@ -257,6 +257,8 @@
 	>
 		<path class="tube-edge" d="M0 0V{upper}" />
 		<path class="tube upper-arm" d="M0 0V{upper}" />
+		<!-- Under the forearm, so a bent arm reaching across the shoulder stays on top of it. -->
+		{#if m.species === 'bob'}<circle class="joint" r={b.armWidth / 2 + 0.5} />{/if}
 		{#if outfit === 'jersey'}
 			<path class="sleeve-band" d="M{-b.armWidth / 2} {upper - 8}H{b.armWidth / 2}" />
 		{/if}
@@ -301,7 +303,6 @@
 				{/if}
 			</g>
 		</g>
-		{#if m.species === 'bob'}<circle class="joint" r={b.armWidth / 2 + 0.5} />{/if}
 	</g>
 {/snippet}
 
@@ -614,11 +615,6 @@
 		<clipPath id={id('torso')}>
 			<path d={torsoPath(hw, b)} />
 		</clipPath>
-		<radialGradient id={id('head-shadow')}>
-			<stop offset="0" class="stop-ink" stop-opacity="0.22" />
-			<stop offset="0.6" class="stop-ink" stop-opacity="0.1" />
-			<stop offset="1" class="stop-ink" stop-opacity="0" />
-		</radialGradient>
 	</defs>
 
 	{#if outfit === 'cape'}
@@ -707,15 +703,18 @@
 	<!-- Drawn over the outfit because the head shades whatever the torso wears; the head itself
 	     covers the top half, so only the falloff below the chin shows. Offset right, away from
 	     the top-left light. -->
-	<ellipse
-		class="head-shadow"
-		clip-path={ref('torso')}
-		cx={100 + hw * 0.08}
-		cy={m.shape.bottom + b.headY}
-		rx={hw * 0.8}
-		ry="8"
-		fill={ref('head-shadow')}
-	/>
+	<g class="head-shadow" clip-path={ref('torso')}>
+		<!-- Stacked copies of the head's own outline, so the shadow hugs its rounded corners
+		     down the sides instead of only darkening the middle. -->
+		<g
+			transform="translate(100 {m.shape.bottom + b.headY}) scale({b.headScale}) translate(-100 {-m
+				.shape.bottom})"
+		>
+			{#each [9, 7, 5, 3.5, 2] as dy (dy)}
+				<path d={m.shape.d} transform="translate({dy * 0.3} {dy})" />
+			{/each}
+		</g>
+	</g>
 	<path class="edge" d={torsoPath(hw, b)} />
 
 	<!-- A tiny status light on the chest echoes the LED face; it beats with the mood. -->
@@ -934,6 +933,10 @@
 		stroke: var(--c-visor);
 		stroke-width: 1.2;
 		opacity: 0.14;
+	}
+	.head-shadow path {
+		fill: var(--c-visor);
+		opacity: 0.045;
 	}
 	.leg {
 		fill: var(--c-body-dark);

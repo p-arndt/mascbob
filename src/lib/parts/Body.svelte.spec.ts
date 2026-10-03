@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import Mascot from '../Mascot.svelte';
 import { BODY_VIEWBOX_HEIGHT, BUILDS, BUILD_DEFS, OUTFITS } from './body.js';
+import { SHAPE_DEFS } from '../geometry.js';
 
 describe('Body', () => {
 	it('stands on plain feet by default', async () => {
@@ -64,6 +65,21 @@ describe('Body', () => {
 		// Painted after the outfit fabric but under the torso outline, so it falls on clothes too.
 		expect(shadow?.nextElementSibling?.classList.contains('edge')).toBe(true);
 		expect(container.querySelectorAll('.leg-ao')).toHaveLength(2);
+	});
+
+	it('casts the head shadow in the shape of the head', async () => {
+		const { container } = render(Mascot, { shape: 'capsule' });
+		const outlines = container.querySelectorAll('.head-shadow path');
+		expect(outlines.length).toBeGreaterThan(1);
+		for (const path of outlines) expect(path.getAttribute('d')).toBe(SHAPE_DEFS.capsule.d);
+	});
+
+	it('draws the shoulder joint under the forearm', async () => {
+		const { container } = render(Mascot, { mood: 'thinking' });
+		const joint = container.querySelector('.arm .joint');
+		const fore = container.querySelector('.arm .fore');
+		expect(joint && fore).toBeTruthy();
+		expect(joint!.compareDocumentPosition(fore!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 	});
 
 	it('drops the head shadow without a body', async () => {

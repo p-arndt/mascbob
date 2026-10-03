@@ -107,8 +107,10 @@ export const BUILD_DEFS: Record<Build, BuildDef> = {
 		legWidth: 17,
 		footScale: FOOT_SCALE,
 		torso: {
-			ratio: 1,
-			max: 48,
+			// A touch narrower than the head, so the head overhangs and sits on the torso
+			// instead of the two stacking flush like a pill in a cup.
+			ratio: 0.9,
+			max: 44,
 			shoulder: 1,
 			belly: 1,
 			bellyY: HIP_Y - 26,
@@ -165,8 +167,8 @@ export const BUILD_DEFS: Record<Build, BuildDef> = {
 		legWidth: 13,
 		footScale: 1.08,
 		torso: {
-			ratio: 0.78,
-			max: 38,
+			ratio: 0.7,
+			max: 34,
 			shoulder: 1,
 			belly: 0.92,
 			bellyY: 196,
@@ -392,9 +394,11 @@ const HAND_POSES: Record<HandPose, BodyPose> = {
 		swingArm: 'right',
 		drop: 0
 	},
+	// Hand to the chin: the upper arm crosses the chest and the forearm rises to the head's
+	// underside. Folding the forearm back further piles the hand onto the shoulder.
 	think: {
-		left: { a1: -8, a2: -86 },
-		right: { a1: -18, a2: -136 },
+		left: { a1: -12, a2: -78 },
+		right: { a1: -78, a2: -77 },
 		swing: 'none',
 		swingArm: 'both',
 		drop: 0

@@ -1,0 +1,1 @@
+Bob's body is now a little narrower than the head, so the head sits on it with a soft shadow that follows its outline. The `thinking` mood and `hands="think"` now raise a hand to the chin instead of folding the arm onto the shoulder.
