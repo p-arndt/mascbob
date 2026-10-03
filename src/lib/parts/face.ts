@@ -48,8 +48,12 @@ export function eyeLids(
 	};
 }
 
-/** How far the accent print plate sits off the ink plate at rest, in head units. */
-export const MISPRINT = { x: 1.6, y: 1.2 };
+/**
+ * How far the accent print plate sits off the ink plate at rest, in head units. Kept small:
+ * thin features (crescent eyes, brows) are only ~3 units thick, and a larger offset turns
+ * the accent into a second, detached shape instead of a misprinted edge.
+ */
+export const MISPRINT = { x: 1.1, y: 0.85 };
 
 export interface EyeShape {
 	cx: number;

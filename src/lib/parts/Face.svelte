@@ -72,7 +72,7 @@
 	const curious = new Spring(0, { stiffness: 0.12, damping: 0.5 });
 	const saccade = new Spring({ x: 0, y: 0 }, { stiffness: 0.4, damping: 0.9 });
 	// Starts far off so the face "prints" into place on mount.
-	const plate = new Spring({ x: -4, y: 4 }, { stiffness: 0.07, damping: 0.32 });
+	const plate = new Spring({ x: -3, y: 2.5 }, { stiffness: 0.08, damping: 0.45 });
 
 	$effect(() => {
 		squeeze.set(m.pressed ? 1 : 0, { instant: m.reduced });
@@ -89,7 +89,8 @@
 		}
 		if (m.mood !== printedMood) {
 			printedMood = m.mood;
-			plate.set({ x: MISPRINT.x - 4.5, y: MISPRINT.y + 3 }, { instant: true });
+			// A small kick: a big one slides the accent clear off thin features like a crescent eye.
+			plate.set({ x: MISPRINT.x - 2.2, y: MISPRINT.y + 1.5 }, { instant: true });
 		}
 		plate.target = MISPRINT;
 	});
@@ -173,7 +174,7 @@
 			saccade.current.y
 	);
 	// Syllables knock the accent plate around a little, like a speaker cone.
-	const offset = $derived({ x: plate.current.x + talk * 1.6, y: plate.current.y - talk * 1.1 });
+	const offset = $derived({ x: plate.current.x + talk * 1, y: plate.current.y - talk * 0.7 });
 
 	function eye(p: EyeParams, baseX: number, side: Side) {
 		const base = EYE_SIZES[m.eyes] ?? EYE_SIZES.round;
@@ -346,14 +347,28 @@
 	</g>
 {/each}
 
-{#snippet features()}
+{#snippet features(ink: boolean)}
 	{#each eyes as e, i (i)}
-		<path d={e.d} />
+		<!-- A crescent's concave lower edge would show the accent as a second, detached lid,
+		     so the accent eye only slides sideways as the eye arches. -->
+		<path
+			d={e.d}
+			transform={ink ? undefined : `translate(0 ${-offset.y * clamp(e.shape.lift / 0.8, 0, 1)})`}
+		/>
 		{#if e.heart.s > 0.5}
 			<path d={HEART_PATH} transform="translate({e.heart.cx} {e.heart.cy}) scale({e.heart.s})" />
 		{/if}
 		{#if e.brow.alpha > 0.01}
-			<path class="line" d={e.brow.d} opacity={clamp(e.brow.alpha * 1.8, 0, 1)} />
+			{@const alpha = clamp(e.brow.alpha * 1.8, 0, 1)}
+			<!-- A faint ink brow is mixed toward the shell instead of made see-through, or the
+			     accent plate shows through it as a muddy brown. -->
+			<path
+				class="line"
+				class:brow-ink={ink}
+				d={e.brow.d}
+				opacity={ink ? undefined : alpha}
+				style:--alpha={ink ? `${alpha * 100}%` : undefined}
+			/>
 		{/if}
 	{/each}
 	{#if sq > 0.01}
@@ -383,10 +398,10 @@
 {/snippet}
 
 <g class="plate accent" transform="translate({offset.x} {offset.y})">
-	{@render features()}
+	{@render features(false)}
 </g>
 <g class="plate ink">
-	{@render features()}
+	{@render features(true)}
 	{#if mouth.tongue > 0.01}
 		<g clip-path={ref('mouth-clip')} opacity={(1 - mouth.cat) * mouth.tongue}>
 			<ellipse
@@ -505,6 +520,9 @@
 		stroke-width: 3.4;
 		stroke-linecap: round;
 		stroke-linejoin: round;
+	}
+	.brow-ink {
+		stroke: color-mix(in oklab, currentColor var(--alpha), var(--c-body-light));
 	}
 	.thin {
 		stroke-width: 2.8;

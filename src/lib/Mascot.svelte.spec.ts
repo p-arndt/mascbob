@@ -31,6 +31,26 @@ describe('Mascot', () => {
 		await expect.element(button, { timeout: 2000 }).toHaveAttribute('data-mood', 'sad');
 	});
 
+	it('prints faint brows opaque, so the accent plate never shows through the ink', async () => {
+		const { container } = render(Mascot, { mood: 'idle', motion: 'reduced' });
+		const inkBrows = container.querySelectorAll<SVGPathElement>('.plate.ink .brow-ink');
+		expect(inkBrows).toHaveLength(2);
+		for (const brow of inkBrows) {
+			expect(brow.hasAttribute('opacity')).toBe(false);
+			expect(getComputedStyle(brow).opacity).toBe('1');
+		}
+		expect(container.querySelector('.plate.accent .brow-ink')).toBeNull();
+	});
+
+	it('keeps the accent of a crescent eye from slipping below it', async () => {
+		const { container } = render(Mascot, { mood: 'happy', motion: 'reduced' });
+		const plate = container.querySelector('.plate.accent');
+		const [, dy] = (plate?.getAttribute('transform') ?? '').match(/-?[\d.]+/g)!.map(Number);
+		const eye = plate?.querySelector('path[transform]');
+		const [, eyeDy] = (eye?.getAttribute('transform') ?? '').match(/-?[\d.]+/g)!.map(Number);
+		expect(dy + eyeDy).toBeCloseTo(0, 5);
+	});
+
 	it('draws only the requested accessories', async () => {
 		const { container } = render(Mascot, { accessories: ['antenna'] });
 		expect(container.querySelector('.antenna-tip')).not.toBeNull();
