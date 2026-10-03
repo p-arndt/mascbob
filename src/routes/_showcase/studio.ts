@@ -102,7 +102,7 @@ export const STUDIO_START: StudioConfig = {
 	...LIBRARY_DEFAULTS,
 	mood: 'happy',
 	accessories: [],
-	outfit: 'puffer',
+	outfit: 'none',
 	shoes: 'sneakers',
 	size: 240
 };
@@ -117,7 +117,7 @@ export const CREATURE_PRESETS = [
 		colors: {},
 		eyes: 'round',
 		proportions: {},
-		outfit: 'puffer',
+		outfit: 'none',
 		shoes: 'sneakers'
 	},
 	{

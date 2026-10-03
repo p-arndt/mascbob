@@ -57,7 +57,7 @@
 	let mood = $state<Mood>('happy');
 	let theme = $state<ThemeName>('og');
 	let shape = $state<Shape>('capsule');
-	let outfit = $state<Outfit>('puffer');
+	let outfit = $state<Outfit>('none');
 	let copied = $state(false);
 	let bubble = $state<string | null>(null);
 
