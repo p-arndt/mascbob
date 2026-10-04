@@ -241,8 +241,11 @@ export interface Bounds {
 }
 
 export const GRAVITY = 2600;
-/** Faster than this and a landing bounces instead of sticking. */
-const BOUNCE_SPEED = 950;
+/** Slower than this onto a surface and it stays down and slides instead of bouncing. */
+const BOUNCE_SPEED = 380;
+/** How much of its fall speed a landing gives back, and of its sideways speed it keeps. */
+const RESTITUTION = 0.4;
+const IMPACT_GRIP = 0.85;
 const MAX_THROW = 4200;
 const MAX_SPIN = 720;
 /** Per-second decay rates: enough air to tame a wild throw, too little to feel floaty. */
@@ -250,6 +253,13 @@ const DRAG = 0.25;
 const SPIN_DRAG = 1.2;
 const WALL_BOUNCE = 0.55;
 const CEILING_BOUNCE = 0.5;
+/** Sliding braking in px/s²: feet grip, a body skidding on its side or back slides further. */
+const FEET_FRICTION = 3000;
+const BODY_FRICTION = 1600;
+/** How far it tumbles along the ground per px it slides, in degrees. */
+const ROLL = 0.3;
+/** How hard it flops onto its feet, side or back when it slows, per second. */
+const SETTLE = 8;
 /**
  * Small fixed steps keep the arc the same at any frame rate, and keep a fast buddy from skipping
  * across a narrow surface between two frames.
@@ -258,17 +268,34 @@ const SUBSTEP = 1 / 240;
 
 const clampSpin = (spin: number) => Math.max(-MAX_SPIN, Math.min(MAX_SPIN, spin));
 
+/** One step of a flight; see `fall`. */
+export interface Step {
+	flight: Flight;
+	/** The surface it slides along, or -1 while in the air. */
+	ground: number;
+	/** The surface it came to rest on, or -1. */
+	landed: number;
+	/** It hit a surface this step, bouncing or touching down, so the landing squash plays. */
+	impact: boolean;
+}
+
 /**
- * Advances a falling buddy by one short step of `dt` seconds: gravity, air drag, bounces off the
- * screen's sides and top, and a landing when its feet cross the top edge of a surface from above.
- * `landed` is the surface index, or -1; `bounced` marks a hard landing that sent it back up.
+ * Advances a thrown buddy by one short step of `dt` seconds. In the air: gravity, air drag,
+ * bounces off the screen's sides and top, and a hit when its feet cross the top edge of a surface
+ * from above, which bounces it back up when hard and puts it down otherwise. On `ground`, the
+ * surface it touched down on, it keeps its speed and slides: friction brakes it, a fast skid
+ * tips it over and tumbles it along, sliding off the end drops it again, and once it slows it
+ * flops onto its feet, side or back and comes to rest.
  */
 export function fall(
 	f: Flight,
 	dt: number,
 	boxes: readonly Box[],
-	bounds: Bounds
-): { flight: Flight; landed: number; bounced: boolean } {
+	bounds: Bounds,
+	ground = -1
+): Step {
+	const floor = ground >= 0 ? boxes[ground] : undefined;
+	if (floor) return slide(f, dt, floor, ground, bounds);
 	const drag = Math.exp(-DRAG * dt);
 	let vx = f.vx * drag;
 	let vy = f.vy * drag + GRAVITY * dt;
@@ -298,35 +325,75 @@ export function fall(
 		});
 		if (hit >= 0) {
 			const top = boxes[hit].top;
+			// Scraping the ground sets it tumbling the way it moves.
+			const kick = clampSpin(spin * 0.5 + vx * 0.25);
 			if (vy > BOUNCE_SPEED) {
-				// Scraping the ground while sliding sets it tumbling the way it slides.
-				const kick = clampSpin(spin * 0.4 + vx * 0.3);
-				const flight = { x, y: top, vx: vx * 0.6, vy: -vy * 0.32, angle, spin: kick };
-				return { flight, landed: -1, bounced: true };
+				const flight = {
+					x,
+					y: top,
+					vx: vx * IMPACT_GRIP,
+					vy: -vy * RESTITUTION,
+					angle,
+					spin: kick
+				};
+				return { flight, ground: -1, landed: -1, impact: true };
 			}
-			return { flight: { x, y: top, vx: 0, vy: 0, angle, spin: 0 }, landed: hit, bounced: false };
+			const flight = { x, y: top, vx, vy: 0, angle, spin: kick };
+			const rest = slide(flight, 0, boxes[hit], hit, bounds);
+			return { ...rest, impact: true };
 		}
 	}
-	return { flight: { x, y, vx, vy, angle, spin }, landed: -1, bounced: false };
+	return { flight: { x, y, vx, vy, angle, spin }, ground: -1, landed: -1, impact: false };
 }
 
-/** Advances a flight by a whole frame of `dt` seconds in fixed small steps, see `fall`. */
+/** A step sliding along the top of `box`, see `fall`. */
+function slide(f: Flight, dt: number, box: Box, index: number, bounds: Bounds): Step {
+	const upright = Math.abs(unwind(f.angle)) < 30;
+	const brake = (upright ? FEET_FRICTION : BODY_FRICTION) * dt;
+	let vx = Math.abs(f.vx) <= brake ? 0 : f.vx - Math.sign(f.vx) * brake;
+	let x = f.x + vx * dt;
+	// Feet, side, back or head: whichever it is closest to lying on is where it flops.
+	const rest = Math.round(f.angle / 90) * 90;
+	const aim = vx * ROLL + (rest - f.angle) * SETTLE;
+	let spin = clampSpin(f.spin + (aim - f.spin) * (1 - Math.exp(-12 * dt)));
+	const angle = f.angle + spin * dt;
+	if (x < bounds.left || x > bounds.right) {
+		const side = x < bounds.left ? 1 : -1;
+		x = side > 0 ? bounds.left : bounds.right;
+		vx = side * Math.abs(vx) * WALL_BOUNCE;
+		spin *= 0.6;
+	}
+	const flight = { x, y: box.top, vx, vy: 0, angle, spin };
+	if (x < box.left || x > box.left + box.width) {
+		return { flight, ground: -1, landed: -1, impact: false };
+	}
+	if (vx === 0 && Math.abs(spin) < 25 && Math.abs(angle - rest) < 2) {
+		const still = { x, y: box.top, vx: 0, vy: 0, angle: rest, spin: 0 };
+		return { flight: still, ground: index, landed: index, impact: false };
+	}
+	return { flight, ground: index, landed: -1, impact: false };
+}
+
+/**
+ * Advances a flight by a whole frame of `dt` seconds in fixed small steps, see `fall`. `ground`
+ * is the surface it slides along, as the last frame returned it.
+ */
 export function fly(
 	f: Flight,
 	dt: number,
 	boxes: readonly Box[],
-	bounds: Bounds
-): { flight: Flight; landed: number; bounced: boolean } {
+	bounds: Bounds,
+	ground = -1
+): Step {
 	const steps = Math.max(1, Math.ceil(dt / SUBSTEP - 1e-9));
-	let flight = f;
-	let bounced = false;
+	let step: Step = { flight: f, ground, landed: -1, impact: false };
+	let impact = false;
 	for (let i = 0; i < steps; i++) {
-		const next = fall(flight, dt / steps, boxes, bounds);
-		flight = next.flight;
-		bounced ||= next.bounced;
-		if (next.landed >= 0) return { flight, landed: next.landed, bounced };
+		step = fall(step.flight, dt / steps, boxes, bounds, step.ground);
+		impact ||= step.impact;
+		if (step.landed >= 0) break;
 	}
-	return { flight, landed: -1, bounced };
+	return { ...step, impact };
 }
 
 /** Samples older than this say nothing about the release any more. */

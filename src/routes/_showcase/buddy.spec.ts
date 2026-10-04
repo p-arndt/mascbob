@@ -191,16 +191,27 @@ describe('throwing the page buddy', () => {
 		angle: 0,
 		spin
 	});
-	const simulate = (start: Flight, boxes: Box[], seconds = 3, fps = 60, bounds = walls) => {
+	const simulate = (
+		start: Flight,
+		boxes: Box[],
+		seconds = 3,
+		fps = 60,
+		bounds = walls,
+		from = -1
+	) => {
 		let flight = start;
+		let ground = from;
 		let top = start.y;
+		let slid = false;
 		for (let t = 0; t < seconds; t += 1 / fps) {
-			const next = fly(flight, 1 / fps, boxes, bounds);
+			const next = fly(flight, 1 / fps, boxes, bounds, ground);
 			flight = next.flight;
+			ground = next.ground;
+			slid ||= ground >= 0 && next.landed < 0;
 			top = Math.min(top, flight.y);
-			if (next.landed >= 0) return { flight, landed: next.landed, t, top };
+			if (next.landed >= 0) return { flight, landed: next.landed, t, top, slid };
 		}
-		return { flight, landed: -1, t: seconds, top };
+		return { flight, landed: -1, t: seconds, top, slid };
 	};
 
 	it('falls onto the perch below and stands on its top edge', () => {
@@ -212,7 +223,8 @@ describe('throwing the page buddy', () => {
 	it('bounces off a hard landing before it settles', () => {
 		const first = fall(at(200, 370, 100, 2000), 1 / 60, [box(380)], walls);
 		expect(first.landed).toBe(-1);
-		expect(first.bounced).toBe(true);
+		expect(first.ground).toBe(-1);
+		expect(first.impact).toBe(true);
 		expect(first.flight.vy).toBeLessThan(0);
 		// Skidding on the ground sets it tumbling the way it slides.
 		expect(first.flight.spin).toBeGreaterThan(0);
@@ -269,12 +281,52 @@ describe('throwing the page buddy', () => {
 		}
 	});
 
-	it('lands on a thin perch at full speed instead of skipping past it', () => {
+	it('hits a thin perch at full speed instead of skipping past it', () => {
 		// One 30 fps frame carries it 80 px sideways, from before the perch to well past it.
 		const thin = box(400, 210, 20);
 		const flight = at(200, 395, 2400, 600);
-		expect(fall(flight, 1 / 30, [thin], walls).landed).toBe(-1);
-		expect(fly(flight, 1 / 30, [thin], walls).landed).toBe(0);
+		expect(fall(flight, 1 / 30, [thin], walls).impact).toBe(false);
+		expect(fly(flight, 1 / 30, [thin], walls).impact).toBe(true);
+	});
+
+	it('keeps sliding after a landing instead of sticking where it touched down', () => {
+		const { flight, landed, slid } = simulate(at(200, 360, 900, 0), [box(380, 0, 1400)]);
+		expect(landed).toBe(0);
+		expect(slid).toBe(true);
+		expect(flight.x).toBeGreaterThan(300);
+		expect(flight.vx).toBe(0);
+		expect(flight.spin).toBe(0);
+	});
+
+	it('skids further on its back than on its feet', () => {
+		const floor = [box(380, 0, 1400)];
+		const feet = simulate(at(200, 380, 600), floor, 3, 60, walls, 0).flight.x;
+		const lying = simulate({ ...at(200, 380, 600), angle: 90 }, floor, 3, 60, walls, 0).flight.x;
+		expect(lying).toBeGreaterThan(feet);
+	});
+
+	it('slides off the end of a surface and drops onto the next one', () => {
+		const short = box(380, 100, 200);
+		const below = box(520, 0, 1400);
+		const { landed, flight } = simulate(at(250, 380, 700), [short, below], 4, 60, walls, 0);
+		expect(landed).toBe(1);
+		expect(flight.x).toBeGreaterThan(300);
+	});
+
+	it('tips over and tumbles in a fast skid, then flops onto its side, back or feet', () => {
+		const floor = [box(380, 0, 1400)];
+		const fast = simulate(at(100, 380, 2000), floor, 4, 60, walls, 0).flight;
+		expect(Math.abs(fast.angle)).toBeGreaterThanOrEqual(90);
+		expect(fast.angle % 90).toBe(0);
+		// A slow shuffle only leans it and it ends up on its feet again.
+		expect(simulate(at(100, 380, 300), floor, 3, 60, walls, 0).flight.angle).toBe(0);
+	});
+
+	it('bounces off the side of the screen while sliding', () => {
+		const next = fall(at(1395, 380, 1200), 1 / 60, [box(380, 0, 1500)], walls, 0);
+		expect(next.flight.x).toBe(1400);
+		expect(next.flight.vx).toBeLessThan(0);
+		expect(next.ground).toBe(0);
 	});
 
 	it('slows down in the air and its spin dies away', () => {
@@ -302,9 +354,9 @@ describe('throwing the page buddy', () => {
 		expect(throwVelocity([{ x: 1, y: 1, t: 0 }])).toEqual({ x: 0, y: 0 });
 	});
 
-	it('lands on the highest surface it falls through in one step', () => {
+	it('hits the highest surface it falls through in one step', () => {
 		const next = fall(at(200, 300, 0, 600), 1 / 10, [box(340), box(320)], walls);
-		expect(next.landed).toBe(1);
+		expect(next.impact).toBe(true);
 		expect(next.flight.y).toBe(320);
 	});
 

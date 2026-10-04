@@ -84,6 +84,8 @@
 	/** The velocity the flight stretch follows, eased so a bounce squeezes it instead of flipping it. */
 	let streak: Point = { x: 0, y: 0 };
 	let flyFloor: Surface[] = [];
+	/** The surface a thrown buddy slides along before it comes to rest, or null in the air. */
+	let skid: Element | null = null;
 	let flyRefresh = 0;
 	let fastest = 0;
 	/**
@@ -282,6 +284,7 @@
 		surface = null;
 		dropView = null;
 		flight = { x, y, vx, vy, angle: rotation, spin };
+		skid = null;
 		streak = { x: vx, y: vy };
 		fastest = Math.hypot(vx, vy);
 		flyFloor = surfaces(FLOOR_MARGIN);
@@ -523,24 +526,29 @@
 			// buddy already above that line (let go up there, or the page scrolled) is never pulled
 			// down to it, only kept from rising further.
 			const ceiling = Math.min(v.top + v.inset + figure().height, flight.y);
+			// The surface it slides along stays underfoot even once the refresh no longer lists it.
+			const floor = [...flyFloor];
+			const skidBox = skid && !floor.some((s) => s.el === skid) ? boxOf(skid, o) : null;
+			if (skidBox) floor.push({ el: skid!, box: skidBox });
 			const next = fly(
 				flight,
 				dt,
 				// Live boxes: a surface sliding in would otherwise be caught where it was a moment ago.
-				flyFloor.map((s) => boxOf(s.el, o) ?? s.box),
-				{ left: size / 2, right: width - size / 2, top: ceiling }
+				floor.map((s) => boxOf(s.el, o) ?? s.box),
+				{ left: size / 2, right: width - size / 2, top: ceiling },
+				skid ? floor.findIndex((s) => s.el === skid) : -1
 			);
-			if (next.bounced) touchDown();
+			if (next.impact) touchDown();
+			skid = next.ground >= 0 ? floor[next.ground].el : null;
 			flight = next.flight;
 			fastest = Math.max(fastest, Math.hypot(flight.vx, flight.vy));
 			rotation = flight.angle;
 			x = flight.x;
 			y = flight.y;
 			if (next.landed >= 0) {
-				touchDown();
 				mood = fastest > 2600 ? 'grumpy' : fastest > 900 ? 'laughing' : 'surprised';
 				const tumble = unwind(rotation);
-				stand(flyFloor[next.landed].el, now);
+				stand(floor[next.landed].el, now);
 				// It lands with whatever tilt it had, without easing, then gets up from there: lying
 				// down for a while after a real tumble, straight away from a slight lean.
 				rotation = tumble;
@@ -572,7 +580,8 @@
 		streak.y += (aim.vy - streak.y) * ease;
 		shape = stretch(streak.x, streak.y, { x: 0, y: -figure().center });
 		const lying = size * 0.27 * Math.abs(Math.sin((rotation * Math.PI) / 180));
-		const target = mode === 'held' || mode === 'fly' ? 0 : lying;
+		// Sliding on its side it lies on the surface; only in the air does it turn around its center.
+		const target = mode === 'held' || (mode === 'fly' && !skid) ? 0 : lying;
 		lift = free ? lift + (target - lift) * (1 - Math.exp(-dt / 0.08)) : target;
 		if (mode !== 'held') pos = { x, y };
 	}
