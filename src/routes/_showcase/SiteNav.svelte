@@ -5,6 +5,9 @@
 	import { Mascot } from '$lib/index.js';
 	import { pinScheme, pinnedScheme } from './scheme.js';
 
+	// The studio pins its own stage to the top, so there the nav scrolls away with the page.
+	let { pinned = true }: { pinned?: boolean } = $props();
+
 	let scrolled = $state(false);
 
 	// Follows the system until the visitor picks a scheme, then stays pinned.
@@ -27,6 +30,7 @@
 		[home + '#moods', 'Moods']
 	] as const;
 	const onDocs = $derived(page.url.pathname === resolve('/docs'));
+	const onStudio = $derived(page.url.pathname === resolve('/studio'));
 
 	let menu = $state<HTMLElement>();
 	function toggleScheme() {
@@ -37,7 +41,7 @@
 
 <svelte:window onscroll={() => (scrolled = scrollY > 8)} />
 
-<nav class:scrolled>
+<nav class:scrolled class:pinned>
 	<a class="brand" href={resolve('/')} aria-label="mascbob home">
 		<Mascot size={28} hands={false} float={false} interactive={false} label="" />
 		<span>mascbob</span>
@@ -70,7 +74,11 @@
 				{/if}
 			</svg>
 		</button>
-		<a class="btn-primary nav-cta" href={home + '#playground'}>Studio</a>
+		<a
+			class="btn-primary nav-cta"
+			href={resolve('/studio')}
+			aria-current={onStudio ? 'page' : undefined}>Studio</a
+		>
 		<button class="menu-toggle" popovertarget="site-menu" aria-label="Menu">
 			<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
 				<path d="M4 8h16M4 16h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
@@ -98,8 +106,7 @@
 
 <style>
 	nav {
-		position: sticky;
-		top: 0;
+		position: relative;
 		z-index: 50;
 		display: grid;
 		grid-template-columns: 1fr auto 1fr;
@@ -107,6 +114,10 @@
 		max-width: 1200px;
 		margin: 0 auto;
 		padding: 0.8rem 1.5rem;
+	}
+	nav.pinned {
+		position: sticky;
+		top: 0;
 	}
 	nav::before {
 		content: '';

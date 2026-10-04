@@ -189,6 +189,69 @@ describe('Studio layout', () => {
 	});
 });
 
+describe('Studio page on a phone', () => {
+	it('pins the stage, docks the tabs at the bottom and lets the page scroll the controls', async () => {
+		await page.viewport(390, 844);
+		const { container } = render(Playground, { standalone: true });
+		const stage = container.querySelector<HTMLElement>('.stage')!;
+		const tabs = container.querySelector<HTMLElement>('.tabs')!;
+		const body = container.querySelector<HTMLElement>('.panel-body')!;
+		expect(getComputedStyle(stage).position).toBe('sticky');
+		expect(tabs.getBoundingClientRect().bottom).toBeCloseTo(innerHeight, 0);
+		expect(getComputedStyle(body).overflowY).toBe('visible');
+	});
+
+	it('resizes the preview from its grab bar', async () => {
+		await page.viewport(390, 844);
+		const { container } = render(Playground, { standalone: true });
+		const stage = container.querySelector<HTMLElement>('.stage')!;
+		const handle = page.getByRole('button', { name: /^Preview size/ });
+		await expect.element(handle).toHaveAccessibleName('Preview size: balanced');
+		const balanced = stage.offsetHeight;
+
+		handle
+			.element()
+			.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+		await expect.element(handle).toHaveAccessibleName('Preview size: big preview');
+		await expect.poll(() => stage.offsetHeight).toBeGreaterThan(balanced + 100);
+
+		const up = () => new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true });
+		handle.element().dispatchEvent(up());
+		handle.element().dispatchEvent(up());
+		await expect.element(handle).toHaveAccessibleName('Preview size: small preview, big controls');
+		await expect.poll(() => stage.offsetHeight).toBeLessThan(balanced);
+	});
+
+	it('shares links that open the studio page', async () => {
+		render(Playground, { standalone: true });
+		await page.getByRole('button', { name: 'Export', exact: true }).click();
+		await page.getByRole('button', { name: 'Share link', exact: true }).click();
+		const link = page.getByRole('textbox', { name: 'Share link' }).element() as HTMLInputElement;
+		expect(link.value).toMatch(/^https:\/\/example\.com\/studio(\?|$)/);
+	});
+
+	it('swaps the mood strip for a switcher with a sheet of faces', async () => {
+		await page.viewport(390, 844);
+		const { container } = render(Playground, { standalone: true });
+		const dock = container.querySelector<HTMLElement>('.dock')!;
+		expect(getComputedStyle(dock).display).toBe('none');
+		const current = page.getByRole('button', { name: /^Mood: / });
+		const start = current.element().getAttribute('aria-label')!;
+
+		await page.getByRole('button', { name: 'Next mood' }).click();
+		await expect.element(current).not.toHaveAccessibleName(start);
+		await page.getByRole('button', { name: 'Previous mood' }).click();
+		await expect.element(current).toHaveAccessibleName(start);
+
+		await current.click();
+		const sheet = container.querySelector<HTMLElement>('.mood-sheet')!;
+		expect(sheet.matches(':popover-open')).toBe(true);
+		await page.getByRole('button', { name: 'sleepy', exact: true }).click();
+		await expect.element(current).toHaveAccessibleName('Mood: sleepy. Choose a mood');
+		expect(sheet.matches(':popover-open')).toBe(false);
+	});
+});
+
 describe('Studio export', () => {
 	it('exports the mascot looking ahead, not at the pointer on the button', async () => {
 		const blobs: Blob[] = [];

@@ -31,6 +31,7 @@
 	} from '$lib/index.js';
 	import { onDestroy, onMount, tick } from 'svelte';
 	import { creatureGeometry, creatureViewTop } from '$lib/species.js';
+	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import Code, { type Token } from './Code.svelte';
 	import GearPicker from './GearPicker.svelte';
@@ -57,6 +58,10 @@
 		type Stage,
 		type StudioConfig
 	} from './studio.js';
+
+	// Standalone is the /studio page: on a phone the stage sticks to the top, the tabs sit at the
+	// bottom and the controls scroll with the page instead of inside a fixed card.
+	let { standalone = false }: { standalone?: boolean } = $props();
 
 	const themeNames = Object.keys(THEMES) as ThemeName[];
 	const reduced = new MediaQuery('(prefers-reduced-motion: reduce)');
@@ -169,8 +174,62 @@
 			? g.build.viewHeight - creatureViewTop(species, g.head, g.build, proportions)
 			: 200;
 		const room = compact.current ? figureHeight * 0.96 || 130 : 360;
-		return Math.min(1, room / ((size * h) / 200));
+		// A phone can pull the stage open, and then the mascot grows past its export size to fill it.
+		const cap = standalone && compact.current ? 2.4 : 1;
+		return Math.min(cap, room / ((size * h) / 200));
 	});
+
+	// The standalone stage on a phone snaps between three heights: big controls, balanced, big mascot.
+	const STAGE_SIZES = ['small', 'normal', 'large'] as const;
+	type StageSize = (typeof STAGE_SIZES)[number];
+	const STAGE_SHARE: Record<StageSize, number> = { small: 0.26, normal: 0.46, large: 0.74 };
+	let stageSize = $state<StageSize>('normal');
+	let dragHeight = $state<number | null>(null);
+	let drag: { y: number; height: number } | null = null;
+	function resizeStage(step: number) {
+		const i = STAGE_SIZES.indexOf(stageSize) + step;
+		stageSize = STAGE_SIZES[Math.min(STAGE_SIZES.length - 1, Math.max(0, i))];
+	}
+	function startResize(e: PointerEvent) {
+		if (!stageEl) return;
+		(e.currentTarget as Element).setPointerCapture(e.pointerId);
+		drag = { y: e.clientY, height: stageEl.offsetHeight };
+	}
+	function moveResize(e: PointerEvent) {
+		if (!drag) return;
+		const dy = e.clientY - drag.y;
+		if (dragHeight === null && Math.abs(dy) < 6) return;
+		const vh = innerHeight;
+		dragHeight = Math.min(
+			vh * STAGE_SHARE.large,
+			Math.max(vh * STAGE_SHARE.small, drag.height + dy)
+		);
+	}
+	function endResize() {
+		if (!drag) return;
+		drag = null;
+		if (dragHeight === null) {
+			// A tap toggles between balanced and a big mascot.
+			stageSize = stageSize === 'normal' ? 'large' : 'normal';
+			return;
+		}
+		const share = dragHeight / innerHeight;
+		stageSize = STAGE_SIZES.reduce((best, size) =>
+			Math.abs(STAGE_SHARE[size] - share) < Math.abs(STAGE_SHARE[best] - share) ? size : best
+		);
+		dragHeight = null;
+	}
+	function stepMood(step: number) {
+		mood = MOODS[(MOODS.indexOf(mood) + step + MOODS.length) % MOODS.length];
+	}
+	let moodSheet = $state<HTMLElement>();
+	// The sheet's tiles are live mascots, so they only exist while it is open.
+	let moodSheetOpen = $state(false);
+	const STAGE_SIZE_LABELS: Record<StageSize, string> = {
+		small: 'small preview, big controls',
+		normal: 'balanced',
+		large: 'big preview'
+	};
 
 	const config: StudioConfig = $derived({
 		species,
@@ -446,10 +505,17 @@
 	];
 	let panel = $state<Panel>('species');
 	let tabsEl = $state<HTMLElement>();
+	let stageEl = $state<HTMLElement>();
+	let panelEl = $state<HTMLElement>();
 	// Keeps the active tab visible when the tab strip overflows on a phone.
 	async function openPanel(id: Panel) {
 		panel = id;
 		await tick();
+		// A new tab starts at its top, right under the pinned stage, wherever the last one was scrolled.
+		if (standalone && compact.current && panelEl && stageEl) {
+			const top = panelEl.getBoundingClientRect().top + scrollY - stageEl.offsetHeight;
+			if (scrollY > top) scrollTo({ top });
+		}
 		const tab = document.getElementById(`${studioId}-${id}`);
 		if (tabsEl && tab)
 			tabsEl.scrollLeft = tab.offsetLeft - (tabsEl.clientWidth - tab.offsetWidth) / 2;
@@ -484,7 +550,7 @@
 	const tokens = $derived<Token[][]>(svelteTokens(config));
 	const shareUrl = $derived.by(() => {
 		const q = toQuery(config);
-		return `${page.url.origin}${page.url.pathname}${q ? `?${q}` : ''}#playground`;
+		return `${page.url.origin}${resolve('/studio')}${q ? `?${q}` : ''}`;
 	});
 
 	function svelteTokens(c: StudioConfig): Token[][] {
@@ -635,9 +701,12 @@
 	</div>
 {/snippet}
 
-<div class="playground card">
+<div class="playground card" class:standalone>
 	<div
-		class="stage"
+		class="stage {standalone ? stageSize : ''}"
+		class:dragging={dragHeight !== null}
+		style:height={dragHeight === null ? undefined : `${dragHeight}px`}
+		bind:this={stageEl}
 		style:background={backdrop.background}
 		style:color-scheme={backdrop.scheme}
 		style:--accent={colors.accent}
@@ -788,6 +857,96 @@
 				>
 			{/each}
 		</div>
+
+		{#if standalone}
+			<div class="mood-switch" role="group" aria-label="Mood switcher">
+				<button class="step" aria-label="Previous mood" onclick={() => stepMood(-1)}>
+					<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+						<path
+							d="M14.5 6l-6 6 6 6"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2.2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						/>
+					</svg>
+				</button>
+				<button
+					class="current"
+					popovertarget="{studioId}-moods"
+					aria-label="Mood: {mood}. Choose a mood"
+				>
+					<small>Mood</small>
+					<strong>{mood}</strong>
+					<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+						<path
+							d="M7 10l5 5 5-5"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2.2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						/>
+					</svg>
+				</button>
+				<button class="step" aria-label="Next mood" onclick={() => stepMood(1)}>
+					<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+						<path
+							d="M9.5 6l6 6-6 6"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2.2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						/>
+					</svg>
+				</button>
+			</div>
+			<div
+				id="{studioId}-moods"
+				class="mood-sheet"
+				popover
+				aria-label="Moods"
+				bind:this={moodSheet}
+				ontoggle={(e) => (moodSheetOpen = e.newState === 'open')}
+			>
+				<div class="sheet-head">
+					<strong>Mood</strong>
+					<button class="reset" onclick={() => moodSheet?.hidePopover()}>Done</button>
+				</div>
+				{#if moodSheetOpen}
+					<GearPicker
+						items={MOODS}
+						crop={gearCrop('face', species, shape, proportions)}
+						isOn={(m) => mood === m}
+						pick={(m) => {
+							mood = m;
+							moodSheet?.hidePopover();
+						}}
+						look={(m) => ({ ...look, mood: m, hands: false, accessories: [] })}
+					/>
+				{/if}
+			</div>
+			<button
+				class="handle"
+				aria-label="Preview size: {STAGE_SIZE_LABELS[stageSize]}"
+				title="Drag to resize the preview"
+				onpointerdown={startResize}
+				onpointermove={moveResize}
+				onpointerup={endResize}
+				onpointercancel={endResize}
+				onkeydown={(e) => {
+					if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+					e.preventDefault();
+					resizeStage(e.key === 'ArrowDown' ? 1 : -1);
+				}}
+				onclick={(e) => {
+					// Pointer taps are handled on release; only keyboard activation lands here.
+					if (e.detail === 0) stageSize = stageSize === 'normal' ? 'large' : 'normal';
+				}}
+			></button>
+		{/if}
 	</div>
 
 	<div class="panel">
@@ -808,6 +967,7 @@
 
 		<div
 			class="panel-body"
+			bind:this={panelEl}
 			role="tabpanel"
 			id="{studioId}-panel"
 			aria-labelledby="{studioId}-{panel}"
@@ -2107,6 +2267,200 @@
 			line-height: 1.5;
 		}
 	}
+	/* Phone-only controls of the standalone stage. */
+	.mood-switch,
+	.handle {
+		display: none;
+	}
+	@media (min-width: 901px) {
+		.standalone {
+			height: clamp(700px, calc(100svh - 6rem), 860px);
+		}
+	}
+	@media (max-width: 900px) {
+		.standalone {
+			display: block;
+			height: auto;
+			overflow: visible;
+			border-radius: 0;
+			background: none;
+		}
+		.standalone .stage {
+			position: sticky;
+			top: 0;
+			z-index: 5;
+			height: max(280px, 46svh);
+			border-radius: 0 0 28px 28px;
+			padding: 0.75rem 1rem 1.6rem;
+			transition:
+				background 0.6s,
+				height 0.35s var(--out);
+		}
+		/* The counter sits quietly in the bottom edge, next to the grab bar, never over the mascot. */
+		.standalone .boops {
+			top: auto;
+			bottom: 0.2rem;
+			left: 1.25rem;
+			z-index: 1;
+			font-size: 0.72rem;
+			white-space: nowrap;
+		}
+		.standalone .boops .companion-name {
+			margin-right: 0.15rem;
+		}
+		/* Seventeen moods don't fit a phone's width; the switcher and its sheet replace the strip. */
+		.standalone .dock {
+			display: none;
+		}
+		.standalone .mood-switch {
+			display: flex;
+		}
+		.standalone .stage.small {
+			height: max(220px, 26svh);
+		}
+		.standalone .stage.large {
+			height: 74svh;
+		}
+		.standalone .stage.dragging {
+			transition: background 0.6s;
+		}
+		.mood-switch {
+			justify-self: center;
+			align-items: center;
+			gap: 0.25rem;
+			padding: 0.25rem;
+			border-radius: 999px;
+			background: color-mix(in srgb, var(--raised) 80%, transparent);
+			box-shadow: 0 6px 24px -10px rgb(0 0 0 / 0.3);
+		}
+		.mood-switch button {
+			display: inline-flex;
+			align-items: center;
+			border: 0;
+			background: none;
+			color: var(--text-1);
+			font: inherit;
+			cursor: pointer;
+		}
+		.mood-switch .step {
+			justify-content: center;
+			width: 2.6rem;
+			height: 2.6rem;
+			border-radius: 50%;
+			transition:
+				background 0.15s,
+				transform 0.2s var(--spring);
+		}
+		.mood-switch .step:active {
+			background: var(--surface);
+			transform: scale(0.9);
+		}
+		.mood-switch .current {
+			gap: 0.4rem;
+			min-width: 9rem;
+			justify-content: center;
+			height: 2.6rem;
+			padding: 0 1rem;
+			border-radius: 999px;
+			background: var(--text-1);
+			color: var(--on-ink);
+		}
+		.mood-switch .current small {
+			font-size: 0.72rem;
+			font-weight: 500;
+			opacity: 0.6;
+		}
+		.mood-switch .current strong {
+			font-size: 0.95rem;
+			font-weight: 650;
+		}
+		/* A bottom sheet over the controls, so picking a mood never hides the mascot it changes. */
+		.mood-sheet {
+			inset: auto 0 0;
+			width: auto;
+			max-height: 56svh;
+			margin: 0;
+			padding: 0.5rem 1rem calc(1.25rem + env(safe-area-inset-bottom));
+			border: 0;
+			border-top: 1px solid var(--line);
+			border-radius: 24px 24px 0 0;
+			background: var(--bg);
+			color: var(--text-1);
+			box-shadow: 0 -18px 40px rgb(0 0 0 / 0.25);
+			overflow-y: auto;
+			overscroll-behavior: contain;
+		}
+		.mood-sheet::backdrop {
+			background: rgb(0 0 0 / 0.15);
+		}
+		.sheet-head {
+			position: sticky;
+			top: -0.5rem;
+			z-index: 1;
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			margin: -0.5rem -1rem 0.5rem;
+			padding: 0.9rem 1rem 0.6rem;
+			background: var(--bg);
+		}
+		/* A grab bar on the stage's bottom edge, like a sheet: drag it, or tap for a big mascot. */
+		.standalone .handle {
+			display: grid;
+			place-items: center;
+			position: absolute;
+			left: 50%;
+			bottom: 0;
+			translate: -50% 0;
+			width: 4.5rem;
+			height: 1.5rem;
+			padding: 0;
+			border: 0;
+			background: none;
+			cursor: ns-resize;
+			touch-action: none;
+		}
+		.standalone .handle::before {
+			content: '';
+			width: 2.6rem;
+			height: 5px;
+			border-radius: 999px;
+			background: color-mix(in srgb, var(--text-1) 35%, transparent);
+			transition: background 0.15s;
+		}
+		.standalone .handle:hover::before,
+		.standalone .stage.dragging .handle::before {
+			background: var(--text-1);
+		}
+		.standalone .panel {
+			display: block;
+		}
+		/* A bottom tab bar, like an app: always in thumb reach and never scrolled away. */
+		.standalone .tabs {
+			position: fixed;
+			inset: auto 0 0;
+			z-index: 40;
+			padding: 0 0.25rem env(safe-area-inset-bottom);
+			border-top: 1px solid var(--line);
+			border-bottom: 0;
+			background: var(--nav-bg);
+			backdrop-filter: blur(14px) saturate(180%);
+			-webkit-backdrop-filter: blur(14px) saturate(180%);
+		}
+		.standalone .tabs button {
+			padding: 0.95rem 0.2rem 1.05rem;
+			font-size: 0.8rem;
+		}
+		.standalone .tabs button.active::after {
+			top: -1px;
+			bottom: auto;
+		}
+		.standalone .panel-body {
+			overflow: visible;
+			gap: 1.1rem;
+			padding: 1.1rem 1rem calc(5.5rem + env(safe-area-inset-bottom));
+		}
+	}
 	@media (max-width: 520px) {
 		/* Icon-only dice, so the stage bar fits a phone next to the mode switch. */
 		.pill span {
@@ -2130,6 +2484,9 @@
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {
+		.standalone .stage {
+			transition: none;
+		}
 		.boops .pop,
 		.reaction {
 			animation: none;

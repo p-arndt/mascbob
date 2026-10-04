@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
 	import { fly, scale } from 'svelte/transition';
 	import { backOut, cubicOut } from 'svelte/easing';
@@ -155,7 +156,7 @@
 			lip-syncs to your voice.
 		</p>
 		<div class="actions">
-			<a class="btn-primary" href="#playground">Open the studio</a>
+			<a class="btn-primary" href={resolve('/studio')}>Open the studio</a>
 			<button class="install" onclick={copyInstall} aria-label="Copy install command">
 				<code>pnpm add mascbob</code>
 				<span>{installCopied ? 'Copied' : 'Copy'}</span>

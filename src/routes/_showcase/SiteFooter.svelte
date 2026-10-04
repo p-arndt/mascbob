@@ -11,8 +11,7 @@
 	<nav aria-label="Footer">
 		<a href={resolve('/')}>Home</a>
 		<a href={resolve('/docs')}>Docs</a>
-		<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- resolve() takes no fragment -->
-		<a href={resolve('/') + '#playground'}>Studio</a>
+		<a href={resolve('/studio')}>Studio</a>
 	</nav>
 </footer>
 
