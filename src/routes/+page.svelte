@@ -15,11 +15,11 @@
 	import Code, { plain, type Token } from './_showcase/Code.svelte';
 	import Galleries from './_showcase/Galleries.svelte';
 	import Hero from './_showcase/Hero.svelte';
-	import Playground from './_showcase/Playground.svelte';
 	import TalkDemo from './_showcase/TalkDemo.svelte';
 	import { copyText, reveal } from './_showcase/interactions.js';
 	import SiteFooter from './_showcase/SiteFooter.svelte';
 	import SiteNav from './_showcase/SiteNav.svelte';
+	import { CREATURE_PRESETS, STUDIO_START, themeProp } from './_showcase/studio.js';
 	import TabIcon from './_showcase/TabIcon.svelte';
 
 	const themeNames = Object.keys(THEMES) as ThemeName[];
@@ -36,6 +36,26 @@
 	});
 
 	let swatch = $state<ThemeName>('lilac');
+
+	// The studio teaser lines up every species in its starting look, bob front and center.
+	const ENSEMBLE_MOODS: Mood[] = ['waving', 'happy', 'love', 'curious', 'laughing', 'wink'];
+	const ensemble = CREATURE_PRESETS.map((preset, i) => ({
+		...preset,
+		mood: ENSEMBLE_MOODS[i],
+		theme: themeProp({ ...STUDIO_START, ...preset })
+	}));
+	const lineup = [ensemble[3], ensemble[1], ensemble[0], ensemble[2], ensemble[5], ensemble[4]];
+	const studioSteps = [
+		['Pick a species', 'Bob, Critterbob, Mossbob, Wispbob, Octobob or Snailbob.'],
+		['Dress it up', `${themeNames.length} colorways, outfits, shoes and accessories.`],
+		['Give it a mood', `${MOODS.length} moods and pointer reactions, tried live.`],
+		['Take it home', 'Svelte code, SVG, PNG, GIF or a share link.']
+	] as const;
+
+	// Share links used to open the studio embedded here; it has its own page now.
+	onMount(() => {
+		if (location.search) location.replace(resolve('/studio') + location.search);
+	});
 
 	const more = [
 		{
@@ -140,6 +160,50 @@
 	</div>
 
 	<main>
+		<section id="playground" class="section">
+			<div class="section-head" {@attach reveal()}>
+				<h2>Build your own in seconds.</h2>
+				<p>
+					Tweak looks and reactions, then take it home as Svelte code, SVG, PNG or a share link.
+				</p>
+			</div>
+			<a
+				class="studio-teaser"
+				href={resolve('/studio')}
+				style:--tint={tint('og')}
+				{@attach reveal(100)}
+			>
+				<div class="ensemble" aria-hidden="true">
+					{#each lineup as c (c.species)}
+						<div class="member" class:lead={c.species === 'bob'}>
+							<Mascot
+								species={c.species}
+								mood={c.mood}
+								theme={c.theme}
+								eyes={c.eyes}
+								accessories={[...c.accessories]}
+								proportions={c.proportions}
+								outfit={c.outfit}
+								shoes={c.shoes}
+								size="100%"
+								lookAt="none"
+								interactive={false}
+								label=""
+							/>
+						</div>
+					{/each}
+				</div>
+				<div class="teaser-copy">
+					<ol>
+						{#each studioSteps as [title, text] (title)}
+							<li><strong>{title}</strong> {text}</li>
+						{/each}
+					</ol>
+					<span class="btn-primary">Open the studio →</span>
+				</div>
+			</a>
+		</section>
+
 		<section id="features" class="section">
 			<div class="section-head" {@attach reveal()}>
 				<h2>Small component. Big personality.</h2>
@@ -231,18 +295,6 @@
 			</div>
 		</section>
 
-		<section id="playground" class="section">
-			<div class="section-head" {@attach reveal()}>
-				<h2>Build your own in seconds.</h2>
-				<p>
-					Tweak looks and reactions, then take it home as Svelte code, SVG, PNG or a share link.
-				</p>
-			</div>
-			<div {@attach reveal(100)}>
-				<Playground />
-			</div>
-		</section>
-
 		<section id="talk" {@attach reveal()}>
 			<TalkDemo />
 		</section>
@@ -258,7 +310,7 @@
 				</p>
 				<div class="usage-actions">
 					<a class="btn-primary" href={resolve('/docs')}>Read the docs</a>
-					<a class="btn-ghost" href="#playground">Design one in the studio</a>
+					<a class="btn-ghost" href={resolve('/studio')}>Design one in the studio</a>
 				</div>
 			</div>
 			<div class="window">
@@ -284,6 +336,76 @@
 		display: grid;
 		grid-template-columns: minmax(0, 1fr);
 		gap: clamp(6rem, 12vw, 10rem);
+	}
+
+	.studio-teaser {
+		display: grid;
+		grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+		align-items: center;
+		gap: 2rem;
+		padding: 2.5rem 3rem;
+		border-radius: 32px;
+		background: var(--tint);
+		color: var(--text-1);
+		text-decoration: none;
+		transition: transform 0.35s var(--spring);
+	}
+	.studio-teaser:hover {
+		transform: translateY(-3px);
+	}
+	.studio-teaser:hover .btn-primary {
+		background: var(--ink-hover);
+	}
+	/* Every species stands on one floor line, bob a size up in the middle. */
+	.ensemble {
+		display: flex;
+		align-items: flex-end;
+		justify-content: center;
+	}
+	.member {
+		flex: 0 1 15%;
+		margin-inline: -1.2%;
+	}
+	.member.lead {
+		flex-basis: 24%;
+		z-index: 1;
+	}
+	.teaser-copy {
+		display: grid;
+		justify-items: start;
+		gap: 1.75rem;
+	}
+	.teaser-copy ol {
+		display: grid;
+		gap: 0.9rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		counter-reset: step;
+	}
+	.teaser-copy li {
+		display: grid;
+		grid-template-columns: 1.9rem minmax(0, 1fr);
+		column-gap: 0.75rem;
+		color: var(--text-2);
+		line-height: 1.45;
+		counter-increment: step;
+	}
+	.teaser-copy li::before {
+		content: counter(step);
+		grid-row: span 2;
+		display: grid;
+		place-items: center;
+		width: 1.9rem;
+		height: 1.9rem;
+		border-radius: 50%;
+		background: color-mix(in srgb, var(--raised) 80%, transparent);
+		color: var(--text-1);
+		font-size: 0.85rem;
+		font-weight: 700;
+	}
+	.teaser-copy li strong {
+		color: var(--text-1);
 	}
 
 	.showcase {
@@ -462,6 +584,17 @@
 		.more,
 		.usage {
 			grid-template-columns: minmax(0, 1fr);
+		}
+	}
+	@media (max-width: 900px) {
+		.studio-teaser {
+			grid-template-columns: minmax(0, 1fr);
+			gap: 1.75rem;
+			padding: 1.75rem 1.25rem 1.5rem;
+		}
+		.teaser-copy .btn-primary {
+			justify-self: stretch;
+			text-align: center;
 		}
 	}
 	@media (max-width: 640px) {
