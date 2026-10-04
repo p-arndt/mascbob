@@ -26,7 +26,7 @@
 	} = $props();
 </script>
 
-<div class="tiles">
+<div class="tiles" class:dense={items.length > 12} class:roomy={items.length <= 8}>
 	{#each items as item (item)}
 		{@const c = typeof crop === 'function' ? crop(item) : crop}
 		<button
@@ -36,12 +36,12 @@
 			{disabled}
 			onclick={() => pick(item)}
 		>
-			<span class="frame" aria-hidden="true">
+			<span class="frame" style:aspect-ratio={c.aspect} aria-hidden="true">
 				<span
 					class="crop"
 					style:width="{c.width * 100}%"
 					style:left="{c.left * 100}%"
-					style:top="{c.top * 100}%"
+					style:margin-top="{(c.top - 0.5) * 100}%"
 				>
 					<Mascot
 						{...look(item)}
@@ -101,8 +101,11 @@
 		border-radius: 8px;
 		background: color-mix(in srgb, var(--text-1) 4%, transparent);
 	}
+	/* Crops are fractions of a square as wide as the frame; a width-relative margin from the middle
+	   keeps them centered when a wide frame trims the top and bottom. */
 	.crop {
 		position: absolute;
+		top: 50%;
 		display: block;
 		pointer-events: none;
 	}
@@ -119,18 +122,46 @@
 	}
 	@media (max-width: 520px) {
 		.tiles {
+			grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+			gap: 6px;
+		}
+		.tiles.roomy {
+			grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+		}
+		/* Long lists stay small so the whole set fits the phone panel without scrolling. */
+		.tiles.dense {
 			grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
 			gap: 5px;
 		}
 		.tile {
+			padding: 4px 4px 6px;
+		}
+		.dense .tile {
 			padding: 4px 2px 6px;
 		}
-		.frame {
+		.dense .frame {
 			aspect-ratio: 1.15;
 		}
-		.name {
+		.dense .name {
 			font-size: 10px;
 			letter-spacing: -0.01em;
+		}
+	}
+	/* The standalone studio scrolls with the page instead of fitting a fixed panel, so tiles can be big. */
+	@media (max-width: 900px) {
+		:global(.standalone) .tiles {
+			grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+			gap: 8px;
+		}
+		:global(.standalone) .tile {
+			padding: 6px 6px 8px;
+		}
+		:global(.standalone) .dense .frame {
+			aspect-ratio: 1;
+		}
+		:global(.standalone) .name {
+			font-size: 12px;
+			letter-spacing: normal;
 		}
 	}
 </style>

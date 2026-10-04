@@ -6,13 +6,15 @@ export type GearSlot = 'head' | 'face' | 'outfit' | 'shoes' | 'hand';
 
 /**
  * A square window onto the figure: `width`, `left` and `top` are fractions of the tile's side.
- * `body` says whether the preview renders the full figure or just the head.
+ * `body` says whether the preview renders the full figure or just the head. `aspect` asks for a
+ * frame wider than tall, trimming the window's top and bottom evenly.
  */
 export interface GearCrop {
 	body: boolean;
 	width: number;
 	left: number;
 	top: number;
+	aspect?: number;
 }
 
 const UNIFIED: readonly Species[] = ['moss', 'wisp', 'octo', 'snail'];
@@ -46,7 +48,11 @@ export function gearCrop(
 		if (species === 'snail') return { body: true, ...frame(viewTop, viewTop - (200 - h) / 2, 200) };
 		return { body: true, ...frame(viewTop, viewTop, h * 0.8) };
 	}
-	if (slot === 'shoes') return { body: true, ...frame(viewTop, build.groundY - 54, 72) };
+	if (slot === 'shoes') {
+		// Wide enough for the longest toe (boots) on both feet; centered on the tallest collar (skates).
+		const side = 2 * (build.legX + 34 * build.footScale) + 12;
+		return { body: true, aspect: 1.4, ...frame(viewTop, build.groundY - 31 - side / 2, side) };
+	}
 	if (slot === 'hand') {
 		// Items sit in the hand on the viewer's right and stick up past the shoulder.
 		const side = build.hipY - build.torsoTop + 70;

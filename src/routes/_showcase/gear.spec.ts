@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import { FOOT_COLLAR } from '$lib/parts/body.js';
+import { creatureGeometry, creatureViewTop } from '$lib/species.js';
 import { gearCrop, gearLabel } from './gear.js';
 
 /** The visible window in viewBox units, from a crop's tile fractions. */
 function window(c: ReturnType<typeof gearCrop>, viewTop = 0) {
 	const side = 200 / c.width;
-	return { x: -c.left * side, y: viewTop - c.top * side, side };
+	const height = side / (c.aspect ?? 1);
+	return { x: -c.left * side, y: viewTop - c.top * side + (side - height) / 2, side, height };
 }
 
 describe('gear preview crops', () => {
@@ -35,8 +38,21 @@ describe('gear preview crops', () => {
 	it('zooms on the feet, following longer legs down', () => {
 		const shoes = window(gearCrop('shoes', 'bob', 'capsule'));
 		const longLegs = window(gearCrop('shoes', 'bob', 'capsule', { legs: 1.8 }));
-		expect(shoes.side).toBeLessThan(100);
+		expect(shoes.side).toBeLessThan(150);
 		expect(longLegs.y).toBeGreaterThan(shoes.y);
+	});
+
+	it('fits both boots and the tallest skate collar into the shoes window', () => {
+		for (const species of ['bob', 'critter'] as const) {
+			const { head, build } = creatureGeometry(species, 'capsule', undefined, {}, true);
+			const viewTop = creatureViewTop(species, head, build);
+			const w = window(gearCrop('shoes', species, 'capsule'), viewTop);
+			const toe = build.legX + 33.5 * build.footScale;
+			expect(w.x).toBeLessThan(100 - toe);
+			expect(w.x + w.side).toBeGreaterThan(100 + toe);
+			expect(w.y).toBeLessThan(build.groundY - FOOT_COLLAR.skates * build.footScale);
+			expect(w.y + w.height).toBeGreaterThan(build.groundY);
+		}
 	});
 
 	it('leans the held-item window toward the holding hand', () => {
