@@ -18,6 +18,7 @@
 	import CodeBlock from '../_showcase/CodeBlock.svelte';
 	import SiteFooter from '../_showcase/SiteFooter.svelte';
 	import SiteNav from '../_showcase/SiteNav.svelte';
+	import TabIcon from '../_showcase/TabIcon.svelte';
 	import { CSS_VARS, EXAMPLES, PROPS, REACTION_DOCS } from '../_showcase/docs.js';
 	import { copyText } from '../_showcase/interactions.js';
 
@@ -142,6 +143,8 @@
 		{/each}
 	</div>
 {/snippet}
+
+<TabIcon />
 
 <div class="site">
 	<SiteNav />

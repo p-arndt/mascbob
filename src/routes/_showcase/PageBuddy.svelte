@@ -2,6 +2,8 @@
 	import { onMount } from 'svelte';
 	import { MediaQuery } from 'svelte/reactivity';
 	import { DEFAULT_REACTIONS, Mascot, type Mood } from '$lib/index.js';
+	import { savedDesign } from './design.js';
+	import { themeProp, type StudioConfig } from './studio.js';
 	import {
 		absence,
 		approach,
@@ -684,8 +686,27 @@
 		}, 250);
 	}
 
+	// The visitor's own studio design lives on the page instead of the stock bob, once there is one.
+	let design = $state<StudioConfig | null>(null);
+	const dressed = $derived(
+		design
+			? {
+					species: design.species,
+					proportions: design.proportions,
+					theme: themeProp(design),
+					shape: design.shape,
+					eyes: design.eyes,
+					accessories: design.accessories,
+					outfit: design.outfit,
+					shoes: design.shoes,
+					heldItem: design.heldItem
+				}
+			: {}
+	);
+
 	onMount(() => {
 		if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+		design = savedDesign();
 		enabled = true;
 		const onScroll = () => (lastScroll = performance.now());
 		addEventListener('scroll', onScroll, { passive: true });
@@ -728,6 +749,7 @@
 				style:translate="0 {lift}px"
 			>
 				<Mascot
+					{...dressed}
 					{mood}
 					{size}
 					{reactions}

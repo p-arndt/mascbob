@@ -39,6 +39,7 @@
 	import { download, snapshotSvg, svgToPng } from './exporter.js';
 	import { CLIP_FORMATS, renderClip, type ClipFormat } from './clip.js';
 	import { showInTab } from './favicon.svelte.js';
+	import { saveDesign, savedDesign } from './design.js';
 	import { copyText, pick } from './interactions.js';
 	import {
 		COLOR_KEYS,
@@ -283,11 +284,20 @@
 		designed = true;
 	});
 
-	// A share link restores its configuration into the studio.
+	// Every change is kept, so the design follows the visitor around the site and to the next visit.
+	let restored = false;
+	$effect(() => {
+		const snapshot = $state.snapshot(config);
+		if (restored) saveDesign(snapshot);
+		restored = true;
+	});
+
+	// A share link restores its configuration into the studio, otherwise the last saved design does.
 	onMount(() => {
-		const q = new URLSearchParams(location.search);
-		if (![...q.keys()].length) return;
-		const c = fromQuery(q);
+		// Only a query that describes a mascot is a share link; a stray tracking parameter is not.
+		const shared = fromQuery(new URLSearchParams(location.search));
+		const c = toQuery(shared) ? shared : savedDesign();
+		if (!c) return;
 		({
 			species,
 			proportions,

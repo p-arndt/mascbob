@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
 import Playground from './Playground.svelte';
@@ -9,6 +9,23 @@ async function openProportions() {
 	await page.getByRole('tab', { name: 'Body', exact: true }).click();
 	await page.getByRole('button', { name: 'Proportions', exact: true }).click();
 }
+
+// Every studio change is saved; a design left over from one test must not leak into the next.
+beforeEach(() => localStorage.clear());
+
+describe('Studio design memory', () => {
+	it('reopens with the last design after a reload', async () => {
+		const first = render(Playground);
+		await page.getByRole('button', { name: 'Use Octobob preset' }).click();
+		await expect.poll(() => localStorage.getItem('mascbob-design')).toContain('species=octo');
+		first.unmount();
+
+		render(Playground);
+		await expect
+			.element(page.getByRole('button', { name: 'Use Octobob preset' }))
+			.toHaveAttribute('aria-pressed', 'true');
+	});
+});
 
 describe('Studio controls', () => {
 	it('offers Snailbob with anatomy-specific controls', async () => {

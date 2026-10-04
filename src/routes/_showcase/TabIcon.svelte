@@ -1,13 +1,21 @@
 <script lang="ts">
 	import { Mascot } from '$lib/index.js';
 	import { snapshotSvg } from './exporter.js';
-	import { favicon } from './favicon.svelte.js';
+	import { onMount } from 'svelte';
+	import { savedDesign, tabLook } from './design.js';
+	import { favicon, showInTab } from './favicon.svelte.js';
 
 	// Crops the 200×200 head the same way as static/favicon.svg.
 	const VIEWBOX = '26 30 148 148';
 	const SIZE = 64;
 
 	let host = $state<HTMLElement>();
+
+	// A mascot designed in the studio stays in the tab on every page, also after a reload.
+	onMount(() => {
+		const design = savedDesign();
+		if (design) showInTab(tabLook(design), 'studio');
+	});
 
 	$effect(() => {
 		const link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
