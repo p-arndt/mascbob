@@ -1,1 +1,1 @@
-The `outfit="hoodie"` hood now lies down behind the neck, and the head comes out of a rounded neckline instead of sitting in front of a tall hood.
+The `outfit="hoodie"` hood now lies down behind the neck, and the head comes out of a rounded neckline instead of sitting in front of a tall hood. A pulled head stretches its neck out of that neckline.

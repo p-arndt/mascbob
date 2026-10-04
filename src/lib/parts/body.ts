@@ -40,6 +40,10 @@ export const HIP_Y = 214;
 /** Collar band that hides the seam between head and torso. */
 export const COLLAR_Y = 142;
 export const COLLAR_H = 30;
+/** How far the hoodie's neckline dips below the collar line in the middle. */
+export const NECKLINE_DIP = 32;
+/** Where a pulled neck goes into the hoodie: the middle of its neckline. */
+export const HOODIE_NECK_Y = COLLAR_Y + 8 + (NECKLINE_DIP - 8) / 2;
 export const SHOULDER_Y = 184;
 export const UPPER_ARM = 17;
 export const FOREARM = 15;

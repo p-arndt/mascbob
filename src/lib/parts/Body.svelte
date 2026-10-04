@@ -17,6 +17,7 @@
 	import {
 		COLLAR_H,
 		COLLAR_Y,
+		NECKLINE_DIP,
 		HIP_Y,
 		bodyPose,
 		coreBeat,
@@ -167,9 +168,9 @@
 	const headHw = $derived(m.shape.halfWidth * b.headScale);
 	// Small torsos (chibi) keep the collar close so it reads as a collar, not a ruff.
 	const collarHw = $derived(Math.min(headHw, 56, hw + 15) + 7);
-	const HOOD_H = 36;
+	const HOOD_H = 26;
 	const neckline = $derived(
-		`M${100 - collarHw + 4} ${COLLAR_Y + 8}Q100 ${COLLAR_Y + 32} ${100 + collarHw - 4} ${COLLAR_Y + 8}`
+		`M${100 - collarHw + 4} ${COLLAR_Y + 8}Q100 ${COLLAR_Y + NECKLINE_DIP} ${100 + collarHw - 4} ${COLLAR_Y + 8}`
 	);
 	const shoulder = $derived(shoulderX(hw, b));
 	const outfit = $derived(m.outfit);
@@ -642,7 +643,7 @@
 		<rect
 			class="hood"
 			x={100 - collarHw}
-			y={COLLAR_Y - HOOD_H / 2}
+			y={COLLAR_Y + 2 - HOOD_H / 2}
 			width={collarHw * 2}
 			height={HOOD_H}
 			rx={HOOD_H / 2}
@@ -817,6 +818,7 @@
 				1.5}Q{100 - collarHw + 2} {COLLAR_Y + 24} {100 - collarHw + 4} {COLLAR_Y + 8}Z"
 		/>
 		<path class="rib" d={neckline} />
+		<path class="rib shade" d={neckline} />
 		<path
 			class="string"
 			d="M{100 - 6 * u} {COLLAR_Y + 20}V{COLLAR_Y + 44}M{100 + 6 * u} {COLLAR_Y + 20}V{COLLAR_Y +
@@ -1148,7 +1150,10 @@
 		stroke: var(--c-accent);
 		stroke-width: 4.5;
 		stroke-linecap: round;
-		filter: brightness(0.85);
+	}
+	.rib.shade {
+		stroke: var(--c-visor);
+		opacity: 0.15;
 	}
 	.string {
 		fill: none;

@@ -15,7 +15,7 @@
 	import Creature from './parts/Creature.svelte';
 	import Accessories from './parts/Accessories.svelte';
 	import Body from './parts/Body.svelte';
-	import { torsoHalfWidth, type Build } from './parts/body.js';
+	import { HOODIE_NECK_Y, torsoHalfWidth, type Build } from './parts/body.js';
 	import Effects from './parts/Effects.svelte';
 	import Face from './parts/Face.svelte';
 	import Hands from './parts/Hands.svelte';
@@ -876,12 +876,16 @@
 	const neckWidth = $derived(Math.min(hw * 0.6, 32) / Math.sqrt(1 + neckOut / 60));
 	// The torso follows a pulled head a little, like a neck tugging at its shoulders.
 	const torsoTurn = $derived(headTurn.current * 0.22 + pullTurn * 0.5 * grabFeel.lean);
-	// The neck grows out of the turned torso, so its root turns with it.
-	const neckRoot = $derived.by(() => {
+	// The neck grows out of the turned torso, so points on it turn with it.
+	function onTorso(y: number) {
 		const a = (torsoTurn * Math.PI) / 180;
-		const d = fig.hipY - (fig.torsoTop + 14);
+		const d = fig.hipY - y;
 		return { x: 100 + d * Math.sin(a), y: fig.hipY - d * Math.cos(a) };
-	});
+	}
+	// A hoodie's neck goes into its neck hole, rooted below the neckline so the yoke hides its end.
+	const neckHoleY = $derived(outfit === 'hoodie' ? HOODIE_NECK_Y : null);
+	const neckRoot = $derived(onTorso(neckHoleY === null ? fig.torsoTop + 14 : neckHoleY + 4));
+	const neckHole = $derived(neckHoleY === null ? null : onTorso(neckHoleY - 3));
 	// In full-body mode the legs take some of the squash so the head doesn't sink into the torso.
 	const figureSquash = $derived(
 		body
@@ -1078,24 +1082,41 @@
 								bend.current.angle} {tiltPivot}) translate(100 {bendY}) scale({1 /
 								Math.sqrt(bend.current.stretch)} {bend.current.stretch}) translate(-100 {-bendY})"
 						>
+							{#snippet neck()}
+								{#if body && !unified && neckOut > 0.5}
+									{#if neckHole}
+										<ellipse
+											class="neck-hole"
+											cx={neckHole.x}
+											cy={neckHole.y}
+											rx={neckWidth / 2 + 7}
+											ry="6"
+										/>
+									{/if}
+									<path
+										class="neck-edge"
+										d="M{neckRoot.x} {neckRoot.y}L{neckTop.x} {neckTop.y}"
+										stroke-width={neckWidth + 1.6}
+									/>
+									<path
+										class="neck"
+										d="M{neckRoot.x} {neckRoot.y}L{neckTop.x} {neckTop.y}"
+										stroke-width={neckWidth}
+									/>
+								{/if}
+							{/snippet}
 							<!-- Behind the torso, so the neck rises out of the shoulders instead of lying on the chest. -->
-							{#if body && !unified && neckOut > 0.5}
-								<path
-									class="neck-edge"
-									d="M{neckRoot.x} {neckRoot.y}L{neckTop.x} {neckTop.y}"
-									stroke-width={neckWidth + 1.6}
-								/>
-								<path
-									class="neck"
-									d="M{neckRoot.x} {neckRoot.y}L{neckTop.x} {neckTop.y}"
-									stroke-width={neckWidth}
-								/>
+							{#if !neckHole}
+								{@render neck()}
 							{/if}
 							{#if body && !unified}
 								<!-- The torso turns a little with the head so no torso corner peeks out behind it. -->
 								<g transform="rotate({torsoTurn} 100 {fig.hipY})">
 									<Body layer="back" />
 								</g>
+							{/if}
+							{#if neckHole}
+								{@render neck()}
 							{/if}
 							<!-- A pulled head moves as a whole on its neck and only tilts and squashes a little,
 							     so the face never skews. -->
@@ -1253,6 +1274,10 @@
 	.neck-edge {
 		stroke: var(--c-visor);
 		opacity: 0.14;
+	}
+	.neck-hole {
+		fill: var(--c-visor);
+		opacity: 0.5;
 	}
 	.grabbable {
 		cursor: grab;

@@ -44,7 +44,7 @@ it.each(['left', 'right'])(
 	}
 );
 
-function setup(reactions?: ReactionsInput, grab?: GrabOptions) {
+function setup(reactions?: ReactionsInput, grab?: GrabOptions, outfit?: 'hoodie') {
 	const onreaction = vi.fn();
 	const onboop = vi.fn();
 	const { container } = render(Mascot, {
@@ -54,7 +54,8 @@ function setup(reactions?: ReactionsInput, grab?: GrabOptions) {
 		onreaction,
 		onboop,
 		...(reactions === undefined ? {} : { reactions }),
-		...(grab === undefined ? {} : { grab })
+		...(grab === undefined ? {} : { grab }),
+		...(outfit === undefined ? {} : { outfit })
 	});
 	const el = container.querySelector('.mascbob') as HTMLElement;
 	const head = el.querySelector('[data-grab="head"]') as SVGGElement;
@@ -144,6 +145,22 @@ describe('Mascot grab', () => {
 		// The torso turns toward the pull, so the neck's root leaves the center line with it.
 		const [rootX] = (/^M([-\d.e]+)/.exec(neck.getAttribute('d') ?? '')?.slice(1) ?? []).map(Number);
 		expect(rootX).toBeGreaterThan(100.5);
+		at('pointerup', 160, 78);
+	});
+
+	it("puts the neck through a hoodie's neck hole, in front of the torso", async () => {
+		const { el, at, angle } = setup(undefined, undefined, 'hoodie');
+		await new Promise((r) => setTimeout(r, 700));
+		await pullRight(at);
+		await expect.poll(angle).toBeGreaterThan(10);
+		const neck = el.querySelector('.neck') as SVGPathElement;
+		const hole = el.querySelector('.neck-hole') as SVGElement;
+		const torso = el.querySelector('clipPath[id$="-torso"]') as SVGElement;
+		expect(neck.compareDocumentPosition(torso) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+		expect(neck.compareDocumentPosition(hole) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+		// The yoke in front hides where the neck ends, so it can't stop short of the neckline.
+		const yoke = [...el.querySelectorAll('path.hoodie')].at(-1)!;
+		expect(neck.compareDocumentPosition(yoke) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 		at('pointerup', 160, 78);
 	});
 
