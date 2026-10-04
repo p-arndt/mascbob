@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { MediaQuery } from 'svelte/reactivity';
-	import { DEFAULT_REACTIONS, Mascot, walkSpeed, type Mood } from '$lib/index.js';
+	import { DEFAULT_REACTIONS, Mascot, type Mood } from '$lib/index.js';
 	import {
 		absence,
 		approach,
@@ -41,8 +41,7 @@
 	/** The figure's feet sit a little above the bottom of its box, over the ground shadow. */
 	const FEET = 0.05;
 	const NAV_HEIGHT = 68;
-	// Its own walk cycle sets the pace: any faster and the planted foot would skate.
-	const speed = $derived(walkSpeed(size));
+	const speed = 80;
 	/** Long strolls at that pace drag on; it walks a stretch at a time instead. */
 	const STROLL = 220;
 	/** A falling buddy only catches surfaces on screen; below that it climbs back in instead. */
@@ -108,7 +107,6 @@
 	let mood = $state<Mood>('idle');
 	let rotation = $state(0);
 	let walking = $state(false);
-	let walkDir = $state<-1 | 1>(1);
 	let held = $state(false);
 	/** Held or tumbling: the rotation follows every frame instead of easing. */
 	let free = $state(false);
@@ -464,10 +462,7 @@
 			} else if (mode === 'walk') {
 				const dir = Math.sign(walkTo - x);
 				x += dir * Math.min(Math.abs(walkTo - x), speed * dt);
-				if (dir) walkDir = dir < 0 ? -1 : 1;
-				// Upright: the walk cycle already rolls the torso over each planted foot, and a lean on
-				// top of that tips the whole figure like a toy falling over.
-				rotation = 0;
+				rotation = dir * 5;
 				if (walkOff && (x < box.left || x > box.left + box.width)) {
 					startFall(dir * 130, -320, now);
 				} else if (Math.abs(walkTo - x) < 0.5) {
@@ -569,7 +564,7 @@
 		// Out of the air the stretch relaxes over the landing squash instead of vanishing in a frame.
 		const ease = 1 - Math.exp(-dt / 0.06);
 		const aim = mode === 'fly' ? flight : { vx: 0, vy: 0 };
-		// The leg cycle is the only motion a walk gets.
+		// A stroll is too slow to stretch; only the bob and lean show it walking.
 		if (mode === 'walk') streak = { x: 0, y: 0 };
 		streak.x += (aim.vx - streak.x) * ease;
 		streak.y += (aim.vy - streak.y) * ease;
@@ -726,6 +721,7 @@
 		>
 			<div
 				class="gait"
+				class:walking
 				class:free
 				class:rising
 				style:rotate="{rotation}deg"
@@ -737,7 +733,6 @@
 					{reactions}
 					float={false}
 					effects={false}
-					walking={walking && walkDir}
 					lookAt="pointer"
 					label="bob living on the page, drag to throw"
 					onboop={onBoop}
@@ -776,6 +771,17 @@
 	}
 	.gait.free {
 		transition: none;
+	}
+	.gait.walking {
+		animation: step 0.3s ease-in-out infinite alternate;
+	}
+	@keyframes step {
+		from {
+			transform: translateY(0);
+		}
+		to {
+			transform: translateY(-3px);
+		}
 	}
 	/* Getting back up after a tumble is slow, with a little wobble at the end. */
 	.gait.rising {
