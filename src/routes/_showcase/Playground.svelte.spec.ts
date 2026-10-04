@@ -202,7 +202,7 @@ describe('Studio layout', () => {
 		expect(tab.element().getBoundingClientRect().right).toBeLessThanOrEqual(
 			tabs.getBoundingClientRect().right + 1
 		);
-		await expect.element(page.getByRole('slider', { name: 'Size' })).toBeInTheDocument();
+		await expect.element(page.getByRole('button', { name: /Save picture/ })).toBeInTheDocument();
 	});
 });
 
@@ -292,8 +292,7 @@ describe('Studio export', () => {
 		await expect.poll(() => aim.transform.baseVal.getItem(0).angle).toBeGreaterThan(4);
 
 		await page.getByRole('button', { name: 'Export', exact: true }).click();
-		await page.getByRole('button', { name: 'Files', exact: true }).click();
-		await page.getByRole('button', { name: /SVG\s*Vector/ }).click();
+		await page.getByRole('button', { name: /For print/ }).click();
 		await expect.poll(() => blobs.length, { timeout: 3000 }).toBe(1);
 		create.mockRestore();
 

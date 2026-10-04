@@ -561,13 +561,19 @@
 		document.getElementById(`${studioId}-${panel}`)?.focus();
 	}
 
-	type Tab = 'svelte' | 'link' | 'files';
+	// Most visitors want a picture, not code: images come first and speak in uses, not formats.
+	type Tab = 'images' | 'link' | 'svelte';
 	const EXPORT_PARTS: Part[] = [
-		{ id: 'svelte', label: 'Svelte' },
+		{ id: 'images', label: 'Images' },
 		{ id: 'link', label: 'Share link' },
-		{ id: 'files', label: 'Files' }
+		{ id: 'svelte', label: 'Code' }
 	];
-	let tab = $state<Tab>('svelte');
+	const CLIP_TILES: Record<ClipFormat, { title: string; hint: string }> = {
+		gif: { title: 'Animation', hint: 'GIF · plays almost anywhere' },
+		webp: { title: 'Sticker', hint: 'WebP · animated, small file' },
+		webm: { title: 'Video', hint: 'WebM · 3 second loop' }
+	};
+	let tab = $state<Tab>('images');
 	const INSTALL = 'pnpm add mascbob';
 
 	const tokens = $derived<Token[][]>(svelteTokens(config));
@@ -1387,6 +1393,24 @@
 								{done === 'code' ? 'Copied' : 'Copy'}
 							</button>
 						</div>
+						<div class="downloads dev">
+							<button class="file" class:done={done === 'file'} onclick={exportSvelte}>
+								<span>.svelte file</span>
+							</button>
+							<button class="file" class:done={done === 'animated'} onclick={exportAnimatedSvg}>
+								<span>Animated SVG</span>
+							</button>
+							<button
+								class="file"
+								class:done={done === 'svgcode'}
+								onclick={async () => {
+									const s = await snapshot();
+									if (s) copy('svgcode', s.text);
+								}}
+							>
+								<span>{done === 'svgcode' ? 'Copied' : 'Copy SVG'}</span>
+							</button>
+						</div>
 					{:else if tab === 'link'}
 						<div class="link">
 							<input
@@ -1406,17 +1430,10 @@
 						<p class="note">Opens this page with your mascot already set up in the studio.</p>
 					{:else}
 						<div class="downloads">
-							<button class="file" class:done={done === 'file'} onclick={exportSvelte}>
-								<span>.svelte</span><small>Component</small>
-							</button>
-							<button class="file" class:done={done === 'svg'} onclick={exportSvg}>
-								<span>SVG</span><small>Vector</small>
-							</button>
-							<button class="file" class:done={done === 'animated'} onclick={exportAnimatedSvg}>
-								<span>SVG</span><small>Animated</small>
-							</button>
-							<button class="file" class:done={done === 'png'} onclick={exportPng}>
-								<span>PNG</span><small>1024 px</small>
+							<button class="file primary" class:done={done === 'png'} onclick={exportPng}>
+								<span>{done === 'png' ? 'Saved' : 'Save picture'}</span><small
+									>PNG · for chats, slides and documents</small
+								>
 							</button>
 							{#each CLIP_FORMATS as format (format)}
 								<button
@@ -1425,24 +1442,17 @@
 									disabled={rendering !== null}
 									onclick={() => exportClip(format)}
 								>
-									<span>{format.toUpperCase()}</span><small
+									<span>{CLIP_TILES[format].title}</span><small
 										>{rendering === format
-											? 'Rendering…'
+											? 'Making it…'
 											: done === `${format}-failed`
-												? 'Not supported here'
-												: '3 s loop'}</small
+												? 'Not supported in this browser'
+												: CLIP_TILES[format].hint}</small
 									>
 								</button>
 							{/each}
-							<button
-								class="file"
-								class:done={done === 'svgcode'}
-								onclick={async () => {
-									const s = await snapshot();
-									if (s) copy('svgcode', s.text);
-								}}
-							>
-								<span>{done === 'svgcode' ? 'Copied' : 'Copy'}</span><small>SVG markup</small>
+							<button class="file" class:done={done === 'svg'} onclick={exportSvg}>
+								<span>For print</span><small>SVG · sharp at any size</small>
 							</button>
 						</div>
 					{/if}
@@ -2150,8 +2160,21 @@
 	}
 	.downloads {
 		display: grid;
-		grid-template-columns: repeat(3, 1fr);
+		grid-template-columns: repeat(2, 1fr);
 		gap: 0.5rem;
+	}
+	/* Extras for developers stay one compact row, so the code tab still fits under the preview. */
+	.downloads.dev {
+		grid-template-columns: repeat(3, 1fr);
+		margin-top: 0.5rem;
+	}
+	.downloads.dev .file {
+		padding: 0.5rem 0.6rem;
+		border-radius: 12px;
+		text-align: center;
+	}
+	.downloads.dev .file span {
+		font-size: 0.82rem;
 	}
 	.file {
 		display: grid;
@@ -2187,6 +2210,16 @@
 		background: var(--text-1);
 		color: var(--on-ink);
 		box-shadow: none;
+	}
+	.file.primary {
+		grid-column: 1 / -1;
+		padding-block: 0.95rem;
+		background: var(--text-1);
+		color: var(--on-ink);
+		box-shadow: none;
+	}
+	.file.primary small {
+		color: color-mix(in srgb, var(--on-ink) 60%, transparent);
 	}
 	.file.done small {
 		color: color-mix(in srgb, var(--on-ink) 60%, transparent);
@@ -2255,9 +2288,6 @@
 			flex: 1 1 auto;
 			padding-inline: 0.45rem;
 			font-size: 0.8rem;
-		}
-		.downloads {
-			grid-template-columns: repeat(2, 1fr);
 		}
 		/* One line per proportion: label, slider, value, reset. */
 		.proportion-row {
