@@ -186,7 +186,19 @@
 	const STAGE_SHARE: Record<StageSize, number> = { small: 0.26, normal: 0.46, large: 0.74 };
 	let stageSize = $state<StageSize>('normal');
 	let dragHeight = $state<number | null>(null);
-	let drag: { y: number; height: number } | null = null;
+	let drag: { y: number; height: number; viewport: number } | null = null;
+	/**
+	 * The stage heights are in svh, so a drag has to measure against the same viewport. innerHeight
+	 * grows and shrinks as the browser's toolbars slide away, and the stage would jump on release.
+	 */
+	function smallViewportHeight() {
+		const probe = document.createElement('div');
+		probe.style.cssText = 'position: fixed; height: 100svh; visibility: hidden';
+		document.body.append(probe);
+		const height = probe.offsetHeight;
+		probe.remove();
+		return height || innerHeight;
+	}
 	function resizeStage(step: number) {
 		const i = STAGE_SIZES.indexOf(stageSize) + step;
 		stageSize = STAGE_SIZES[Math.min(STAGE_SIZES.length - 1, Math.max(0, i))];
@@ -194,27 +206,28 @@
 	function startResize(e: PointerEvent) {
 		if (!stageEl) return;
 		(e.currentTarget as Element).setPointerCapture(e.pointerId);
-		drag = { y: e.clientY, height: stageEl.offsetHeight };
+		drag = { y: e.clientY, height: stageEl.offsetHeight, viewport: smallViewportHeight() };
 	}
 	function moveResize(e: PointerEvent) {
 		if (!drag) return;
 		const dy = e.clientY - drag.y;
 		if (dragHeight === null && Math.abs(dy) < 6) return;
-		const vh = innerHeight;
+		const { viewport } = drag;
 		dragHeight = Math.min(
-			vh * STAGE_SHARE.large,
-			Math.max(vh * STAGE_SHARE.small, drag.height + dy)
+			viewport * STAGE_SHARE.large,
+			Math.max(viewport * STAGE_SHARE.small, drag.height + dy)
 		);
 	}
 	function endResize() {
 		if (!drag) return;
+		const { viewport } = drag;
 		drag = null;
 		if (dragHeight === null) {
 			// A tap toggles between balanced and a big mascot.
 			stageSize = stageSize === 'normal' ? 'large' : 'normal';
 			return;
 		}
-		const share = dragHeight / innerHeight;
+		const share = dragHeight / viewport;
 		stageSize = STAGE_SIZES.reduce((best, size) =>
 			Math.abs(STAGE_SHARE[size] - share) < Math.abs(STAGE_SHARE[best] - share) ? size : best
 		);
@@ -2390,7 +2403,8 @@
 			width: auto;
 			max-height: 56svh;
 			margin: 0;
-			padding: 0.5rem 1rem calc(1.25rem + env(safe-area-inset-bottom));
+			padding: 0.5rem calc(1rem + env(safe-area-inset-right))
+				calc(1.25rem + env(safe-area-inset-bottom)) calc(1rem + env(safe-area-inset-left));
 			border: 0;
 			border-top: 1px solid var(--line);
 			border-radius: 24px 24px 0 0;
@@ -2450,7 +2464,8 @@
 			position: fixed;
 			inset: auto 0 0;
 			z-index: 40;
-			padding: 0 0.25rem env(safe-area-inset-bottom);
+			padding: 0 calc(0.25rem + env(safe-area-inset-right)) env(safe-area-inset-bottom)
+				calc(0.25rem + env(safe-area-inset-left));
 			border-top: 1px solid var(--line);
 			border-bottom: 0;
 			background: var(--nav-bg);
