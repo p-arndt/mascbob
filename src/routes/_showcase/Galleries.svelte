@@ -141,7 +141,7 @@
 	</div>
 	<div class="cast">
 		{#each family as m, i (m.name)}
-			<figure class="member" style:--tint={tint(m.theme)} {@attach reveal(i * 70)}>
+			<figure class="member" data-perch style:--tint={tint(m.theme)} {@attach reveal(i * 70)}>
 				<div class="stage">
 					<Mascot
 						theme={m.theme}

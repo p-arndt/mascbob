@@ -18,6 +18,7 @@
 	import TalkDemo from './_showcase/TalkDemo.svelte';
 	import { copyText, reveal } from './_showcase/interactions.js';
 	import SiteFooter from './_showcase/SiteFooter.svelte';
+	import PageBuddy from './_showcase/PageBuddy.svelte';
 	import SiteNav from './_showcase/SiteNav.svelte';
 	import { CREATURE_PRESETS, STUDIO_START, themeProp } from './_showcase/studio.js';
 	import TabIcon from './_showcase/TabIcon.svelte';
@@ -169,6 +170,7 @@
 			</div>
 			<a
 				class="studio-teaser"
+				data-perch
 				href={resolve('/studio')}
 				style:--tint={tint('og')}
 				{@attach reveal(100)}
@@ -211,7 +213,7 @@
 			</div>
 
 			<div class="showcase">
-				<article class="feature" style:--tint={tint('og')} {@attach reveal()}>
+				<article class="feature" data-perch style:--tint={tint('og')} {@attach reveal()}>
 					<div class="art">
 						<Mascot mood={cycled} size="min(170px, 40vw)" interactive={false} label="" />
 					</div>
@@ -225,7 +227,7 @@
 					</div>
 				</article>
 
-				<article class="feature" style:--tint={tint('ice')} {@attach reveal(80)}>
+				<article class="feature" data-perch style:--tint={tint('ice')} {@attach reveal(80)}>
 					<div class="art">
 						<Mascot
 							theme="ice"
@@ -246,7 +248,7 @@
 					</div>
 				</article>
 
-				<article class="feature" style:--tint={tint(swatch)} {@attach reveal(160)}>
+				<article class="feature" data-perch style:--tint={tint(swatch)} {@attach reveal(160)}>
 					<div class="art">
 						<Mascot
 							theme={swatch}
@@ -313,7 +315,7 @@
 					<a class="btn-ghost" href={resolve('/studio')}>Design one in the studio</a>
 				</div>
 			</div>
-			<div class="window">
+			<div class="window" data-perch>
 				<div class="window-bar">
 					<em>App.svelte</em>
 					<button class="copy" class:done={copied} onclick={copyUsage}
@@ -326,6 +328,7 @@
 	</main>
 
 	<SiteFooter />
+	<PageBuddy />
 </div>
 
 <style>

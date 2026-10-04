@@ -121,7 +121,7 @@
 	);
 </script>
 
-<div class="talk">
+<div class="talk" data-perch>
 	<div class="copy">
 		<h2>Talk to it.<br /><span>It talks back.</span></h2>
 		<p>
