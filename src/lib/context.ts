@@ -3,7 +3,6 @@ import type { ShapeDef } from './geometry.js';
 import type { GrabPart } from './grab.js';
 import type { Reaction } from './interaction.js';
 import type { BuildDef } from './parts/body.js';
-import type { WalkPose } from './walk.js';
 import type { Species, resolveProportions } from './species.js';
 import type {
 	Accessory,
@@ -56,8 +55,6 @@ export interface MascotContext {
 	readonly heldItem: HeldItem;
 	/** Body proportions of the full figure (the resolved `build` prop). */
 	readonly build: BuildDef;
-	/** Current pose of the walk cycle (`walking` prop); all zeros while standing. */
-	readonly walk: WalkPose;
 	/**
 	 * Degrees the whole figure currently rocks around its base (hover lean toward the
 	 * pointer plus wobbles from boops, mood changes and fidgets). Positive leans right.

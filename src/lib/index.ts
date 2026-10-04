@@ -10,8 +10,6 @@ export type { BuildDef } from './parts/body.js';
 export { REACTIONS, DEFAULT_REACTIONS, resolveReactions } from './interaction.js';
 export type { Reaction, ReactionEvent, ReactionsInput } from './interaction.js';
 export { GRAB_PARTS, DEFAULT_GRAB, resolveGrab } from './grab.js';
-export { walkSpeed } from './walk.js';
-export type { Walking } from './walk.js';
 export type { GrabOptions, GrabPart } from './grab.js';
 export {
 	MOODS,

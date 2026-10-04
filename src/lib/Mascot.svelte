@@ -46,7 +46,6 @@
 		type ReactionsInput
 	} from './interaction.js';
 	import { resolveTheme, themeStyle, type ThemeInput } from './themes.js';
-	import { Gait, REST_POSE, type WalkPose, type Walking } from './walk.js';
 	import type {
 		Accessory,
 		EyeStyle,
@@ -87,12 +86,6 @@
 		level?: number;
 		/** Pixels, or any CSS length. */
 		size?: number | string;
-		/**
-		 * Walk cycle: `true` marches on the spot, `-1` / `1` sidestep left / right. Move the mascot
-		 * at `walkSpeed(size)` pixels per second while sidestepping and its feet won't skate.
-		 * Figures without legs waddle instead; the snail glides and ignores it.
-		 */
-		walking?: Walking;
 		float?: boolean;
 		/** Particles around the head: mood effects (sparkles, hearts, zzz, …) and boop bursts. */
 		effects?: boolean;
@@ -140,7 +133,6 @@
 		lookAt = 'pointer',
 		level,
 		size = 160,
-		walking = false,
 		float = true,
 		effects = true,
 		motion = 'auto',
@@ -253,30 +245,6 @@
 		io.observe(root);
 		return () => io.disconnect();
 	});
-	const gait = new Gait();
-	let walk = $state<WalkPose>(REST_POSE);
-	// Runs only while walking or still finishing a step, so a standing mascot costs no frames.
-	$effect(() => {
-		const want = walking;
-		if (reduced || !onscreen || species === 'snail') {
-			walk = REST_POSE;
-			return;
-		}
-		if (!want && !untrack(() => gait.busy)) return;
-		let raf = 0;
-		let last = 0;
-		const tick = (now: number) => {
-			// A long gap (a hidden tab) would otherwise jump several steps at once.
-			const dt = last ? Math.min((now - last) / 1000, 0.05) : 0;
-			last = now;
-			walk = gait.advance(dt, want);
-			if (want || gait.busy) raf = requestAnimationFrame(tick);
-			else walk = REST_POSE;
-		};
-		raf = requestAnimationFrame(tick);
-		return () => cancelAnimationFrame(raf);
-	});
-
 	// The idle loops run at a fixed CSS duration and the mood only changes their playback rate:
 	// retiming a running CSS animation jumps its progress, a playback rate keeps the phase.
 	const PACED = ['float', 'stand', 'shadow', 'contact', 'ground-glow', 'breathe', 'bob'];
@@ -921,14 +889,6 @@
 			: ''
 	);
 
-	// Legs carry the torso, which sinks and sways over the planted foot; anything without legs
-	// waddles as a whole around its base instead.
-	const walkTransform = $derived(
-		legs
-			? `translate(${walk.shift} ${walk.bob}) rotate(${walk.roll} 100 ${fig.hipY})`
-			: `translate(0 ${walk.hop}) rotate(${walk.waddle} ${rockPivot})`
-	);
-
 	function trackPointer(e: PointerEvent) {
 		const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
 		pointerX = clamp((e.clientX - (rect.left + rect.width / 2)) / (rect.width / 2), -1, 1);
@@ -1004,9 +964,6 @@
 		},
 		get build() {
 			return fig;
-		},
-		get walk() {
-			return walk;
 		},
 		get lean() {
 			return rock + bend.current.angle + headTurn.current + headDrag + pullTurn;
@@ -1089,14 +1046,14 @@
 				transform="translate(100 {groundY}) scale({footContactScale} 1)"
 				opacity={clamp(1 - air * 2.5, 0, 1)}
 			>
-				{#each [-1, 1] as const as side (side)}
+				{#each [-1, 1] as side (side)}
 					<ellipse
 						class="foot-contact"
-						cx={side * footContact.x + walk.feet[side].dx}
+						cx={side * footContact.x}
 						rx={footContact.rx}
 						ry="2.2"
 						fill={ref('ground-shadow')}
-						opacity={1 - Math.max(footLifts[side], clamp(walk.feet[side].lift / 8, 0, 1))}
+						opacity={1 - footLifts[side]}
 					/>
 				{/each}
 			</g>
@@ -1115,91 +1072,89 @@
 							<Body layer="feet" />
 						{/if}
 						<!-- Everything above the legs: tilts with the mood and bends at the hips when pulled. -->
-						<g transform={walkTransform}>
-							<g
-								bind:this={tiltFrame}
-								transform="rotate({f.tilt +
-									bend.current.angle} {tiltPivot}) translate(100 {bendY}) scale({1 /
-									Math.sqrt(bend.current.stretch)} {bend.current.stretch}) translate(-100 {-bendY})"
-							>
-								<!-- Behind the torso, so the neck rises out of the shoulders instead of lying on the chest. -->
-								{#if body && !unified && neckOut > 0.5}
-									<path
-										class="neck-edge"
-										d="M{neckRoot.x} {neckRoot.y}L{neckTop.x} {neckTop.y}"
-										stroke-width={neckWidth + 1.6}
-									/>
-									<path
-										class="neck"
-										d="M{neckRoot.x} {neckRoot.y}L{neckTop.x} {neckTop.y}"
-										stroke-width={neckWidth}
-									/>
-								{/if}
-								{#if body && !unified}
-									<!-- The torso turns a little with the head so no torso corner peeks out behind it. -->
-									<g transform="rotate({torsoTurn} 100 {fig.hipY})">
-										<Body layer="back" />
-									</g>
-								{/if}
-								<!-- A pulled head moves as a whole on its neck and only tilts and squashes a little,
+						<g
+							bind:this={tiltFrame}
+							transform="rotate({f.tilt +
+								bend.current.angle} {tiltPivot}) translate(100 {bendY}) scale({1 /
+								Math.sqrt(bend.current.stretch)} {bend.current.stretch}) translate(-100 {-bendY})"
+						>
+							<!-- Behind the torso, so the neck rises out of the shoulders instead of lying on the chest. -->
+							{#if body && !unified && neckOut > 0.5}
+								<path
+									class="neck-edge"
+									d="M{neckRoot.x} {neckRoot.y}L{neckTop.x} {neckTop.y}"
+									stroke-width={neckWidth + 1.6}
+								/>
+								<path
+									class="neck"
+									d="M{neckRoot.x} {neckRoot.y}L{neckTop.x} {neckTop.y}"
+									stroke-width={neckWidth}
+								/>
+							{/if}
+							{#if body && !unified}
+								<!-- The torso turns a little with the head so no torso corner peeks out behind it. -->
+								<g transform="rotate({torsoTurn} 100 {fig.hipY})">
+									<Body layer="back" />
+								</g>
+							{/if}
+							<!-- A pulled head moves as a whole on its neck and only tilts and squashes a little,
 							     so the face never skews. -->
+							<g
+								transform="translate({pose.x} {pose.y}) rotate({pose.tilt} {headBase.x} {headBase.y}) translate({headBase.x} {headBase.y}) scale({pose.sx} {pose.sy}) translate({-headBase.x} {-headBase.y})"
+							>
 								<g
-									transform="translate({pose.x} {pose.y}) rotate({pose.tilt} {headBase.x} {headBase.y}) translate({headBase.x} {headBase.y}) scale({pose.sx} {pose.sy}) translate({-headBase.x} {-headBase.y})"
+									class="head-aim"
+									transform="rotate({headTurn.current +
+										headDrag} 100 {neckY}) translate({gazeShift} {headDrop}) translate(100 {neckY}) scale(1 {1 -
+										gazeNod}) translate(-100 {-neckY})"
 								>
+									<!-- svelte-ignore a11y_no_static_element_interactions -->
 									<g
-										class="head-aim"
-										transform="rotate({headTurn.current +
-											headDrag} 100 {neckY}) translate({gazeShift} {headDrop}) translate(100 {neckY}) scale(1 {1 -
-											gazeNod}) translate(-100 {-neckY})"
+										class="head"
+										class:grabbable={canGrab}
+										data-grab="head"
+										transform="translate(100 {head.bottom + headY}) scale({headSx *
+											headScale} {headSy * headScale}) translate(-100 {-head.bottom})"
+										onpointerdown={grabHead}
 									>
-										<!-- svelte-ignore a11y_no_static_element_interactions -->
-										<g
-											class="head"
-											class:grabbable={canGrab}
-											data-grab="head"
-											transform="translate(100 {head.bottom + headY}) scale({headSx *
-												headScale} {headSy * headScale}) translate(-100 {-head.bottom})"
-											onpointerdown={grabHead}
-										>
-											<g class="blast" class:blasting={reaction?.name === 'explode'}>
-												<g class="breathe" class:lift={body}>
-													<Accessories layer="back" />
-													<Creature layer="back" />
-													<g
-														class="face-body"
-														transform={species === 'snail'
-															? `translate(${snailTuck.current * 13} ${head.bottom * snailTuck.current * 0.25}) scale(1 ${1 - snailTuck.current * 0.25})`
-															: undefined}
-													>
-														<Shell />
-														<Creature layer="markings" />
-														<Face />
-														{#if species === 'snail'}
-															<Accessories layer="front" />
-															{@render accessory?.({ top: t, halfWidth: hw })}
-														{/if}
-													</g>
-													<Creature layer="front" />
-													{#if species !== 'snail'}
+										<g class="blast" class:blasting={reaction?.name === 'explode'}>
+											<g class="breathe" class:lift={body}>
+												<Accessories layer="back" />
+												<Creature layer="back" />
+												<g
+													class="face-body"
+													transform={species === 'snail'
+														? `translate(${snailTuck.current * 13} ${head.bottom * snailTuck.current * 0.25}) scale(1 ${1 - snailTuck.current * 0.25})`
+														: undefined}
+												>
+													<Shell />
+													<Creature layer="markings" />
+													<Face />
+													{#if species === 'snail'}
 														<Accessories layer="front" />
 														{@render accessory?.({ top: t, halfWidth: hw })}
 													{/if}
 												</g>
+												<Creature layer="front" />
+												{#if species !== 'snail'}
+													<Accessories layer="front" />
+													{@render accessory?.({ top: t, halfWidth: hw })}
+												{/if}
 											</g>
 										</g>
 									</g>
 								</g>
-								{#if body && !unified}
-									<g transform="rotate({torsoTurn} 100 {fig.hipY})">
-										<Body layer="front" />
-									</g>
-								{:else if hands && !(unified && body) && species !== 'snail'}
-									<Hands />
-								{/if}
-								{#if effects}
-									<Effects />
-								{/if}
 							</g>
+							{#if body && !unified}
+								<g transform="rotate({torsoTurn} 100 {fig.hipY})">
+									<Body layer="front" />
+								</g>
+							{:else if hands && !(unified && body) && species !== 'snail'}
+								<Hands />
+							{/if}
+							{#if effects}
+								<Effects />
+							{/if}
 						</g>
 					</g>
 				</g>

@@ -1,1 +1,0 @@
-New `walking` prop: `true` marches on the spot, `walking={-1}` or `walking={1}` sidesteps left or right with alternating steps, a body bob and swinging arms. Move the mascot at `walkSpeed(size)` pixels per second and its feet stay planted; figures without legs waddle instead.
