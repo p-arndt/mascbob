@@ -3,12 +3,15 @@ import { flushSync } from 'svelte';
 import { render } from 'vitest-browser-svelte';
 import TabIcon from './TabIcon.svelte';
 import { favicon, showInTab } from './favicon.svelte.js';
+import { DESIGN_KEY } from './design.js';
 
 const STATIC = '/favicon.svg';
 
 describe('TabIcon', () => {
 	let link: HTMLLinkElement;
 	beforeEach(() => {
+		// Other specs share this origin; a design they saved would hand the tab to the studio.
+		localStorage.removeItem(DESIGN_KEY);
 		link = document.createElement('link');
 		link.rel = 'icon';
 		link.href = STATIC;
