@@ -87,15 +87,21 @@
 		left: new Spring({ a1: 0, a2: 0, stretch: 0 }, RELEASE_SPRING),
 		right: new Spring({ a1: 0, a2: 0, stretch: 0 }, RELEASE_SPRING)
 	};
-	const posed = (side: Side): ArmAngles =>
-		side === 'left'
-			? { a1: arms.current.la1 + lift, a2: arms.current.la2 }
-			: { a1: arms.current.ra1 + lift, a2: arms.current.ra2 };
+	/** Arm swing of the walk cycle: forward bends the elbow and brings the hand in, back opens it out. */
+	const walkArm = (side: Side) => m.walk.arms[side === 'left' ? -1 : 1];
+	const posed = (side: Side): ArmAngles => {
+		const fw = walkArm(side);
+		const a1 = (side === 'left' ? arms.current.la1 : arms.current.ra1) + lift - fw * 9;
+		const a2 = (side === 'left' ? arms.current.la2 : arms.current.ra2) - Math.max(fw, 0) * 30;
+		return { a1, a2 };
+	};
 	const shown = (side: Side): ArmReach => {
 		const p = posed(side);
 		const o = offset[side].current;
 		// The snap back overshoots into a brief squash, but never folds the arm up entirely.
-		return { a1: p.a1 + o.a1, a2: p.a2 + o.a2, stretch: Math.max(1 + o.stretch, 0.6) };
+		// A swinging arm points a little toward or away from the viewer, so it looks shorter.
+		const swing = 1 - Math.abs(walkArm(side)) * 0.1;
+		return { a1: p.a1 + o.a1, a2: p.a2 + o.a2, stretch: Math.max((1 + o.stretch) * swing, 0.6) };
 	};
 	const left = $derived(shown('left'));
 	const right = $derived(shown('right'));
@@ -187,6 +193,22 @@
 		new Spring({ angle: 0, grow: 0 }, RELEASE_SPRING)
 	];
 	const legPull = (side: number) => legPulls[side < 0 ? 0 : 1];
+	/**
+	 * Each leg of the walk cycle, solved from the hip to where its foot should be: it swings out
+	 * around the hip, stretches to keep a planted foot on the ground as the hips sway, and
+	 * shortens as a stepping knee bends toward the viewer.
+	 */
+	const strides = $derived.by(() => {
+		const w = m.walk;
+		const solve = (side: -1 | 1) => {
+			const reach = b.groundY - hip(side).y;
+			const x = w.feet[side].dx - w.shift;
+			const y = reach - w.bob - w.feet[side].lift;
+			return { angle: (-Math.atan2(x, y) * 180) / Math.PI, grow: Math.hypot(x, y) - reach };
+		};
+		return { [-1]: solve(-1), [1]: solve(1) } as Record<-1 | 1, { angle: number; grow: number }>;
+	});
+	const legGrow = (side: -1 | 1) => legPull(side).current.grow + strides[side].grow;
 	let heldLeg = $state(0);
 	/** Wraps the whole feet layer without being swung itself, so drag points stay put. */
 	let feetFrame: SVGGElement | undefined = $state();
@@ -499,8 +521,8 @@
 			</g>
 		{/snippet}
 
-		{#snippet leg(side: number)}
-			{@const grow = legPull(side).current.grow}
+		{#snippet leg(side: -1 | 1)}
+			{@const grow = legGrow(side)}
 			<!-- Like the arms, a stretched leg thins out. -->
 			{@const legHw =
 				(b.legWidth / 2) * Math.sqrt((legBottom - legTop) / Math.max(legBottom - legTop + grow, 8))}
@@ -557,9 +579,12 @@
 		     wrapper because `.foot` has its own CSS transform for the tap. -->
 		{#snippet swung(side: -1 | 1, part: 'rim' | 'leg' | 'shoe')}
 			{@const pivot = hip(side)}
+			{@const stride = strides[side]}
+			<!-- The hips ride along with the torso's sway, so the legs stay attached to it. -->
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<g
-				transform="rotate({legPull(side).current.angle} {pivot.x} {pivot.y})"
+				transform="translate({m.walk.shift} {m.walk.bob}) rotate({legPull(side).current.angle +
+					stride.angle} {pivot.x} {pivot.y})"
 				class:grabbable={m.canGrab}
 				data-grab={side < 0 ? 'leg-left' : 'leg-right'}
 				onpointerdown={(e) => grabLeg(e, side)}
@@ -568,7 +593,12 @@
 					{@render leg(side)}
 				{:else}
 					<!-- The leg points straight down in here, so stretching it pushes the foot along y. -->
-					<g transform="translate(0 {legPull(side).current.grow})">
+					<!-- A walking foot turns back against its leg's swing, so its sole lands flat; in the
+					     air its toe hangs down a little. -->
+					<g
+						transform="translate(0 {legGrow(side)}) rotate({side * m.walk.feet[side].lift * 0.7 -
+							stride.angle} {pivot.x} {b.groundY})"
+					>
 						{@render foot(side, part === 'rim')}
 					</g>
 				{/if}

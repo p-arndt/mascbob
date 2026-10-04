@@ -157,6 +157,7 @@ import { MOODS, SHAPES, EYE_STYLES, ACCESSORIES, OUTFITS, SHOES, BUILDS, THEMES 
 | `lookAt`      | `pointer` `wander` `none` or `{ x, y }` in -1..1                                                               | `pointer`                |
 | `level`       | mouth opening 0..1 while `talking` (e.g. mic amplitude); omit for automatic lip movement                       | –                        |
 | `size`        | px number or any CSS length                                                                                    | `160`                    |
+| `walking`     | walk cycle: `true` marches on the spot, `-1` / `1` sidestep left / right (see below)                           | `false`                  |
 | `float`       | idle hover animation (head-only mode; the full figure stands)                                                  | `true`                   |
 | `effects`     | particles around the head: mood effects (sparkles, hearts, zzz) and boop bursts                                | `true`                   |
 | `motion`      | `auto` (respects `prefers-reduced-motion`), `full`, `reduced`                                                  | `auto`                   |
@@ -167,6 +168,23 @@ import { MOODS, SHAPES, EYE_STYLES, ACCESSORIES, OUTFITS, SHOES, BUILDS, THEMES 
 | `onboop`      | click/tap handler                                                                                              | –                        |
 | `onreaction`  | called with a `ReactionEvent` (`pet`, `startle`, `dizzy`, `shy`, `tickle`, `explode`, `grab`, `bored`, `wake`) | –                        |
 | `accessory`   | snippet `({ top, halfWidth })` drawing custom SVG in the head's 200×200 viewBox                                | –                        |
+
+`walking` makes the full figure step: one foot lifts while the other stays planted, the torso
+bobs and sways over the planted foot and the arms swing. The figure faces you, so `-1` and `1`
+sidestep; move the mascot at `walkSpeed(size)` pixels per second (exported, for a numeric `size`)
+and the planted foot holds still on the ground. Turning `walking` off finishes with a closing step.
+Figures without legs (`build="blob"`, moss, wisp, octo, head-only) waddle instead; the snail
+ignores it. Nothing walks under reduced motion.
+
+```svelte
+<script>
+	import { Mascot, walkSpeed } from 'mascbob';
+	let x = $state(0);
+	// …move x by walkSpeed(80) * dt every frame while walking
+</script>
+
+<div style:translate="{x}px 0"><Mascot size={80} walking={1} /></div>
+```
 
 `lookAt` also guides a head lean and nod; the default `follow` reaction allows this even outside the mascot.
 Bob and Critter move their whole head toward the gaze while their torso follows only a little.

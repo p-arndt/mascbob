@@ -111,6 +111,13 @@ export const PROPS: PropDoc[] = [
 		default: '160',
 		description: 'Width in pixels, or any CSS length.'
 	},
+	{
+		name: 'walking',
+		type: 'boolean | -1 | 0 | 1',
+		default: 'false',
+		description:
+			'Walk cycle: true marches on the spot, -1 / 1 sidestep left / right. Move the mascot at walkSpeed(size) px/s so its feet don’t skate. Legless figures waddle; the snail ignores it.'
+	},
 	{ name: 'float', type: 'boolean', default: 'true', description: 'Idle hover animation.' },
 	{
 		name: 'effects',
