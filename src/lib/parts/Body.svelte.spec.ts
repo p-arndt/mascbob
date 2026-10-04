@@ -24,6 +24,7 @@ describe('Body', () => {
 			'.scarf',
 			'.bow',
 			'.hoodie',
+			'.hood',
 			'.rib',
 			'.denim',
 			'.shorts',

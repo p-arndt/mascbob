@@ -163,11 +163,14 @@
 	const u = $derived(Math.min(Math.max(hw / 48, 0.75), 1.2));
 	// Room between collar and hips, relative to the standard build: ties and scarves hang to fit.
 	const v = $derived((b.hipY - COLLAR_Y) / (HIP_Y - COLLAR_Y));
-	// The head is scaled around its bottom per build; the hood has to wrap the scaled head.
+	// The head is scaled around its bottom per build; collars have to wrap the scaled head.
 	const headHw = $derived(m.shape.halfWidth * b.headScale);
-	const headTop = $derived(m.shape.bottom + b.headY - (m.shape.bottom - m.shape.top) * b.headScale);
 	// Small torsos (chibi) keep the collar close so it reads as a collar, not a ruff.
 	const collarHw = $derived(Math.min(headHw, 56, hw + 15) + 7);
+	const HOOD_H = 36;
+	const neckline = $derived(
+		`M${100 - collarHw + 4} ${COLLAR_Y + 8}Q100 ${COLLAR_Y + 32} ${100 + collarHw - 4} ${COLLAR_Y + 8}`
+	);
 	const shoulder = $derived(shoulderX(hw, b));
 	const outfit = $derived(m.outfit);
 	const shoes = $derived(m.shoes);
@@ -635,13 +638,14 @@
 			/>
 		</g>
 	{:else if outfit === 'hoodie'}
+		<!-- A hood that is down: bunched behind the neck, peeking out beside the chin. -->
 		<rect
 			class="hood"
-			x={100 - headHw - 7}
-			y={headTop + 34 * b.headScale}
-			width={headHw * 2 + 14}
-			height={COLLAR_Y + 8 - headTop - 34 * b.headScale}
-			rx={headHw}
+			x={100 - collarHw}
+			y={COLLAR_Y - HOOD_H / 2}
+			width={collarHw * 2}
+			height={HOOD_H}
+			rx={HOOD_H / 2}
 		/>
 	{/if}
 
@@ -805,17 +809,17 @@
 			<rect class="bow-knot" x="-4" y="-5" width="8" height="10" rx="3" />
 		</g>
 	{:else if outfit === 'hoodie'}
-		<rect
-			class="rib"
-			x={100 - collarHw + 4}
-			y={COLLAR_Y + 8}
-			width={collarHw * 2 - 8}
-			height="16"
-			rx="8"
+		<!-- Fabric in front of the chin, so the head comes out of the neckline. -->
+		<path
+			class="hoodie"
+			d="{neckline}Q{100 + collarHw - 2} {COLLAR_Y + 24} {100 + hw + 1.5} {COLLAR_Y + 40}H{100 -
+				hw -
+				1.5}Q{100 - collarHw + 2} {COLLAR_Y + 24} {100 - collarHw + 4} {COLLAR_Y + 8}Z"
 		/>
+		<path class="rib" d={neckline} />
 		<path
 			class="string"
-			d="M{100 - 6 * u} {COLLAR_Y + 22}V{COLLAR_Y + 44}M{100 + 6 * u} {COLLAR_Y + 22}V{COLLAR_Y +
+			d="M{100 - 6 * u} {COLLAR_Y + 20}V{COLLAR_Y + 44}M{100 + 6 * u} {COLLAR_Y + 20}V{COLLAR_Y +
 				40}"
 		/>
 		<rect class="aglet" x={100 - 6 * u - 1.2} y={COLLAR_Y + 43} width="2.4" height="5" rx="1.2" />
@@ -1135,15 +1139,16 @@
 		stroke-linejoin: round;
 		opacity: 0.2;
 	}
-	.hem,
-	.rib {
+	.hem {
 		fill: var(--c-visor);
 		opacity: 0.14;
 	}
 	.rib {
-		fill: var(--c-accent);
-		opacity: 1;
-		filter: brightness(0.9);
+		fill: none;
+		stroke: var(--c-accent);
+		stroke-width: 4.5;
+		stroke-linecap: round;
+		filter: brightness(0.85);
 	}
 	.string {
 		fill: none;
