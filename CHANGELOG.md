@@ -4,6 +4,22 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.4.0 - 2026-10-04
+
+### Added
+
+- Give full-body bob and critter a `heldItem="sword"`, `"microphone"` or `"phone"`. They swing a long fantasy sword, gesture with the microphone while `mood="talking"`, or check a small phone with its screen facing them; `motion="reduced"` keeps the movements still.
+- New `muscle` proportion: `proportions={{ muscle: 1.6 }}` gives Bob and Critter thicker arms, bigger fists and slightly broader shoulders.
+
+### Changed
+
+- Pulling the head of a full-body mascot up no longer leaves its shadow behind on the body, and the top of the body it reveals is rounded instead of flat.
+- Bob's body is now a little narrower than the head, so the head sits on it with a soft shadow that follows its outline. The `thinking` mood and `hands="think"` now raise a hand to the chin instead of folding the arm onto the shoulder.
+
+### Fixed
+
+- Faint eyebrows no longer look muddy brown where the orange misprint shows through, and the misprint sits closer to the ink, so happy crescent eyes and mood changes no longer get a detached orange copy below the eyes.
+
 ## 0.3.0 - 2026-10-01
 
 ### Added

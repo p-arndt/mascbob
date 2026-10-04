@@ -1,1 +1,0 @@
-Faint eyebrows no longer look muddy brown where the orange misprint shows through, and the misprint sits closer to the ink, so happy crescent eyes and mood changes no longer get a detached orange copy below the eyes.
