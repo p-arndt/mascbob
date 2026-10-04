@@ -39,7 +39,7 @@
 	// mascots, hops between them, wanders off edges and falls, and follows the reader down. Grab it
 	// to carry it around; let go mid-swing to throw it.
 	const small = new MediaQuery('(max-width: 640px)');
-	const size = $derived(small.current ? 40 : 54);
+	const size = $derived(small.current ? 60 : 84);
 	/** The figure's feet sit a little above the bottom of its box, over the ground shadow. */
 	const FEET = 0.05;
 	const NAV_HEIGHT = 68;
