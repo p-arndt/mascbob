@@ -19,13 +19,13 @@ function setup() {
 	frame.append(part);
 	svg.append(frame);
 	document.body.append(svg);
-	const fire = (type: string, x: number, y: number) =>
+	const fire = (type: string, x: number, y: number, pointerType = 'mouse') =>
 		part.dispatchEvent(
 			new PointerEvent(type, {
 				pointerId: 1,
 				bubbles: true,
 				button: 0,
-				pointerType: 'mouse',
+				pointerType,
 				clientX: x,
 				clientY: y
 			})
@@ -37,7 +37,12 @@ function setup() {
 		end: vi.fn()
 	};
 	part.addEventListener('pointerdown', (e) => drag(e, handlers));
-	return { svg, frame, fire, handlers };
+	const swipe = () => {
+		const ev = new TouchEvent('touchmove', { bubbles: true, cancelable: true });
+		part.dispatchEvent(ev);
+		return ev.defaultPrevented;
+	};
+	return { svg, frame, fire, swipe, handlers };
 }
 
 describe('drag', () => {
@@ -78,5 +83,14 @@ describe('drag', () => {
 		svg.remove();
 		await frames(2);
 		expect(handlers.end).toHaveBeenCalledOnce();
+	});
+
+	it('keeps the page from scrolling away a held touch, and only while it is held', () => {
+		const { fire, swipe } = setup();
+		expect(swipe()).toBe(false);
+		fire('pointerdown', 50, 50, 'touch');
+		expect(swipe()).toBe(true);
+		fire('pointerup', 50, 50, 'touch');
+		expect(swipe()).toBe(false);
 	});
 });

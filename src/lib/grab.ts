@@ -264,9 +264,15 @@ export function drag(e: PointerEvent, h: DragHandlers): void {
 		active = true;
 		follow();
 	};
+	// Chrome ignores `touch-action` on shapes inside an SVG, so it starts scrolling the page and
+	// cancels the pointer; holding the touch still keeps a held part from being dropped.
+	const hold = (ev: TouchEvent) => {
+		if (ev.cancelable) ev.preventDefault();
+	};
 	const done = (ev?: PointerEvent) => {
 		if (ev && ev.pointerId !== e.pointerId) return;
 		cancelAnimationFrame(raf);
+		el.removeEventListener('touchmove', hold);
 		el.removeEventListener('pointermove', move);
 		el.removeEventListener('pointerup', done);
 		el.removeEventListener('pointercancel', done);
@@ -275,6 +281,7 @@ export function drag(e: PointerEvent, h: DragHandlers): void {
 		if (active) h.end();
 		active = false;
 	};
+	if (e.pointerType === 'touch') el.addEventListener('touchmove', hold, { passive: false });
 	el.addEventListener('pointermove', move);
 	el.addEventListener('pointerup', done);
 	el.addEventListener('pointercancel', done);
