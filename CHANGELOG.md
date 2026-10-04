@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.4.1 - 2026-10-04
+
+### Changed
+
+- The `outfit="hoodie"` hood now lies down behind the neck, and the head comes out of a rounded neckline instead of sitting in front of a tall hood. A pulled head stretches its neck out of that neckline.
+
+### Fixed
+
+- Dragging the head (or any grabbable part) by touch no longer stops right away in Chrome on phones; the page used to start scrolling and drop the pull.
+
 ## 0.4.0 - 2026-10-04
 
 ### Added
