@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.4.2 - 2026-10-06
+
+### Added
+
+- `theme` now also accepts any `#RRGGBB` body color, e.g. `theme="#123456"`. The body keeps that exact color; shading and a readable face ink are derived from it.
+
+### Fixed
+
+- Extreme `proportions` no longer break the figure: narrow or short bodies keep arms, legs and feet in proportion, and very wide figures are no longer clipped. Such figures now render slightly smaller at the same `size` so they fit.
+
 ## 0.4.1 - 2026-10-04
 
 ### Changed
