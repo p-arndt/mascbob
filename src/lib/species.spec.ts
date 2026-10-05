@@ -9,6 +9,23 @@ describe('creature geometry', () => {
 		expect(g.head).toEqual(SHAPE_DEFS.capsule);
 		expect(g.build).toEqual(BUILD_DEFS.standard);
 	});
+	it('keeps short limbs and narrow torsos proportionate without restricting lengths', () => {
+		for (const build of Object.keys(BUILD_DEFS) as (keyof typeof BUILD_DEFS)[]) {
+			const base = BUILD_DEFS[build];
+			const { build: b } = creatureGeometry('bob', 'capsule', build, {
+				body: 0.4,
+				height: 0.4,
+				arms: 0.4,
+				legs: 0.4
+			});
+			expect(b.legX).toBeCloseTo(base.legX * 0.4);
+			expect(b.legWidth).toBeCloseTo(base.legWidth * 0.4);
+			expect(b.footScale).toBeCloseTo(base.footScale * 0.4);
+			expect(b.armWidth).toBeCloseTo(base.armWidth * Math.sqrt(0.4));
+			expect(b.torso.round).toBeCloseTo(base.torso.round * 0.4);
+			expect(b.upperArm).toBeCloseTo(base.upperArm * 0.4);
+		}
+	});
 	it('keeps unified species legless even when passed a standing build', () => {
 		for (const species of ['moss', 'wisp', 'octo', 'snail'] as const) {
 			const g = creatureGeometry(species, 'cat', 'lanky');

@@ -1,0 +1,1 @@
+Extreme `proportions` no longer break the figure: narrow or short bodies keep arms, legs and feet in proportion, and very wide figures are no longer clipped. Such figures now render slightly smaller at the same `size` so they fit.

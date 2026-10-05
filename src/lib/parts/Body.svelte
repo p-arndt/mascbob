@@ -735,7 +735,7 @@
 			{#each [-5, 0, 5] as dx, i (dx)}
 				<circle
 					cx={100 + dx}
-					cy={COLLAR_Y + COLLAR_H + 16}
+					cy={Math.min(COLLAR_Y + COLLAR_H + 16, b.hipY - 8)}
 					r="1.7"
 					style:animation-delay="{i * 0.08}s"
 				/>

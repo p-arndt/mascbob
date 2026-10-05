@@ -12,6 +12,8 @@ export interface ShapeDef {
 	bottom: number;
 	/** Half width at eye height, to place hands and ears. */
 	halfWidth: number;
+	/** Widest silhouette extent where it differs from the face width. */
+	silhouetteHalfWidth?: number;
 	/** Continuous creatures may attach hands below the face at a different width. */
 	handHalfWidth?: number;
 	/**
@@ -78,6 +80,7 @@ export const SHAPE_DEFS: Record<Shape, ShapeDef> = {
 		top: 28,
 		bottom: 172,
 		halfWidth: 58,
+		silhouetteHalfWidth: 60,
 		crownHalfWidth: 33
 	},
 	// Slightly bulging sides so it reads as an old CRT set rather than a squircle.
@@ -86,6 +89,7 @@ export const SHAPE_DEFS: Record<Shape, ShapeDef> = {
 		top: 46,
 		bottom: 164,
 		halfWidth: 72,
+		silhouetteHalfWidth: 73.5,
 		crownHalfWidth: 71
 	},
 	cloud: {
@@ -93,6 +97,7 @@ export const SHAPE_DEFS: Record<Shape, ShapeDef> = {
 		top: 46,
 		bottom: 168,
 		halfWidth: 62,
+		silhouetteHalfWidth: 70.6,
 		crownHalfWidth: 27
 	}
 };

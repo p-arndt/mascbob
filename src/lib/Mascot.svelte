@@ -8,6 +8,7 @@
 	import {
 		creatureGeometry,
 		creatureViewTop,
+		creatureViewWidth,
 		resolveProportions,
 		type Species,
 		type Proportions
@@ -812,6 +813,7 @@
 	const standing = $derived(body && fig.motion === 'stand');
 	const legs = $derived(body && fig.legs);
 	const viewTop = $derived(body ? creatureViewTop(species, head, fig, proportions) : 0);
+	const viewW = $derived(body ? creatureViewWidth(head, fig) : 200);
 	const viewH = $derived((body ? fig.viewHeight : 200) - viewTop);
 	const groundY = $derived(body ? fig.groundY + 1 : head.bottom + 14);
 	// With a body, the whole figure leans around its hips instead of the head's center.
@@ -1005,7 +1007,7 @@
 </script>
 
 {#snippet art()}
-	<svg viewBox="0 {viewTop} 200 {viewH}" aria-hidden="true" focusable="false">
+	<svg viewBox="{100 - viewW / 2} {viewTop} {viewW} {viewH}" aria-hidden="true" focusable="false">
 		<defs>
 			<radialGradient id="{uid}-body" cx="0.36" cy="0.28" r="0.9">
 				<stop offset="0" class="stop-light" />

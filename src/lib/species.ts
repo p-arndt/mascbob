@@ -1,5 +1,11 @@
 import { SHAPE_DEFS, clamp, type ShapeDef } from './geometry.js';
-import { buildDef, type Build, type BuildDef } from './parts/body.js';
+import {
+	buildDef,
+	torsoHalfWidth,
+	torsoOuterWidth,
+	type Build,
+	type BuildDef
+} from './parts/body.js';
 import type { Shape } from './types.js';
 
 export const SPECIES = ['bob', 'critter', 'moss', 'wisp', 'octo', 'snail'] as const;
@@ -48,6 +54,7 @@ export function creatureGeometry(
 	);
 	// Only jointed arms can bulk up; the continuous species keep their soft limbs.
 	const muscle = unified ? 1 : p.muscle;
+	const limbWidth = Math.min(1, p.body, Math.sqrt(p.legs));
 	const hipY = base.torsoTop + (base.hipY - base.torsoTop) * p.height;
 	const groundY = base.legs ? hipY + (base.groundY - base.hipY) * p.legs : hipY;
 	const b: BuildDef = {
@@ -55,16 +62,20 @@ export function creatureGeometry(
 		hipY,
 		groundY,
 		viewHeight: groundY + 26,
-		shoulderY: base.torsoTop + (base.shoulderY - base.torsoTop) * p.height,
+		shoulderY: base.torsoTop + (base.shoulderY - base.torsoTop) * Math.min(1, p.height),
 		upperArm: base.upperArm * p.arms,
 		forearm: base.forearm * p.arms,
-		armWidth: base.armWidth * muscle,
+		armWidth: base.armWidth * muscle * Math.sqrt(Math.min(1, p.arms, p.body)),
+		legX: base.legX * Math.min(1, p.body),
+		legWidth: base.legWidth * limbWidth,
+		footScale: base.footScale * limbWidth,
 		headScale: base.headScale * p.head,
 		torso: {
 			...base.torso,
 			// Bulk shows in the shoulders too, but far less than in the arms.
 			ratio: base.torso.ratio * p.body * (1 + (muscle - 1) * 0.15),
 			max: base.torso.max * p.body * (1 + (muscle - 1) * 0.15),
+			round: base.torso.round * Math.min(1, p.height),
 			bellyY: base.torsoTop + (base.torso.bellyY - base.torsoTop) * p.height
 		}
 	};
@@ -178,5 +189,19 @@ export function creatureViewTop(
 	return Math.min(
 		0,
 		Math.floor(head.bottom + build.headY + (artTop - head.bottom) * build.headScale - 8)
+	);
+}
+
+/** Keeps extreme heads, torsos and arm reaches inside the full figure view. */
+export function creatureViewWidth(head: ShapeDef, build: BuildDef): number {
+	const hw = torsoHalfWidth(head.halfWidth, build);
+	return Math.max(
+		200,
+		2 *
+			Math.max(
+				(head.silhouetteHalfWidth ?? head.halfWidth) * build.headScale,
+				torsoOuterWidth(hw, build),
+				hw * build.torso.arms - 2 + build.upperArm + build.forearm + build.armWidth * 0.6
+			)
 	);
 }
