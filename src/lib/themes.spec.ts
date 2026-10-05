@@ -11,6 +11,19 @@ describe('resolveTheme', () => {
 		expect(resolveTheme('unknown' as ThemeName)).toEqual(THEMES.og);
 	});
 
+	it('accepts all full RGB colors with shading and readable ink', () => {
+		for (const hex of ['#000000', '#ffffff', '#FF0000', '#00ff00', '#0000ff', '#808080']) {
+			const theme = resolveTheme(hex as `#${string}`);
+			expect(theme.bodyMid).toBe(hex.toLowerCase());
+			expect(contrast(theme.eye, theme.bodyMid)).toBeGreaterThan(3);
+			expect(theme.accent).not.toBe(theme.bodyMid);
+		}
+		expect(resolveTheme('#123456').bodyLight).toBe('#3d5974');
+		expect(resolveTheme('#123456').bodyDark).toBe('#0e2943');
+		expect(resolveTheme('#12345')).toEqual(THEMES.og);
+		expect(resolveTheme('#gggggg')).toEqual(THEMES.og);
+	});
+
 	it('overrides single colors on top of a base', () => {
 		const theme = resolveTheme({ base: 'mocha', eye: '#00ff00', cheek: undefined });
 		expect(theme).toEqual({ ...THEMES.mocha, eye: '#00ff00' });

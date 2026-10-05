@@ -126,14 +126,46 @@ export const THEMES = {
 
 export type ThemeName = keyof typeof THEMES;
 
-/** A preset name, or a preset extended with color overrides. */
-export type ThemeInput = ThemeName | (Partial<ThemeColors> & { base?: ThemeName });
+/** A preset name, a full RGB body color, or a preset extended with color overrides. */
+export type ThemeInput = ThemeName | `#${string}` | (Partial<ThemeColors> & { base?: ThemeName });
 
 export function resolveTheme(input: ThemeInput = 'og'): ThemeColors {
-	if (typeof input === 'string') return THEMES[input] ?? THEMES.og;
+	if (typeof input === 'string') {
+		if (/^#[0-9a-f]{6}$/i.test(input)) return customTheme(input);
+		return THEMES[input as ThemeName] ?? THEMES.og;
+	}
 	const { base = 'og', ...overrides } = input;
 	const defined = Object.fromEntries(Object.entries(overrides).filter(([, v]) => v !== undefined));
 	return { ...(THEMES[base] ?? THEMES.og), ...defined };
+}
+
+/** Keep the requested body color exact; derive shading and readable face ink. */
+function customTheme(hex: string): ThemeColors {
+	const rgb = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+	const mix = (target: number[], amount: number) =>
+		'#' +
+		rgb
+			.map((c, i) =>
+				Math.round(c + (target[i] - c) * amount)
+					.toString(16)
+					.padStart(2, '0')
+			)
+			.join('');
+	const linear = rgb.map((c) => {
+		const value = c / 255;
+		return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+	});
+	const lightInk = 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2] < 0.179;
+	const ink = lightInk ? [253, 252, 248] : [29, 29, 31];
+	return {
+		bodyLight: mix([255, 255, 255], 0.18),
+		bodyMid: hex.toLowerCase(),
+		bodyDark: mix([0, 0, 0], 0.22),
+		visor: '#1d1d1f',
+		eye: lightInk ? '#fdfcf8' : '#1d1d1f',
+		cheek: '#ff7a59',
+		accent: mix(ink, 0.45)
+	};
 }
 
 const CSS_VARS: Record<keyof ThemeColors, string> = {
